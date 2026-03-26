@@ -17,5 +17,3 @@ adapter_dropout: 0.1
 
 workers: 8
 seed: 42
-model_path: "save/hypersphere_dpp/CUB_200_2011_CLIP_ViTL14_HypersphereDPP"
-

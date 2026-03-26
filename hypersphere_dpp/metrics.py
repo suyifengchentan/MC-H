@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Dict
+from typing import Dict, Mapping
 
 import numpy as np
 import torch
@@ -49,3 +49,14 @@ def evaluate_clustering(model, dataloader, device: torch.device) -> Dict[str, fl
         "ari": float(adjusted_rand_score(labels_np, predictions_np)),
     }
 
+
+def clustering_selection_score(metrics: Mapping[str, float]) -> float:
+    return float(metrics["acc"] + metrics["nmi"] + metrics["ari"])
+
+
+def format_clustering_metrics(metrics: Mapping[str, float]) -> str:
+    return "acc={acc:.4f} nmi={nmi:.4f} ari={ari:.4f}".format(
+        acc=metrics["acc"],
+        nmi=metrics["nmi"],
+        ari=metrics["ari"],
+    )

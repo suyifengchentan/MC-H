@@ -1,21 +1,27 @@
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 
 import torch
+from torch import amp
 from torch import optim
-from torch.cuda.amp import GradScaler, autocast
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
 from hypersphere_dpp.data import build_cub_dataloaders
+from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
     dpp_diversity_loss,
     nt_xent_loss,
     swav_cluster_loss,
 )
-from hypersphere_dpp.metrics import evaluate_clustering
+from hypersphere_dpp.metrics import (
+    clustering_selection_score,
+    evaluate_clustering,
+    format_clustering_metrics,
+)
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
@@ -28,6 +34,21 @@ def parse_args():
     return parser.parse_args()
 
 
+def resolve_amp_settings(precision: str, device: torch.device) -> tuple[bool, str, torch.dtype | None, bool]:
+    device_type = device.type
+    if precision == "fp32":
+        return False, device_type, None, False
+    if precision == "fp16":
+        enabled = device_type == "cuda"
+        dtype = torch.float16 if enabled else None
+        return enabled, device_type, dtype, enabled
+    if precision == "bf16":
+        enabled = device_type in {"cuda", "cpu"}
+        dtype = torch.bfloat16 if enabled else None
+        return enabled, device_type, dtype, False
+    raise ValueError(f"Unsupported precision mode: {precision}")
+
+
 def train_one_epoch(
     model: HypersphereDPPModel,
     dataloader,
@@ -37,9 +58,10 @@ def train_one_epoch(
     config,
     device: torch.device,
     epoch: int,
+    logger,
 ) -> dict[str, float]:
     model.train()
-    use_amp = config.precision == "fp16" and device.type == "cuda"
+    use_amp, amp_device_type, amp_dtype, _ = resolve_amp_settings(config.precision, device)
     totals = {
         "loss": 0.0,
         "inst_loss": 0.0,
@@ -50,13 +72,18 @@ def train_one_epoch(
         "rho": 0.0,
     }
     num_steps = len(dataloader)
+    log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
 
     for step, batch in enumerate(dataloader):
         view1 = batch["view1"].to(device, non_blocking=True)
         view2 = batch["view2"].to(device, non_blocking=True)
 
         optimizer.zero_grad(set_to_none=True)
-        with autocast(enabled=use_amp):
+        autocast_kwargs = {"device_type": amp_device_type, "enabled": use_amp}
+        if amp_dtype is not None:
+            autocast_kwargs["dtype"] = amp_dtype
+        amp_context = amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
+        with amp_context:
             teacher1 = model.encode_teacher(view1)
             teacher2 = model.encode_teacher(view2)
             student1 = model.encode_student(teacher_features=teacher1)
@@ -126,6 +153,25 @@ def train_one_epoch(
         totals["alpha_div"] += float(alpha_div.item())
         totals["rho"] += float(rho.item())
 
+        if (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps:
+            running_denom = step + 1
+            logger.info(
+                (
+                    "epoch=%03d step=%04d/%04d "
+                    "loss=%.4f inst=%.4f cluster=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                ),
+                epoch,
+                step + 1,
+                num_steps,
+                totals["loss"] / running_denom,
+                totals["inst_loss"] / running_denom,
+                totals["cluster_loss"] / running_denom,
+                totals["subspace_loss"] / running_denom,
+                totals["dpp_loss"] / running_denom,
+                totals["alpha_div"] / running_denom,
+                totals["rho"] / running_denom,
+            )
+
     denom = max(len(dataloader), 1)
     return {key: value / denom for key, value in totals.items()}
 
@@ -136,6 +182,20 @@ def evaluate_splits(model, datasets, device: torch.device) -> dict[str, dict[str
         results["val"] = evaluate_clustering(model, datasets.val_loader, device)
     results["test"] = evaluate_clustering(model, datasets.test_loader, device)
     return results
+
+
+def select_checkpoint_score(
+    eval_metrics: dict[str, dict[str, float]],
+    logger,
+) -> tuple[str, dict[str, float], float]:
+    if "val" in eval_metrics:
+        split_name = "val"
+    else:
+        split_name = "test"
+        logger.warning("validation split is unavailable; falling back to test metrics for checkpoint selection.")
+    metrics = eval_metrics[split_name]
+    score = clustering_selection_score(metrics)
+    return split_name, metrics, score
 
 
 def maybe_resume_training(model, optimizer, scaler, queue, config, device):
@@ -163,6 +223,22 @@ def main():
     device = resolve_device(args.device or config.device)
     set_seed(config.seed)
     ensure_dir(config.output_dir)
+    logger = setup_training_logger(config.output_dir)
+    use_amp, amp_device_type, amp_dtype, use_grad_scaler = resolve_amp_settings(config.precision, device)
+    logger.info("starting training")
+    logger.info("device=%s output_dir=%s", device, config.output_dir)
+    logger.info("config=%s", config.as_dict())
+    logger.info("validation cadence: run val every %d epoch(s) based on config.eval_interval", config.eval_interval)
+    logger.info(
+        "precision=%s amp_enabled=%s amp_device_type=%s amp_dtype=%s grad_scaler=%s",
+        config.precision,
+        use_amp,
+        amp_device_type,
+        amp_dtype,
+        use_grad_scaler,
+    )
+    if config.precision in {"fp16", "bf16"} and not use_amp:
+        logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
 
     datasets = build_cub_dataloaders(config)
     model = HypersphereDPPModel(
@@ -180,7 +256,10 @@ def main():
         lr=config.learning_rate,
         weight_decay=config.weight_decay,
     )
-    scaler = GradScaler(enabled=config.precision == "fp16" and device.type == "cuda")
+    scaler = amp.GradScaler(
+        device="cuda" if device.type == "cuda" else "cpu",
+        enabled=use_grad_scaler,
+    )
     queue = ClusterFeatureQueue(
         num_clusters=config.class_num,
         feature_dim=config.feature_dim,
@@ -195,6 +274,14 @@ def main():
         config=config,
         device=device,
     )
+    if start_epoch > 0:
+        logger.info(
+            "resumed_from=%s epoch=%d global_step=%d best_metric=%.6f",
+            config.output_dir / "last.pt",
+            start_epoch,
+            global_step,
+            best_metric,
+        )
 
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
@@ -207,17 +294,45 @@ def main():
             config=config,
             device=device,
             epoch=epoch,
+            logger=logger,
         )
         global_step += len(datasets.train_loader)
-        print(f"[Epoch {epoch:03d}] train={train_metrics}")
+        logger.info("epoch=%03d split=train metrics=%s", epoch, train_metrics)
+        append_metrics_record(
+            config.output_dir,
+            {
+                "epoch": epoch,
+                "global_step": global_step,
+                "split": "train",
+                **train_metrics,
+            },
+        )
 
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
         eval_metrics = evaluate_splits(model, datasets, device)
-        print(f"[Epoch {epoch:03d}] eval={eval_metrics}")
+        for split_name, metrics in eval_metrics.items():
+            selection_score = clustering_selection_score(metrics)
+            logger.info(
+                "epoch=%03d split=%s %s selection_score=%.6f",
+                epoch,
+                split_name,
+                format_clustering_metrics(metrics),
+                selection_score,
+            )
+            append_metrics_record(
+                config.output_dir,
+                {
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    "split": split_name,
+                    "selection_score": selection_score,
+                    **metrics,
+                },
+            )
 
-        tracked_metric = eval_metrics.get("val", eval_metrics["test"])["acc"]
+        selected_split, selected_metrics, tracked_metric = select_checkpoint_score(eval_metrics, logger)
         is_best = tracked_metric > best_metric
         if is_best:
             best_metric = tracked_metric
@@ -233,6 +348,13 @@ def main():
                 best_metric=best_metric,
                 config=config.as_dict(),
             )
+            logger.info(
+                "saved checkpoint=%s split=%s %s selection_score=%.6f",
+                config.output_dir / "best.pt",
+                selected_split,
+                format_clustering_metrics(selected_metrics),
+                best_metric,
+            )
         else:
             epochs_without_improvement += 1
 
@@ -247,9 +369,17 @@ def main():
             best_metric=best_metric,
             config=config.as_dict(),
         )
+        logger.info(
+            "saved checkpoint=%s current_best_selection_score=%.6f",
+            config.output_dir / "last.pt",
+            best_metric,
+        )
 
         if epochs_without_improvement >= config.best_checkpoint_patience:
-            print(f"Stopping early after {config.best_checkpoint_patience} eval rounds without improvement.")
+            logger.info(
+                "stopping early after %d eval rounds without improvement",
+                config.best_checkpoint_patience,
+            )
             break
 
 

@@ -14,7 +14,6 @@ image_size: 224
 feature_dim: 768
 batch_size: 128
 epochs: 200
-start_epoch: 0
 
 learning_rate: 0.00025
 weight_decay: 0.000001
@@ -46,7 +45,5 @@ transform_profile: "fine_grained_two_view"
 model_path: "save/hypersphere_dpp/CUB_200_2011_CLIP_ViTL14_HypersphereDPP"
 workers: 8
 reload: false
-save_best_only: true
 seed: 42
 best_checkpoint_patience: 40
-

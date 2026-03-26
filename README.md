@@ -22,6 +22,7 @@
 - `config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml`: 训练配置
 - `config/test/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml`: 评估配置
 - `tests/`: 基础单元测试
+- `save/`: 运行产物目录占位，实际权重和日志默认写到这里
 
 ## 数据协议
 
@@ -51,6 +52,12 @@
 python3 train.py --config config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml
 ```
 
+训练运行时会在 `model_path` 下生成：
+
+- `train.log`: 可读训练日志
+- `metrics.jsonl`: 结构化 epoch 指标
+- `best.pt` / `last.pt`: checkpoint
+
 评估命令：
 
 ```bash
@@ -65,6 +72,19 @@ python3 eval.py \
 python3 train.py --config ... --device cuda:0
 python3 eval.py --config ... --checkpoint ... --device cuda:0
 ```
+
+精度模式由配置项 `precision` 控制，当前支持：
+
+- `fp16`: 仅在 CUDA 上启用 autocast 和 GradScaler
+- `bf16`: 在 CUDA/CPU 上启用 autocast，不使用 GradScaler
+- `fp32`: 关闭 AMP
+
+训练期间的 `val` 评估频率由配置项 `eval_interval` 控制：
+
+- 当 `eval_interval = 1` 时，每轮训练后都做一次 `val`
+- 当 `eval_interval = N` 时，每 `N` 轮训练后做一次 `val`
+
+`best.pt` 的替换只发生在这些 `val` 评估轮次上，并且依据 `val_acc + val_nmi + val_ari` 是否超过当前最优。
 
 ## 配置说明
 
@@ -121,6 +141,12 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 - 没有接入离线 k-means
 - 没有接入 text semantic prototypes
 - 若环境离线，`open_clip` 预训练权重需要提前准备本地 checkpoint，并通过 `pretrained_checkpoint` 指定
+
+## Git Ignore 规则
+
+- 默认忽略所有文件，再显式保留源码、配置和文档类文本文件
+- 保留目录结构通过 `.gitkeep` 完成
+- 训练权重、日志、`jsonl` 指标文件和其他二进制产物不会被纳入版本控制
 
 ## 测试
 

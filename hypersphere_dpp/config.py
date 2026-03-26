@@ -8,6 +8,9 @@ import warnings
 import yaml
 
 
+SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
+
+
 @dataclass
 class ExperimentConfig:
     dataset: str = "CUB_200_2011"
@@ -21,7 +24,6 @@ class ExperimentConfig:
     batch_size: int = 128
     eval_batch_size: int = 256
     epochs: int = 100
-    start_epoch: int = 0
 
     learning_rate: float = 2.5e-4
     weight_decay: float = 1e-6
@@ -53,7 +55,6 @@ class ExperimentConfig:
     eval_interval: int = 1
     workers: int = 8
     reload: bool = False
-    save_best_only: bool = True
     seed: int = 42
     best_checkpoint_patience: int = 50
     model_path: str = "save/hypersphere_dpp/cub_vitl14"
@@ -109,5 +110,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
 
-    return config
+    if config.eval_interval <= 0:
+        raise ValueError("eval_interval must be a positive integer.")
 
+    if config.precision not in SUPPORTED_PRECISIONS:
+        raise ValueError(
+            f"precision must be one of {sorted(SUPPORTED_PRECISIONS)}, got {config.precision!r}."
+        )
+
+    return config

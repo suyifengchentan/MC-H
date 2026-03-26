@@ -1,0 +1,46 @@
+# Ignore everything by default, then allow source/config/doc text files back in.
+*
+!*/
+!.gitignore
+!.gitkeep
+!*.py
+!*.sh
+!*.md
+!*.txt
+!*.yaml
+!*.yml
+!*.json
+!*.toml
+!*.ini
+!*.cfg
+!*.tex
+
+# Local system/cache artifacts
+.DS_Store
+__pycache__/
+*.py[cod]
+
+# Training outputs and binary artifacts
+*.log
+*.jsonl
+*.pt
+*.pth
+*.ckpt
+*.bin
+*.onnx
+*.npy
+*.npz
+*.pkl
+*.pickle
+*.tar
+*.gz
+*.zip
+
+# Media and document artifacts generated during experiments
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.pdf
+
