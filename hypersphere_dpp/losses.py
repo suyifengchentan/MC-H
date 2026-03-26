@@ -4,6 +4,31 @@ import torch
 import torch.nn.functional as F
 
 
+def _spd_logdet(matrix: torch.Tensor) -> torch.Tensor:
+    chol, info = torch.linalg.cholesky_ex(matrix)
+    if torch.any(info > 0):
+        sign, logabsdet = torch.linalg.slogdet(matrix)
+        if not torch.all(sign > 0):
+            raise RuntimeError("DPP matrix lost positive definiteness even after jitter.")
+        return logabsdet
+    return 2.0 * torch.log(torch.diagonal(chol)).sum()
+
+
+def _dpp_logdet_from_phi(phi: torch.Tensor, jitter: float) -> torch.Tensor:
+    num_samples, feature_dim = phi.shape
+    diagonal_shift = phi.new_tensor(1.0 + jitter)
+
+    # Compute the determinant in the smaller space when possible via Sylvester's identity.
+    if feature_dim < num_samples:
+        gram = phi.t() @ phi
+        matrix = diagonal_shift * torch.eye(feature_dim, device=phi.device, dtype=phi.dtype) + gram
+        return _spd_logdet(matrix) + (num_samples - feature_dim) * torch.log(diagonal_shift)
+
+    kernel = phi @ phi.t()
+    matrix = diagonal_shift * torch.eye(num_samples, device=phi.device, dtype=phi.dtype) + kernel
+    return _spd_logdet(matrix)
+
+
 def nt_xent_loss(features_a: torch.Tensor, features_b: torch.Tensor, temperature: float) -> torch.Tensor:
     batch_size = features_a.size(0)
     if batch_size <= 1:
@@ -78,13 +103,7 @@ def dpp_diversity_loss(
         relative_quality = centered_log_quality.exp()
 
         phi = normalized * relative_quality.unsqueeze(1)
-        kernel = phi @ phi.t()
-        identity = torch.eye(kernel.size(0), device=kernel.device, dtype=kernel.dtype)
-        matrix = identity + kernel + jitter * identity
-        sign, logabsdet = torch.linalg.slogdet(matrix)
-
-    if not torch.all(sign > 0):
-        raise RuntimeError("DPP matrix lost positive definiteness even after jitter.")
+        logabsdet = _dpp_logdet_from_phi(phi, jitter)
 
     rho = mean_pairwise_cosine(normalized).detach()
     return -logabsdet, rho, relative_quality

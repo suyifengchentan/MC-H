@@ -3,9 +3,10 @@ from __future__ import annotations
 import unittest
 
 import torch
+import torch.nn.functional as F
 
 from hypersphere_dpp.data import split_train_indices
-from hypersphere_dpp.losses import dpp_diversity_loss
+from hypersphere_dpp.losses import _dpp_logdet_from_phi, dpp_diversity_loss
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 
 
@@ -28,6 +29,22 @@ class DataAndLossesTest(unittest.TestCase):
         self.assertTrue(torch.isfinite(loss))
         self.assertTrue(torch.isfinite(rho))
         self.assertEqual(relative_quality.shape, (8,))
+
+    def test_dpp_small_matrix_logdet_matches_original_formula(self):
+        torch.manual_seed(0)
+        features = F.normalize(torch.randn(16, 6), dim=-1)
+        assignments = torch.softmax(torch.randn(16, 5), dim=-1)
+        quality = assignments.max(dim=1).values.clamp_min(1e-6)
+        centered_log_quality = quality.log() - quality.log().mean()
+        relative_quality = centered_log_quality.exp()
+        phi = features * relative_quality.unsqueeze(1)
+
+        kernel = phi @ phi.t()
+        matrix = (1.0 + 1e-5) * torch.eye(kernel.size(0), dtype=kernel.dtype) + kernel
+        _, original_logabsdet = torch.linalg.slogdet(matrix)
+        optimized_logabsdet = _dpp_logdet_from_phi(phi, 1e-5)
+
+        self.assertTrue(torch.allclose(optimized_logabsdet, original_logabsdet, atol=1e-5, rtol=1e-5))
 
     def test_queue_respects_capacity(self):
         queue = ClusterFeatureQueue(num_clusters=3, feature_dim=4, queue_size=2)
