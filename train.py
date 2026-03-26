@@ -9,7 +9,7 @@ from torch import optim
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_cub_dataloaders
+from hypersphere_dpp.data import build_experiment_dataloaders
 from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
@@ -232,7 +232,7 @@ def main():
     if config.precision in {"fp16", "bf16"} and not use_amp:
         logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
 
-    datasets = build_cub_dataloaders(config)
+    datasets = build_experiment_dataloaders(config)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
         pretrained=config.pretrained,

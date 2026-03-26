@@ -4,7 +4,7 @@ import argparse
 
 from hypersphere_dpp.checkpoint import load_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_cub_dataloaders
+from hypersphere_dpp.data import build_experiment_dataloaders
 from hypersphere_dpp.metrics import evaluate_clustering
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.utils import resolve_device, set_seed
@@ -25,7 +25,7 @@ def main():
     device = resolve_device(args.device or config.device)
     set_seed(config.seed)
 
-    datasets = build_cub_dataloaders(config)
+    datasets = build_experiment_dataloaders(config)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
         pretrained=config.pretrained,
@@ -51,4 +51,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

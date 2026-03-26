@@ -1,6 +1,6 @@
 # Hypersphere-DPP CUB Prototype
 
-这个目录现在包含一版面向 `CUB_200_2011` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
+这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`Image50` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
 
 ## 方法概要
 
@@ -26,10 +26,14 @@
 
 ## 数据协议
 
-- 仅支持 `CUB_200_2011`
+- 支持 `CUB_200_2011`、`Image10`、`Image50`、`Image200`
 - 训练只使用官方 `train` split
 - validation 从 `train` 中按 `validation_ratio` 划分
-- 官方 `test` 仅用于最终评估
+- 官方评估 split 由 `official_eval_split` 控制：
+  - `CUB_200_2011`: 默认 `test`
+  - `Image10`: 默认 `test`
+  - `Image50`: 默认 `val`
+  - `Image200`: 默认 `val`
 
 这版实现不复用 `datasets/data_loader_orthogonal.py` 中的 train/test 合并逻辑。
 
@@ -95,6 +99,7 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 - `class_num`
 - `validation_ratio`
 - `validation_seed`
+- `official_eval_split`
 - `image_size`
 - `feature_dim`
 - `batch_size`
@@ -136,11 +141,28 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 
 ## 当前限制
 
-- 首版只支持 `CUB_200_2011`
 - prototype 数量固定等于 `class_num`
 - 没有接入离线 k-means
 - 没有接入 text semantic prototypes
 - 若环境离线，`open_clip` 预训练权重需要提前准备本地 checkpoint，并通过 `pretrained_checkpoint` 指定
+
+## ImageNet 系列增强
+
+针对 `Image10`、`Image50`、`Image200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
+
+- `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
+- `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
+- `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
+
+Image10 和 Image50 默认假设数据目录为标准 `ImageFolder` 结构：
+
+```text
+root/
+  train/<class_name>/*.jpg
+  val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
+```
+
+Image200 默认按标准 Tiny-ImageNet 目录解析，其中 `val` 通过 `val_annotations.txt` 读取标签。
 
 ## Git Ignore 规则
 

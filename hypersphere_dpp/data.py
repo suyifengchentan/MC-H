@@ -6,6 +6,8 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from datasets.cub_dataset import CUB200Dataset
+from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
+from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
 from .transforms import build_eval_transform, build_train_transform
@@ -85,16 +87,43 @@ def _build_loader(
     )
 
 
-def build_cub_dataloaders(config: ExperimentConfig) -> DatasetBundle:
-    train_base = CUB200Dataset(root=config.dataset_dir, train=True, transform=None)
-    test_base = CUB200Dataset(root=config.dataset_dir, train=False, transform=None)
+def _default_official_eval_split(dataset_name: str) -> str:
+    if dataset_name in {"CUB_200_2011", "Image10"}:
+        return "test"
+    if dataset_name in {"Image50", "Image200"}:
+        return "val"
+    raise ValueError(f"Unsupported dataset: {dataset_name}")
+
+
+def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
+    official_eval_split = config.official_eval_split or _default_official_eval_split(config.dataset)
+
+    if config.dataset == "CUB_200_2011":
+        train_base = CUB200Dataset(root=config.dataset_dir, train=True, transform=None)
+        eval_base = CUB200Dataset(root=config.dataset_dir, train=False, transform=None)
+        return train_base, eval_base
+
+    if config.dataset in {"Image10", "Image50"}:
+        train_base = IndexedImageFolderDataset(root=config.dataset_dir, split="train", transform=None)
+        eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        return train_base, eval_base
+
+    if config.dataset == "Image200":
+        train_base = TinyImageNetDataset(root=config.dataset_dir, split="train", transform=None)
+        eval_base = TinyImageNetDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        return train_base, eval_base
+
+    raise ValueError(f"Unsupported dataset for dataloader construction: {config.dataset}")
+
+
+def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
+    train_base, test_base = _build_base_datasets(config)
 
     train_indices, val_indices = split_train_indices(
         size=len(train_base),
         validation_ratio=config.validation_ratio,
         seed=config.validation_seed,
     )
-    val_indices = val_indices[: config.batch_size]
 
     train_subset = Subset(train_base, train_indices)
     val_subset = Subset(train_base, val_indices)

@@ -9,6 +9,8 @@ import yaml
 
 
 SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
+SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image200"}
+SUPPORTED_EVAL_SPLITS = {"val", "test"}
 
 
 @dataclass
@@ -18,6 +20,7 @@ class ExperimentConfig:
     class_num: int = 200
     validation_ratio: float = 0.1
     validation_seed: int = 42
+    official_eval_split: str | None = None
 
     image_size: int = 224
     feature_dim: int = 768
@@ -96,9 +99,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     usable = {key: value for key, value in raw.items() if key in _field_names()}
     config = ExperimentConfig(**usable)
 
-    if config.dataset != "CUB_200_2011":
+    if config.dataset not in SUPPORTED_DATASETS:
         raise ValueError(
-            f"This prototype only supports dataset='CUB_200_2011', got '{config.dataset}'."
+            f"dataset must be one of {sorted(SUPPORTED_DATASETS)}, got {config.dataset!r}."
         )
 
     if config.feature_dim != 768:
@@ -112,6 +115,11 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")
+
+    if config.official_eval_split is not None and config.official_eval_split not in SUPPORTED_EVAL_SPLITS:
+        raise ValueError(
+            f"official_eval_split must be one of {sorted(SUPPORTED_EVAL_SPLITS)}, got {config.official_eval_split!r}."
+        )
 
     if config.precision not in SUPPORTED_PRECISIONS:
         raise ValueError(
