@@ -183,15 +183,16 @@ def train_one_epoch(
     return {key: value / denom for key, value in totals.items()}
 
 
-def build_random_eval_loader(dataloader) -> DataLoader:
+def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
     dataset = dataloader.dataset
     dataset_size = len(dataset)
     if dataset_size == 0:
-        raise ValueError("Validation dataset is empty; cannot sample an eval batch.")
+        raise ValueError("Validation dataset is empty; cannot build a fixed eval batch.")
 
     batch_size = dataloader.batch_size or dataset_size
     sample_size = min(batch_size, dataset_size)
-    sample_indices = torch.randperm(dataset_size)[:sample_size].tolist()
+    generator = torch.Generator().manual_seed(seed)
+    sample_indices = torch.randperm(dataset_size, generator=generator)[:sample_size].tolist()
     sampled_dataset = Subset(dataset, sample_indices)
     return DataLoader(
         sampled_dataset,
@@ -203,9 +204,8 @@ def build_random_eval_loader(dataloader) -> DataLoader:
     )
 
 
-def evaluate_splits(model, datasets, device: torch.device) -> dict[str, dict[str, float]]:
-    sampled_val_loader = build_random_eval_loader(datasets.val_loader)
-    return {"val": evaluate_clustering(model, sampled_val_loader, device)}
+def evaluate_splits(model, fixed_val_loader, device: torch.device) -> dict[str, dict[str, float]]:
+    return {"val": evaluate_clustering(model, fixed_val_loader, device)}
 
 
 def select_checkpoint_score(
@@ -249,7 +249,11 @@ def main():
     logger.info("device=%s output_dir=%s", device, config.output_dir)
     logger.info("config=%s", config.as_dict())
     logger.info("validation cadence: run val every %d epoch(s) based on config.eval_interval", config.eval_interval)
-    logger.info("validation sampling: use one random val batch of size up to %d per eval", config.eval_batch_size)
+    logger.info(
+        "validation sampling: use one fixed val batch of size up to %d per eval (seed=%d)",
+        config.eval_batch_size,
+        config.validation_seed,
+    )
     logger.info("dataloader optimization: pin_memory=True persistent_workers=%s prefetch_factor=%d", config.workers > 0, 4)
     logger.info(
         "precision=%s amp_enabled=%s amp_device_type=%s amp_dtype=%s grad_scaler=%s",
@@ -263,6 +267,7 @@ def main():
         logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
 
     datasets = build_experiment_dataloaders(config)
+    fixed_val_loader = build_fixed_eval_loader(datasets.val_loader, config.validation_seed)
     gpu_train_transform = build_gpu_train_transform(config.image_size, config.transform_profile).to(device)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
@@ -336,7 +341,7 @@ def main():
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
-        eval_metrics = evaluate_splits(model, datasets, device)
+        eval_metrics = evaluate_splits(model, fixed_val_loader, device)
         for split_name, metrics in eval_metrics.items():
             selection_score = clustering_selection_score(metrics)
             logger.info(
