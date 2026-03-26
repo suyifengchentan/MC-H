@@ -13,6 +13,7 @@ image_size: 224
 feature_dim: 512
 backbone_name: "ViT-B-16"
 pretrained: "laion2b_s34b_b88k"
+pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.bin"
 adapter_hidden_dim: 1024
 adapter_dropout: 0.1
 transform_profile: "imagenet50_two_view"
