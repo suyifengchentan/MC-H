@@ -19,8 +19,8 @@ transform_profile: "imagenet50_two_view"
 
 # Optimization
 precision: "fp16"
-batch_size: 512
-eval_batch_size: 512
+batch_size: 672
+eval_batch_size: 1024
 epochs: 400
 learning_rate: 0.00025
 weight_decay: 0.000001
