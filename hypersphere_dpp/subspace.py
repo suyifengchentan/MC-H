@@ -13,27 +13,34 @@ class SubspaceStats:
 
 
 class ClusterFeatureQueue:
-    def __init__(self, num_clusters: int, feature_dim: int, queue_size: int):
+    def __init__(
+        self,
+        num_clusters: int,
+        feature_dim: int,
+        queue_size: int,
+        device: torch.device | str = "cpu",
+    ):
         self.num_clusters = num_clusters
         self.feature_dim = feature_dim
         self.queue_size = queue_size
-        self.features = [torch.empty(0, feature_dim) for _ in range(num_clusters)]
-        self.weights = [torch.empty(0) for _ in range(num_clusters)]
+        self.device = torch.device(device)
+        self.features = [torch.empty(0, feature_dim, device=self.device) for _ in range(num_clusters)]
+        self.weights = [torch.empty(0, device=self.device) for _ in range(num_clusters)]
 
     @torch.no_grad()
     def enqueue(self, teacher_features: torch.Tensor, assignments: torch.Tensor) -> None:
         confidences, cluster_ids = assignments.detach().max(dim=1)
-        features_cpu = teacher_features.detach().float().cpu()
-        confidences_cpu = confidences.detach().float().cpu()
-        cluster_ids_cpu = cluster_ids.detach().cpu()
+        features = teacher_features.detach().float().to(self.device)
+        weights = confidences.detach().float().to(self.device)
+        cluster_ids_local = cluster_ids.detach().to(self.device)
 
-        for cluster_id in cluster_ids_cpu.unique().tolist():
-            cluster_mask = cluster_ids_cpu == cluster_id
+        for cluster_id in cluster_ids_local.unique().tolist():
+            cluster_mask = cluster_ids_local == cluster_id
             if not torch.any(cluster_mask):
                 continue
 
-            new_features = features_cpu[cluster_mask]
-            new_weights = confidences_cpu[cluster_mask]
+            new_features = features[cluster_mask]
+            new_weights = weights[cluster_mask]
 
             merged_features = torch.cat([self.features[cluster_id], new_features], dim=0)
             merged_weights = torch.cat([self.weights[cluster_id], new_weights], dim=0)
@@ -45,7 +52,9 @@ class ClusterFeatureQueue:
             self.features[cluster_id] = merged_features
             self.weights[cluster_id] = merged_weights
 
-    def get(self, cluster_id: int, device: torch.device) -> tuple[torch.Tensor, torch.Tensor]:
+    def get(self, cluster_id: int, device: torch.device | None = None) -> tuple[torch.Tensor, torch.Tensor]:
+        if device is None or torch.device(device) == self.device:
+            return self.features[cluster_id], self.weights[cluster_id]
         return self.features[cluster_id].to(device), self.weights[cluster_id].to(device)
 
     def state_dict(self) -> dict:
@@ -53,13 +62,18 @@ class ClusterFeatureQueue:
             "num_clusters": self.num_clusters,
             "feature_dim": self.feature_dim,
             "queue_size": self.queue_size,
-            "features": self.features,
-            "weights": self.weights,
+            "device": str(self.device),
+            "features": [feature.detach().cpu() for feature in self.features],
+            "weights": [weight.detach().cpu() for weight in self.weights],
         }
 
     def load_state_dict(self, state_dict: dict) -> None:
-        self.features = state_dict.get("features", self.features)
-        self.weights = state_dict.get("weights", self.weights)
+        features = state_dict.get("features")
+        weights = state_dict.get("weights")
+        if features is not None:
+            self.features = [feature.to(self.device) for feature in features]
+        if weights is not None:
+            self.weights = [weight.to(self.device) for weight in weights]
 
 
 def weighted_covariance(features: torch.Tensor, weights: torch.Tensor, eps: float = 1e-6) -> torch.Tensor:
@@ -92,21 +106,22 @@ def subspace_regularization_loss(
     rank: int,
     min_mass: float,
 ) -> tuple[torch.Tensor, SubspaceStats]:
-    num_clusters = assignments.size(1)
     losses = []
     teacher_masses = []
     student_masses = []
 
-    detached_assignments = assignments.detach()
-    for cluster_id in range(num_clusters):
-        student_weights = detached_assignments[:, cluster_id].float()
+    detached_assignments = assignments.detach().float()
+    teacher_features_f = teacher_features.detach().float()
+    student_features_f = student_features.float()
+    active_cluster_ids = torch.nonzero(detached_assignments.sum(dim=0) >= min_mass, as_tuple=False).flatten().tolist()
+
+    for cluster_id in active_cluster_ids:
+        student_weights = detached_assignments[:, cluster_id]
         student_mass = float(student_weights.sum().item())
-        if student_mass < min_mass:
-            continue
 
         queued_features, queued_weights = queue.get(cluster_id, teacher_features.device)
-        batch_teacher_weights = detached_assignments[:, cluster_id].float()
-        teacher_sources = [teacher_features.detach().float()]
+        batch_teacher_weights = detached_assignments[:, cluster_id]
+        teacher_sources = [teacher_features_f]
         teacher_weight_sources = [batch_teacher_weights]
 
         if queued_features.numel() > 0:
@@ -125,7 +140,7 @@ def subspace_regularization_loss(
             rank=rank,
         )
         sigma_student = weighted_covariance(
-            features=student_features.float(),
+            features=student_features_f,
             weights=student_weights,
         )
         projection = anchor_basis @ anchor_basis.t()
@@ -145,4 +160,3 @@ def subspace_regularization_loss(
         mean_student_mass=sum(student_masses) / len(student_masses),
     )
     return stacked_losses.mean(), stats
-
