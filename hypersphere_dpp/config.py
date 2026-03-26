@@ -15,6 +15,7 @@ SUPPORTED_EVAL_SPLITS = {"val", "test"}
 
 @dataclass
 class ExperimentConfig:
+    # Data
     dataset: str = "CUB_200_2011"
     dataset_dir: str = ""
     class_num: int = 200
@@ -22,47 +23,51 @@ class ExperimentConfig:
     validation_seed: int = 42
     official_eval_split: str | None = None
 
+    # Model
     image_size: int = 224
     feature_dim: int = 768
-    batch_size: int = 128
-    eval_batch_size: int = 256
-    epochs: int = 100
-
-    learning_rate: float = 2.5e-4
-    weight_decay: float = 1e-6
-    precision: str = "fp16"
-    instance_temperature: float = 0.2
-    cluster_temperature: float = 0.1
-    lambda_instance: float = 1.0
-    lambda_cluster: float = 1.0
-    lambda_subspace: float = 0.15
-    alpha_div_base: float = 0.6
-
     backbone_name: str = "ViT-L-14"
     pretrained: str = "laion2b_s32b_b82k"
     pretrained_checkpoint: str | None = None
     adapter_hidden_dim: int = 1024
     adapter_dropout: float = 0.1
+    transform_profile: str = "fine_grained_two_view"
 
-    dpp_warmup_epochs: int = 20
-    dpp_every_n_steps: int = 1
-    dpp_jitter: float = 1e-5
+    # Optimization
+    batch_size: int = 128
+    eval_batch_size: int = 256
+    epochs: int = 100
+    learning_rate: float = 2.5e-4
+    weight_decay: float = 1e-6
+    precision: str = "fp16"
 
+    # Compact / clustering
+    instance_temperature: float = 0.2
+    cluster_temperature: float = 0.1
+    lambda_instance: float = 1.0
+    lambda_cluster: float = 1.0
     sinkhorn_iters: int = 3
     sinkhorn_epsilon: float = 0.05
 
+    # Subspace
+    lambda_subspace: float = 0.15
     subspace_rank: int = 8
     subspace_queue_size: int = 64
     subspace_min_mass: float = 2.0
 
+    # DPP
+    alpha_div_base: float = 0.6
+    dpp_warmup_epochs: int = 20
+    dpp_every_n_steps: int = 1
+    dpp_jitter: float = 1e-5
+
+    # Runtime / output
     eval_interval: int = 1
     workers: int = 8
     reload: bool = False
     seed: int = 42
     best_checkpoint_patience: int = 50
     model_path: str = "save/hypersphere_dpp/cub_vitl14"
-    transform_profile: str = "fine_grained_two_view"
-
     device: str | None = None
 
     @property
