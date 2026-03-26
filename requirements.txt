@@ -1,0 +1,7 @@
+torch
+torchvision
+open_clip_torch
+scikit-learn
+scipy
+pyyaml
+

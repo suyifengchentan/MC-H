@@ -1,0 +1,20 @@
+# config/test/fine_grained/cub_clip_compactness_config.yaml
+
+# ------------------- 固定 Teacher 参数已内置代码 -------------------
+
+# ------------------- 数据集参数 -------------------
+dataset: "CUB_200_2011"
+dataset_dir: "/home/geyingjie/gmm-data/CUB_200_2011/CUB_200_2011"
+class_num: 200
+
+# ------------------ 学生模型架构参数 ------------------
+image_size: 224
+feature_dim: 768
+
+# ------------------- 模型加载参数 --------------------
+model_path: "save/frozen_feature/CUB_200_2011_CLIP_ViTB16_FrozenFeature_DPPCovariance_G=0.6"
+start_epoch: best
+
+# -------------------- 其他运行参数 ----------------
+eval_batch_size: 512
+workers: 8

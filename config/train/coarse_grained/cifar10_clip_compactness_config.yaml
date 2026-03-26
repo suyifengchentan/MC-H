@@ -1,0 +1,62 @@
+# config/train/coarse_grained/cifar10_clip_compactness_config.yaml
+
+# ------------------- 教师模型参数 -------------------
+precision: "fp16"
+eval_interval: 3
+eval_batch_size: 512
+
+# ------------------- 数据集参数 -------------------
+dataset: "CIFAR10"
+dataset_dir: "/home/geyingjie/gmm-data/CIFAR10"
+class_num: 10
+validation_ratio: 0.1
+validation_seed: 42
+
+# ------------------ 学生模型与训练参数 ------------------
+image_size: 224
+feature_dim: 768
+batch_size: 256
+epochs: 500
+start_epoch: 0
+
+# --- 优化器与损失函数参数 ---
+learning_rate: 0.0003
+weight_decay: 0.00001
+instance_temperature: 0.2
+cluster_temperature: 0.4
+lambda_instance: 0.08
+alpha_align_c: 0.8
+beta_align_z: 1.2
+gamma_compactness: 0.5
+gamma_space: 0.15
+
+# -------------------- 系统与路径参数 -----------------
+model_path: "save/frozen_feature/CIFAR10_CLIP_ViTB16_FrozenFeature_DPPCovariance_G=0.5"
+workers: 8
+reload: False
+save_best_only: true
+seed: 42
+best_checkpoint_patience: 120
+
+# -------------------- experimental parameters --------------------
+dpp_every_n_steps: 2
+class_aware_dpp: true
+class_aware_dpp_mask_floor: 0.1
+compactness_use_cluster_base: true
+compactness_use_soft_assignment: true
+compactness_use_cosine: true
+semantic_prototype_enabled: true
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+semantic_prompt_templates:
+  - "a photo of a {label}"
+  - "a low resolution photo of a {label}"
+  - "a blurry photo of a {label}"
+  - "a close-up photo of a {label}"
+subspace_loss: "covariance"
+subspace_compare_log: False
+subspace_compare_target: "lowrank"
+distill_confidence_weighting: true
+distill_confidence_metric: "entropy_agreement"
+distill_confidence_temperature: 8.0
+distill_confidence_floor: 0.1

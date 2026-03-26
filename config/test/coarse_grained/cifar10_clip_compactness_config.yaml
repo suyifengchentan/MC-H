@@ -1,0 +1,20 @@
+# config/test/coarse_grained/cifar10_clip_compactness_config.yaml
+
+# ------------------- 固定 Teacher 参数已内置代码 -------------------
+
+# ------------------- 数据集参数 -------------------
+dataset: "CIFAR10"
+dataset_dir: "/home/geyingjie/gmm-data/CIFAR10"
+class_num: 10
+
+# ------------------ 学生模型架构参数 ------------------
+image_size: 224
+feature_dim: 768
+
+# ------------------- 模型加载参数 --------------------
+model_path: "save/frozen_feature/CIFAR10_CLIP_ViTB16_FrozenFeature_DPPCovariance_G=0.5"
+start_epoch: best
+
+# -------------------- 其他运行参数 ----------------
+eval_batch_size: 512
+workers: 8

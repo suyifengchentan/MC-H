@@ -1,0 +1,21 @@
+# config/test/medium_grained/imagenet1k_clip_compactness_config.yaml
+
+# ------------------- 固定 Teacher 参数已内置代码 -------------------
+
+# ------------------- 数据集参数 -------------------
+dataset: "ImageNet1K"
+dataset_dir: "/home/geyingjie/gmm-data/imagenet-1k"
+class_num: 1000
+test_split: "val"
+
+# ------------------ 学生模型架构参数 ------------------
+image_size: 224
+feature_dim: 768
+
+# ------------------- 模型加载参数 --------------------
+model_path: "save/frozen_feature/ImageNet1K_CLIP_ViTB16_FrozenFeature_DPPCovariance_G=0.55"
+start_epoch: best
+
+# -------------------- 其他运行参数 ----------------
+eval_batch_size: 512
+workers: 8

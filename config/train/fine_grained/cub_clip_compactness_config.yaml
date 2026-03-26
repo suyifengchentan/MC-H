@@ -1,0 +1,60 @@
+# config/train/fine_grained/cub_clip_compactness_config.yaml
+
+# ------------------- 教师模型参数 -------------------
+precision: "fp16"
+eval_interval: 3
+eval_batch_size: 512
+
+# ------------------- 数据集参数 -------------------
+dataset: "CUB_200_2011"
+dataset_dir: "/home/geyingjie/gmm-data/CUB_200_2011/CUB_200_2011"
+class_num: 200
+validation_ratio: 0.1
+validation_seed: 42
+
+# ------------------ 学生模型与训练参数 ------------------
+image_size: 224
+feature_dim: 768
+batch_size: 256
+epochs: 500
+start_epoch: 0
+
+# --- 优化器与损失函数参数 ---
+learning_rate: 0.00025
+weight_decay: 0.000001
+instance_temperature: 0.2
+cluster_temperature: 0.6
+lambda_instance: 0.1
+alpha_align_c: 0.8
+beta_align_z: 1.2
+gamma_compactness: 0.6
+gamma_space: 0.15
+
+# -------------------- 系统与路径参数 -----------------
+model_path: "save/frozen_feature/CUB_200_2011_CLIP_ViTB16_FrozenFeature_DPPCovariance_G=0.6"
+workers: 8
+reload: False
+save_best_only: true
+seed: 42
+best_checkpoint_patience: 120
+
+# -------------------- experimental parameters --------------------
+transform_profile: "fine_grained"
+dpp_every_n_steps: 2
+class_aware_dpp: true
+class_aware_dpp_mask_floor: 0.1
+compactness_use_cluster_base: true
+compactness_use_soft_assignment: true
+compactness_use_cosine: true
+semantic_prototype_enabled: true
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+subspace_loss: "covariance"
+# 是否在日志中额外输出一个“对照”子空间损失（仅记录，不参与反传）
+subspace_compare_log: False
+# 对照损失类型；当主损失为 covariance 时可设为 lowrank，反之亦然
+subspace_compare_target: "lowrank"
+distill_confidence_weighting: true
+distill_confidence_metric: "entropy_agreement"
+distill_confidence_temperature: 8.0
+distill_confidence_floor: 0.05
