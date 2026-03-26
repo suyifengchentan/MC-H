@@ -6,6 +6,7 @@ from contextlib import nullcontext
 import torch
 from torch import amp
 from torch import optim
+from torch.utils.data import DataLoader, Subset
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
@@ -182,8 +183,29 @@ def train_one_epoch(
     return {key: value / denom for key, value in totals.items()}
 
 
+def build_random_eval_loader(dataloader) -> DataLoader:
+    dataset = dataloader.dataset
+    dataset_size = len(dataset)
+    if dataset_size == 0:
+        raise ValueError("Validation dataset is empty; cannot sample an eval batch.")
+
+    batch_size = dataloader.batch_size or dataset_size
+    sample_size = min(batch_size, dataset_size)
+    sample_indices = torch.randperm(dataset_size)[:sample_size].tolist()
+    sampled_dataset = Subset(dataset, sample_indices)
+    return DataLoader(
+        sampled_dataset,
+        batch_size=sample_size,
+        shuffle=False,
+        drop_last=False,
+        num_workers=0,
+        pin_memory=dataloader.pin_memory,
+    )
+
+
 def evaluate_splits(model, datasets, device: torch.device) -> dict[str, dict[str, float]]:
-    return {"val": evaluate_clustering(model, datasets.val_loader, device)}
+    sampled_val_loader = build_random_eval_loader(datasets.val_loader)
+    return {"val": evaluate_clustering(model, sampled_val_loader, device)}
 
 
 def select_checkpoint_score(
@@ -227,6 +249,8 @@ def main():
     logger.info("device=%s output_dir=%s", device, config.output_dir)
     logger.info("config=%s", config.as_dict())
     logger.info("validation cadence: run val every %d epoch(s) based on config.eval_interval", config.eval_interval)
+    logger.info("validation sampling: use one random val batch of size up to %d per eval", config.eval_batch_size)
+    logger.info("dataloader optimization: pin_memory=True persistent_workers=%s prefetch_factor=%d", config.workers > 0, 4)
     logger.info(
         "precision=%s amp_enabled=%s amp_device_type=%s amp_dtype=%s grad_scaler=%s",
         config.precision,

@@ -94,14 +94,20 @@ def _build_loader(
     shuffle: bool,
     drop_last: bool,
 ) -> DataLoader:
+    loader_kwargs = {
+        "dataset": dataset,
+        "batch_size": batch_size,
+        "shuffle": shuffle,
+        "drop_last": drop_last,
+        "num_workers": workers,
+        "pin_memory": True,
+        "persistent_workers": workers > 0,
+    }
+    if workers > 0:
+        loader_kwargs["prefetch_factor"] = 4
+
     return DataLoader(
-        dataset,
-        batch_size=batch_size,
-        shuffle=shuffle,
-        drop_last=drop_last,
-        num_workers=workers,
-        pin_memory=True,
-        persistent_workers=workers > 0,
+        **loader_kwargs,
     )
 
 
