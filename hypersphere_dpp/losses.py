@@ -73,17 +73,18 @@ def dpp_diversity_loss(
     assignments: torch.Tensor,
     jitter: float = 1e-5,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-    normalized = F.normalize(features.float(), dim=-1)
-    quality = assignments.detach().max(dim=1).values.clamp_min(1e-6)
-    centered_log_quality = quality.log() - quality.log().mean()
-    relative_quality = centered_log_quality.exp()
+    with torch.autocast(device_type=features.device.type, enabled=False):
+        normalized = F.normalize(features.float(), dim=-1)
+        quality = assignments.detach().float().max(dim=1).values.clamp_min(1e-6)
+        centered_log_quality = quality.log() - quality.log().mean()
+        relative_quality = centered_log_quality.exp()
 
-    phi = normalized * relative_quality.unsqueeze(1)
-    kernel = phi @ phi.t()
-    identity = torch.eye(kernel.size(0), device=kernel.device, dtype=kernel.dtype)
-    matrix = identity + kernel + jitter * identity
+        phi = normalized * relative_quality.unsqueeze(1)
+        kernel = phi @ phi.t()
+        identity = torch.eye(kernel.size(0), device=kernel.device, dtype=kernel.dtype)
+        matrix = identity + kernel + jitter * identity
+        sign, logabsdet = torch.linalg.slogdet(matrix)
 
-    sign, logabsdet = torch.linalg.slogdet(matrix)
     if not torch.all(sign > 0):
         raise RuntimeError("DPP matrix lost positive definiteness even after jitter.")
 
@@ -103,4 +104,3 @@ def adaptive_diversity_weight(
         curriculum = min(max(epoch_progress / warmup_epochs, 0.0), 1.0)
     rho_value = rho.detach().clamp(min=0.0)
     return rho_value.new_tensor(curriculum) * torch.clamp(alpha_div_base * rho_value, max=1.0)
-

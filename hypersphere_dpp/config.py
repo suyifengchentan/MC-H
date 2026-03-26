@@ -104,8 +104,8 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.feature_dim != 768:
         raise ValueError(f"feature_dim must be 768 for ViT-L/14 CLIP, got {config.feature_dim}.")
 
-    if not 0.0 <= config.validation_ratio < 1.0:
-        raise ValueError("validation_ratio must be in [0, 1).")
+    if not 0.0 < config.validation_ratio < 1.0:
+        raise ValueError("validation_ratio must be in (0, 1) so training always has a validation split.")
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")

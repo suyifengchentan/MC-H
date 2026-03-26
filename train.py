@@ -177,22 +177,14 @@ def train_one_epoch(
 
 
 def evaluate_splits(model, datasets, device: torch.device) -> dict[str, dict[str, float]]:
-    results = {}
-    if datasets.val_loader is not None:
-        results["val"] = evaluate_clustering(model, datasets.val_loader, device)
-    results["test"] = evaluate_clustering(model, datasets.test_loader, device)
-    return results
+    return {"val": evaluate_clustering(model, datasets.val_loader, device)}
 
 
 def select_checkpoint_score(
     eval_metrics: dict[str, dict[str, float]],
     logger,
 ) -> tuple[str, dict[str, float], float]:
-    if "val" in eval_metrics:
-        split_name = "val"
-    else:
-        split_name = "test"
-        logger.warning("validation split is unavailable; falling back to test metrics for checkpoint selection.")
+    split_name = "val"
     metrics = eval_metrics[split_name]
     score = clustering_selection_score(metrics)
     return split_name, metrics, score

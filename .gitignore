@@ -20,6 +20,7 @@
 # Local system/cache artifacts
 .DS_Store
 __pycache__/
+/*/__pycache__
 *.py[cod]
 
 # Training outputs and binary artifacts

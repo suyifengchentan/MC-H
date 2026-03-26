@@ -50,14 +50,18 @@ class SingleViewDataset(Dataset):
 @dataclass
 class DatasetBundle:
     train_loader: DataLoader
-    val_loader: DataLoader | None
+    val_loader: DataLoader
     test_loader: DataLoader
 
 
 def split_train_indices(size: int, validation_ratio: float, seed: int) -> tuple[list[int], list[int]]:
+    if size < 2:
+        raise ValueError("Dataset must contain at least 2 samples to create train/val splits.")
     generator = torch.Generator().manual_seed(seed)
     indices = torch.randperm(size, generator=generator).tolist()
-    val_size = int(size * validation_ratio)
+    val_size = max(1, int(size * validation_ratio))
+    if val_size >= size:
+        raise ValueError("validation_ratio leaves no samples for training; reduce validation_ratio.")
     val_indices = sorted(indices[:val_size])
     train_indices = sorted(indices[val_size:])
     return train_indices, val_indices
@@ -90,19 +94,16 @@ def build_cub_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         validation_ratio=config.validation_ratio,
         seed=config.validation_seed,
     )
+    val_indices = val_indices[: config.batch_size]
 
     train_subset = Subset(train_base, train_indices)
-    val_subset = Subset(train_base, val_indices) if val_indices else None
+    val_subset = Subset(train_base, val_indices)
 
     train_dataset = PairViewDataset(
         train_subset,
         build_train_transform(config.image_size, config.transform_profile),
     )
-    val_dataset = (
-        SingleViewDataset(val_subset, build_eval_transform(config.image_size))
-        if val_subset is not None
-        else None
-    )
+    val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size))
     test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size))
 
     train_loader = _build_loader(
@@ -112,16 +113,12 @@ def build_cub_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         shuffle=True,
         drop_last=True,
     )
-    val_loader = (
-        _build_loader(
-            val_dataset,
-            batch_size=config.eval_batch_size,
-            workers=config.workers,
-            shuffle=False,
-            drop_last=False,
-        )
-        if val_dataset is not None
-        else None
+    val_loader = _build_loader(
+        val_dataset,
+        batch_size=config.eval_batch_size,
+        workers=config.workers,
+        shuffle=False,
+        drop_last=False,
     )
     test_loader = _build_loader(
         test_dataset,
