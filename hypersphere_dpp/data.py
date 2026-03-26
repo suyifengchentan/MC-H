@@ -160,7 +160,7 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
 
     train_dataset = TrainTensorDataset(
         train_subset,
-        build_train_decode_transform(),
+        build_train_decode_transform(config.image_size),
     )
     val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size))
     test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size))

@@ -202,8 +202,15 @@ def build_train_transform(image_size: int, profile: str) -> Callable:
     raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
-def build_train_decode_transform() -> Callable:
-    return transforms.PILToTensor()
+def build_train_decode_transform(image_size: int) -> Callable:
+    resize_size = int(image_size / 0.875)
+    return transforms.Compose(
+        [
+            transforms.Resize(resize_size, interpolation=InterpolationMode.BICUBIC),
+            transforms.CenterCrop(resize_size),
+            transforms.PILToTensor(),
+        ]
+    )
 
 
 def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
