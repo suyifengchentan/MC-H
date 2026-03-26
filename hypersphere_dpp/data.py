@@ -11,7 +11,7 @@ from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
-from .transforms import build_eval_transform, build_train_transform
+from .transforms import build_eval_transform, build_train_decode_transform
 
 
 class PairViewDataset(Dataset):
@@ -28,6 +28,23 @@ class PairViewDataset(Dataset):
         return {
             "view1": view1,
             "view2": view2,
+            "label": label,
+            "index": sample_index,
+        }
+
+
+class TrainTensorDataset(Dataset):
+    def __init__(self, dataset: Dataset, transform):
+        self.dataset = dataset
+        self.transform = transform
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int):
+        image, label, sample_index = self.dataset[index]
+        return {
+            "image": self.transform(image),
             "label": label,
             "index": sample_index,
         }
@@ -141,9 +158,9 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     train_subset = Subset(train_base, train_indices)
     val_subset = Subset(train_base, val_indices)
 
-    train_dataset = PairViewDataset(
+    train_dataset = TrainTensorDataset(
         train_subset,
-        build_train_transform(config.image_size, config.transform_profile),
+        build_train_decode_transform(),
     )
     val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size))
     test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size))

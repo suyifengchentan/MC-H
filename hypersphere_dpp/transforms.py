@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from typing import Callable
 
+import kornia.augmentation as K
+import torch
+from torch import nn
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
@@ -16,6 +19,30 @@ class TwoViewTransform:
 
     def __call__(self, image):
         return self.transform(image), self.transform(image)
+
+
+class TwoViewBatchTransform(nn.Module):
+    def __init__(self, transform: nn.Module):
+        super().__init__()
+        self.transform = transform
+
+    def forward(self, images: torch.Tensor) -> tuple[torch.Tensor, torch.Tensor]:
+        return self.transform(images), self.transform(images)
+
+
+class Uint8ToFloat(nn.Module):
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return images.float().div(255.0)
+
+
+class NormalizeBatch(nn.Module):
+    def __init__(self, mean: tuple[float, float, float], std: tuple[float, float, float]):
+        super().__init__()
+        self.register_buffer("mean", torch.tensor(mean, dtype=torch.float32).view(1, -1, 1, 1))
+        self.register_buffer("std", torch.tensor(std, dtype=torch.float32).view(1, -1, 1, 1))
+
+    def forward(self, images: torch.Tensor) -> torch.Tensor:
+        return (images - self.mean) / self.std
 
 
 def _gaussian_blur_kernel_size(image_size: int) -> int:
@@ -66,6 +93,50 @@ def _build_two_view_transform(
         ]
     )
     return TwoViewTransform(transforms.Compose(ops))
+
+
+def _build_gpu_two_view_transform(
+    image_size: int,
+    crop_scale: tuple[float, float],
+    crop_ratio: tuple[float, float],
+    color_jitter: tuple[float, float, float, float],
+    color_jitter_p: float,
+    grayscale_p: float,
+    blur_p: float,
+) -> nn.Module:
+    ops: list[nn.Module] = [
+        Uint8ToFloat(),
+        K.RandomResizedCrop(
+            size=(image_size, image_size),
+            scale=crop_scale,
+            ratio=crop_ratio,
+            resample="BICUBIC",
+            p=1.0,
+        ),
+        K.RandomHorizontalFlip(p=0.5),
+    ]
+    if color_jitter_p > 0:
+        ops.append(
+            K.ColorJiggle(
+                brightness=color_jitter[0],
+                contrast=color_jitter[1],
+                saturation=color_jitter[2],
+                hue=color_jitter[3],
+                p=color_jitter_p,
+            )
+        )
+    if grayscale_p > 0:
+        ops.append(K.RandomGrayscale(p=grayscale_p))
+    if blur_p > 0:
+        ops.append(
+            K.RandomGaussianBlur(
+                kernel_size=(_gaussian_blur_kernel_size(image_size), _gaussian_blur_kernel_size(image_size)),
+                sigma=(0.1, 2.0),
+                p=blur_p,
+            )
+        )
+    ops.append(NormalizeBatch(mean=CLIP_MEAN, std=CLIP_STD))
+    return TwoViewBatchTransform(nn.Sequential(*ops))
 
 
 def build_train_transform(image_size: int, profile: str) -> Callable:
@@ -119,6 +190,69 @@ def build_train_transform(image_size: int, profile: str) -> Callable:
     if profile == "tiny_imagenet200_two_view":
         # Tiny-ImageNet 原图分辨率低，放大到 224 后不适合过强裁剪和模糊，因此使用温和增强。
         return _build_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.6, 1.0),
+            crop_ratio=(0.9, 1.1),
+            color_jitter=(0.2, 0.2, 0.15, 0.03),
+            color_jitter_p=0.6,
+            grayscale_p=0.02,
+            blur_p=0.0,
+        )
+
+    raise ValueError(f"Unsupported transform_profile: {profile}")
+
+
+def build_train_decode_transform() -> Callable:
+    return transforms.PILToTensor()
+
+
+def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
+    if profile == "fine_grained_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.5, 1.0),
+            crop_ratio=(0.75, 1.3333333333),
+            color_jitter=(0.2, 0.2, 0.2, 0.05),
+            color_jitter_p=0.8,
+            grayscale_p=0.1,
+            blur_p=0.0,
+        )
+
+    if profile == "imagenet10_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.35, 1.0),
+            crop_ratio=(0.7, 1.4),
+            color_jitter=(0.4, 0.4, 0.25, 0.08),
+            color_jitter_p=0.8,
+            grayscale_p=0.05,
+            blur_p=0.15,
+        )
+
+    if profile == "imagenet50_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.45, 1.0),
+            crop_ratio=(0.75, 1.3333333333),
+            color_jitter=(0.3, 0.3, 0.2, 0.05),
+            color_jitter_p=0.75,
+            grayscale_p=0.05,
+            blur_p=0.1,
+        )
+
+    if profile == "imagenet100_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.45, 1.0),
+            crop_ratio=(0.75, 1.3333333333),
+            color_jitter=(0.3, 0.3, 0.2, 0.05),
+            color_jitter_p=0.75,
+            grayscale_p=0.05,
+            blur_p=0.1,
+        )
+
+    if profile == "tiny_imagenet200_two_view":
+        return _build_gpu_two_view_transform(
             image_size=image_size,
             crop_scale=(0.6, 1.0),
             crop_ratio=(0.9, 1.1),

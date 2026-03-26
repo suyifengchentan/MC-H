@@ -24,6 +24,7 @@ from hypersphere_dpp.metrics import (
 )
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
+from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
 
 
@@ -52,6 +53,7 @@ def resolve_amp_settings(precision: str, device: torch.device) -> tuple[bool, st
 def train_one_epoch(
     model: HypersphereDPPModel,
     dataloader,
+    gpu_train_transform,
     optimizer,
     scaler,
     queue: ClusterFeatureQueue,
@@ -75,8 +77,8 @@ def train_one_epoch(
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
 
     for step, batch in enumerate(dataloader):
-        view1 = batch["view1"].to(device, non_blocking=True)
-        view2 = batch["view2"].to(device, non_blocking=True)
+        images = batch["image"].to(device, non_blocking=True)
+        view1, view2 = gpu_train_transform(images)
 
         optimizer.zero_grad(set_to_none=True)
         autocast_kwargs = {"device_type": amp_device_type, "enabled": use_amp}
@@ -237,6 +239,7 @@ def main():
         logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
 
     datasets = build_experiment_dataloaders(config)
+    gpu_train_transform = build_gpu_train_transform(config.image_size, config.transform_profile).to(device)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
         pretrained=config.pretrained,
@@ -285,6 +288,7 @@ def main():
         train_metrics = train_one_epoch(
             model=model,
             dataloader=datasets.train_loader,
+            gpu_train_transform=gpu_train_transform,
             optimizer=optimizer,
             scaler=scaler,
             queue=queue,
