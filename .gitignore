@@ -17,6 +17,9 @@
 !*.cfg
 !*.tex
 
+.vscode/
+.vscode/*
+.venv/
 # Local system/cache artifacts
 .DS_Store
 __pycache__/
