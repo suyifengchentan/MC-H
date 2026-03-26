@@ -76,8 +76,8 @@ bash scripts/train_by_dataset.sh cub --foreground
 - 根据数据集名选择对应的训练 YAML
 - 检查数据目录是否存在
 - 默认以 `nohup` 后台运行
-- 将后台标准输出写入 `model_path/nohup.log`
 - 将训练 PID 写入 `model_path/train.pid`
+- 后台运行不额外落标准输出日志，直接使用 Python 写入的 `model_path/train.log`
 
 训练运行时会在 `model_path` 下生成：
 

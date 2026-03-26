@@ -114,7 +114,6 @@ PY
 DATASET_DIR="${CONFIG_INFO[0]}"
 MODEL_PATH_REL="${CONFIG_INFO[1]}"
 OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
-NOHUP_LOG="$OUTPUT_DIR/nohup.log"
 PID_FILE="$OUTPUT_DIR/train.pid"
 
 if [[ ! -d "$DATASET_DIR" ]]; then
@@ -156,7 +155,7 @@ if [[ "$FOREGROUND" -eq 1 ]]; then
 fi
 
 printf -v CMD_ESCAPED '%q ' "${CMD[@]}"
-setsid nohup bash -lc "exec ${CMD_ESCAPED}" > "$NOHUP_LOG" 2>&1 < /dev/null &
+setsid nohup bash -lc "exec ${CMD_ESCAPED}" > /dev/null 2>&1 < /dev/null &
 PID=$!
 echo "$PID" > "$PID_FILE"
 
@@ -164,12 +163,11 @@ sleep 1
 if ! ps -p "$PID" > /dev/null 2>&1; then
   rm -f "$PID_FILE"
   echo "background training exited immediately" >&2
-  echo "inspect log: $NOHUP_LOG" >&2
+  echo "inspect log: $OUTPUT_DIR/train.log" >&2
   exit 1
 fi
 
 echo "started background training"
 echo "pid: $PID"
-echo "nohup_log: $NOHUP_LOG"
 echo "train_log: $OUTPUT_DIR/train.log"
 echo "pid_file: $PID_FILE"
