@@ -1,7 +1,9 @@
 # Ignore everything by default, then allow source/config/doc text files back in.
 *
 !*/
+# Always keep ignore rules themselves tracked.
 !.gitignore
+!**/.gitignore
 !.gitkeep
 !*.py
 !*.sh
@@ -43,4 +45,3 @@ __pycache__/
 *.gif
 *.bmp
 *.pdf
-
