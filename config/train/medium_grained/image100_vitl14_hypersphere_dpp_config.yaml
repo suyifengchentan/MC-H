@@ -10,16 +10,16 @@ official_eval_split: "val"
 
 # Model
 image_size: 224
-feature_dim: 768
-backbone_name: "ViT-L-14"
-pretrained: "laion2b_s32b_b82k"
+feature_dim: 512
+backbone_name: "ViT-B-16"
+pretrained: "laion2b_s34b_b88k"
 adapter_hidden_dim: 1024
 adapter_dropout: 0.1
 transform_profile: "imagenet100_two_view"
 
 # Optimization
 precision: "fp16"
-batch_size: 672
+batch_size: 512
 eval_batch_size: 1024
 epochs: 450
 learning_rate: 0.00025
@@ -51,7 +51,7 @@ dpp_jitter: 0.00001
 
 # Runtime / output
 eval_interval: 3
-model_path: "save/hypersphere_dpp/Image100_CLIP_ViTL14_HypersphereDPP"
+model_path: "save/hypersphere_dpp/Image100_CLIP_ViTB16_HypersphereDPP"
 workers: 8
 reload: false
 seed: 42

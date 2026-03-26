@@ -11,6 +11,10 @@ import yaml
 SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
 SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image100", "Image200"}
 SUPPORTED_EVAL_SPLITS = {"val", "test"}
+SUPPORTED_BACKBONE_FEATURE_DIMS = {
+    "ViT-L-14": 768,
+    "ViT-B-16": 512,
+}
 
 
 @dataclass
@@ -89,10 +93,7 @@ def _warn_unknown_fields(values: Dict[str, Any], supported_fields: Iterable[str]
     supported = set(supported_fields)
     unknown = sorted(set(values) - supported)
     for key in unknown:
-        warnings.warn(
-            f"Unsupported config field '{key}' will be ignored in the ViT-L/14 prototype.",
-            stacklevel=2,
-        )
+        warnings.warn(f"Unsupported config field '{key}' will be ignored in the CLIP prototype.", stacklevel=2)
 
 
 def load_experiment_config(path: str | Path) -> ExperimentConfig:
@@ -112,8 +113,16 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             f"dataset must be one of {sorted(SUPPORTED_DATASETS)}, got {config.dataset!r}."
         )
 
-    if config.feature_dim != 768:
-        raise ValueError(f"feature_dim must be 768 for ViT-L/14 CLIP, got {config.feature_dim}.")
+    if config.backbone_name not in SUPPORTED_BACKBONE_FEATURE_DIMS:
+        raise ValueError(
+            f"backbone_name must be one of {sorted(SUPPORTED_BACKBONE_FEATURE_DIMS)}, got {config.backbone_name!r}."
+        )
+
+    expected_feature_dim = SUPPORTED_BACKBONE_FEATURE_DIMS[config.backbone_name]
+    if config.feature_dim != expected_feature_dim:
+        raise ValueError(
+            f"feature_dim must be {expected_feature_dim} for {config.backbone_name} CLIP, got {config.feature_dim}."
+        )
 
     if not 0.0 < config.validation_ratio < 1.0:
         raise ValueError("validation_ratio must be in (0, 1) so training always has a validation split.")

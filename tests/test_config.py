@@ -35,6 +35,9 @@ class ConfigLoaderTest(unittest.TestCase):
             dataset: "Image100"
             dataset_dir: "/tmp/image100"
             class_num: 100
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            pretrained: "laion2b_s34b_b88k"
             subspace_every_n_steps: 2
             subspace_pca_q_offset: 2
             subspace_topk_clusters: 48
@@ -50,6 +53,9 @@ class ConfigLoaderTest(unittest.TestCase):
 
         self.assertEqual(config.dataset, "Image100")
         self.assertEqual(config.official_eval_split, "val")
+        self.assertEqual(config.feature_dim, 512)
+        self.assertEqual(config.backbone_name, "ViT-B-16")
+        self.assertEqual(config.pretrained, "laion2b_s34b_b88k")
         self.assertEqual(config.subspace_every_n_steps, 2)
         self.assertEqual(config.subspace_pca_q_offset, 2)
         self.assertEqual(config.subspace_topk_clusters, 48)
