@@ -2,7 +2,7 @@
 
 precision: "bf16"
 eval_interval: 3
-eval_batch_size: 512
+eval_batch_size: 1024
 
 dataset: "Image200"
 dataset_dir: "/home/geyingjie/gmm-data/tiny-imagenet-200"
@@ -14,7 +14,7 @@ official_eval_split: "val"
 
 image_size: 224
 feature_dim: 768
-batch_size: 256
+batch_size: 512
 epochs: 500
 
 learning_rate: 0.00025
