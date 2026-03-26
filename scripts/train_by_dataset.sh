@@ -66,23 +66,23 @@ DATASET_KEY="$(printf '%s' "$DATASET_INPUT" | tr '[:upper:]' '[:lower:]')"
 case "$DATASET_KEY" in
   cub|cub_200_2011)
     DATASET_NAME="CUB_200_2011"
-    CONFIG_REL="config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml"
+    CONFIG_REL="config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml"
     ;;
   image10)
     DATASET_NAME="Image10"
-    CONFIG_REL="config/train/coarse_grained/image10_vitl14_hypersphere_dpp_config.yaml"
+    CONFIG_REL="config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
     ;;
   image50)
     DATASET_NAME="Image50"
-    CONFIG_REL="config/train/medium_grained/image50_vitl14_hypersphere_dpp_config.yaml"
+    CONFIG_REL="config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"
     ;;
   image100)
     DATASET_NAME="Image100"
-    CONFIG_REL="config/train/medium_grained/image100_vitl14_hypersphere_dpp_config.yaml"
+    CONFIG_REL="config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml"
     ;;
   image200)
     DATASET_NAME="Image200"
-    CONFIG_REL="config/train/medium_grained/image200_vitl14_hypersphere_dpp_config.yaml"
+    CONFIG_REL="config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml"
     ;;
   *)
     echo "Unsupported dataset name: $DATASET_INPUT" >&2

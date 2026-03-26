@@ -19,8 +19,8 @@
 - `train.py`: 训练入口
 - `eval.py`: 评估入口
 - `hypersphere_dpp/`: 配置、数据、模型、损失、子空间队列、评估指标等实现
-- `config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml`: 训练配置
-- `config/test/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml`: 评估配置
+- `config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml`: 训练配置
+- `config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml`: 评估配置
 - `tests/`: 基础单元测试
 - `save/`: 运行产物目录占位，实际权重和日志默认写到这里
 
@@ -55,7 +55,7 @@
 安装依赖后，训练命令：
 
 ```bash
-python3 train.py --config config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml
+python3 train.py --config config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
 ```
 
 也可以直接按数据集名启动训练脚本：
@@ -89,7 +89,7 @@ bash scripts/train_by_dataset.sh cub --foreground
 
 ```bash
 python3 eval.py \
-  --config config/test/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml \
+  --config config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml \
   --checkpoint save/hypersphere_dpp/CUB_200_2011_CLIP_ViTL14_HypersphereDPP/best.pt
 ```
 
