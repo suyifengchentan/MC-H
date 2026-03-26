@@ -19,7 +19,7 @@ adapter_dropout: 0.1
 transform_profile: "tiny_imagenet200_two_view"
 
 # Optimization
-precision: "bf16"
+precision: "fp16"
 batch_size: 512
 eval_batch_size: 512
 epochs: 500
@@ -39,12 +39,13 @@ sinkhorn_epsilon: 0.05
 lambda_subspace: 0.12
 subspace_rank: 8
 subspace_queue_size: 64
-subspace_min_mass: 2.0
+subspace_min_mass: 4.0
+subspace_every_n_steps: 3
 
 # DPP
 alpha_div_base: 0.3
 dpp_warmup_epochs: 25
-dpp_every_n_steps: 3
+dpp_every_n_steps: 6
 dpp_jitter: 0.00001
 
 # Runtime / output

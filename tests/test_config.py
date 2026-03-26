@@ -35,6 +35,8 @@ class ConfigLoaderTest(unittest.TestCase):
             dataset: "Image100"
             dataset_dir: "/tmp/image100"
             class_num: 100
+            subspace_every_n_steps: 2
+            dpp_every_n_steps: 4
             official_eval_split: "val"
             """
         )
@@ -46,6 +48,8 @@ class ConfigLoaderTest(unittest.TestCase):
 
         self.assertEqual(config.dataset, "Image100")
         self.assertEqual(config.official_eval_split, "val")
+        self.assertEqual(config.subspace_every_n_steps, 2)
+        self.assertEqual(config.dpp_every_n_steps, 4)
 
 
 if __name__ == "__main__":

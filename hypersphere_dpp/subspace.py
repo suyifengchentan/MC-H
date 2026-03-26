@@ -94,8 +94,10 @@ def top_principal_subspace(
     normalized_weights = weights / total_weight
     mean = torch.sum(normalized_weights.unsqueeze(1) * features, dim=0, keepdim=True)
     centered = (features - mean) * normalized_weights.sqrt().unsqueeze(1)
-    _, _, v = torch.linalg.svd(centered, full_matrices=False)
-    return v[:rank].t()
+    max_rank = min(centered.shape)
+    q = min(max_rank, max(rank + 4, rank))
+    _, _, v = torch.pca_lowrank(centered, q=q, center=False)
+    return v[:, :rank]
 
 
 def subspace_regularization_loss(
@@ -110,45 +112,46 @@ def subspace_regularization_loss(
     teacher_masses = []
     student_masses = []
 
-    detached_assignments = assignments.detach().float()
-    teacher_features_f = teacher_features.detach().float()
-    student_features_f = student_features.float()
-    active_cluster_ids = torch.nonzero(detached_assignments.sum(dim=0) >= min_mass, as_tuple=False).flatten().tolist()
+    with torch.autocast(device_type=student_features.device.type, enabled=False):
+        detached_assignments = assignments.detach().float()
+        teacher_features_f = teacher_features.detach().float()
+        student_features_f = student_features.float()
+        active_cluster_ids = torch.nonzero(detached_assignments.sum(dim=0) >= min_mass, as_tuple=False).flatten().tolist()
 
-    for cluster_id in active_cluster_ids:
-        student_weights = detached_assignments[:, cluster_id]
-        student_mass = float(student_weights.sum().item())
+        for cluster_id in active_cluster_ids:
+            student_weights = detached_assignments[:, cluster_id]
+            student_mass = float(student_weights.sum().item())
 
-        queued_features, queued_weights = queue.get(cluster_id, teacher_features.device)
-        batch_teacher_weights = detached_assignments[:, cluster_id]
-        teacher_sources = [teacher_features_f]
-        teacher_weight_sources = [batch_teacher_weights]
+            queued_features, queued_weights = queue.get(cluster_id, teacher_features.device)
+            batch_teacher_weights = detached_assignments[:, cluster_id]
+            teacher_sources = [teacher_features_f]
+            teacher_weight_sources = [batch_teacher_weights]
 
-        if queued_features.numel() > 0:
-            teacher_sources.append(queued_features)
-            teacher_weight_sources.append(queued_weights)
+            if queued_features.numel() > 0:
+                teacher_sources.append(queued_features.float())
+                teacher_weight_sources.append(queued_weights.float())
 
-        merged_teacher_features = torch.cat(teacher_sources, dim=0)
-        merged_teacher_weights = torch.cat(teacher_weight_sources, dim=0)
-        teacher_mass = float(merged_teacher_weights.sum().item())
-        if teacher_mass < min_mass or merged_teacher_features.size(0) < rank:
-            continue
+            merged_teacher_features = torch.cat(teacher_sources, dim=0)
+            merged_teacher_weights = torch.cat(teacher_weight_sources, dim=0)
+            teacher_mass = float(merged_teacher_weights.sum().item())
+            if teacher_mass < min_mass or merged_teacher_features.size(0) < rank:
+                continue
 
-        anchor_basis = top_principal_subspace(
-            features=merged_teacher_features,
-            weights=merged_teacher_weights,
-            rank=rank,
-        )
-        sigma_student = weighted_covariance(
-            features=student_features_f,
-            weights=student_weights,
-        )
-        projection = anchor_basis @ anchor_basis.t()
-        projected_sigma = projection @ sigma_student @ projection
-        residual = sigma_student - projected_sigma
-        losses.append(torch.linalg.norm(residual, ord="fro"))
-        teacher_masses.append(teacher_mass)
-        student_masses.append(student_mass)
+            anchor_basis = top_principal_subspace(
+                features=merged_teacher_features,
+                weights=merged_teacher_weights,
+                rank=rank,
+            )
+            sigma_student = weighted_covariance(
+                features=student_features_f,
+                weights=student_weights,
+            )
+            projection = anchor_basis @ anchor_basis.t()
+            projected_sigma = projection @ sigma_student @ projection
+            residual = sigma_student - projected_sigma
+            losses.append(torch.linalg.norm(residual, ord="fro"))
+            teacher_masses.append(teacher_mass)
+            student_masses.append(student_mass)
 
     if not losses:
         return student_features.new_zeros(()), SubspaceStats(0, 0.0, 0.0)

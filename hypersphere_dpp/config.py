@@ -53,12 +53,13 @@ class ExperimentConfig:
     lambda_subspace: float = 0.15
     subspace_rank: int = 8
     subspace_queue_size: int = 64
-    subspace_min_mass: float = 2.0
+    subspace_min_mass: float = 4.0
+    subspace_every_n_steps: int = 2
 
     # DPP
     alpha_div_base: float = 0.6
     dpp_warmup_epochs: int = 20
-    dpp_every_n_steps: int = 1
+    dpp_every_n_steps: int = 4
     dpp_jitter: float = 1e-5
 
     # Runtime / output
@@ -120,6 +121,15 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")
+
+    if config.subspace_every_n_steps <= 0:
+        raise ValueError("subspace_every_n_steps must be a positive integer.")
+
+    if config.dpp_every_n_steps <= 0:
+        raise ValueError("dpp_every_n_steps must be a positive integer.")
+
+    if config.subspace_min_mass <= 0:
+        raise ValueError("subspace_min_mass must be positive.")
 
     if config.official_eval_split is not None and config.official_eval_split not in SUPPORTED_EVAL_SPLITS:
         raise ValueError(

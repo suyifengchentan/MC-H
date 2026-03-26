@@ -104,14 +104,17 @@ def train_one_epoch(
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
-            subspace_loss, _ = subspace_regularization_loss(
-                student_features=student_cat,
-                teacher_features=teacher_cat,
-                assignments=assignment_cat,
-                queue=queue,
-                rank=config.subspace_rank,
-                min_mass=config.subspace_min_mass,
-            )
+            if step % config.subspace_every_n_steps == 0:
+                subspace_loss, _ = subspace_regularization_loss(
+                    student_features=student_cat,
+                    teacher_features=teacher_cat,
+                    assignments=assignment_cat,
+                    queue=queue,
+                    rank=config.subspace_rank,
+                    min_mass=config.subspace_min_mass,
+                )
+            else:
+                subspace_loss = student_cat.new_zeros(())
 
             if step % config.dpp_every_n_steps == 0:
                 dpp_loss, rho, _ = dpp_diversity_loss(
