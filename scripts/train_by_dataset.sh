@@ -3,7 +3,12 @@
 set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-PYTHON_BIN="${PYTHON_BIN:-python3}"
+PYTHON_BIN_INPUT="${PYTHON_BIN:-python}"
+
+if ! PYTHON_BIN="$(command -v "$PYTHON_BIN_INPUT" 2>/dev/null)"; then
+  echo "Python executable not found: $PYTHON_BIN_INPUT" >&2
+  exit 1
+fi
 
 usage() {
   cat <<'EOF'
@@ -115,6 +120,7 @@ DATASET_DIR="${CONFIG_INFO[0]}"
 MODEL_PATH_REL="${CONFIG_INFO[1]}"
 OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
 PID_FILE="$OUTPUT_DIR/train.pid"
+LAUNCH_LOG="$OUTPUT_DIR/launcher.log"
 
 if [[ ! -d "$DATASET_DIR" ]]; then
   echo "Dataset directory does not exist for $DATASET_NAME: $DATASET_DIR" >&2
@@ -154,20 +160,21 @@ if [[ "$FOREGROUND" -eq 1 ]]; then
   exec "${CMD[@]}"
 fi
 
-printf -v CMD_ESCAPED '%q ' "${CMD[@]}"
-setsid nohup bash -lc "exec ${CMD_ESCAPED}" > /dev/null 2>&1 < /dev/null &
+nohup "${CMD[@]}" >> "$LAUNCH_LOG" 2>&1 < /dev/null &
 PID=$!
 echo "$PID" > "$PID_FILE"
 
 sleep 1
-if ! ps -p "$PID" > /dev/null 2>&1; then
+if ! kill -0 "$PID" > /dev/null 2>&1; then
   rm -f "$PID_FILE"
   echo "background training exited immediately" >&2
   echo "inspect log: $OUTPUT_DIR/train.log" >&2
+  echo "launcher log: $LAUNCH_LOG" >&2
   exit 1
 fi
 
 echo "started background training"
 echo "pid: $PID"
 echo "train_log: $OUTPUT_DIR/train.log"
+echo "launcher_log: $LAUNCH_LOG"
 echo "pid_file: $PID_FILE"
