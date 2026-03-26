@@ -6,7 +6,7 @@ import torch
 
 from hypersphere_dpp.data import split_train_indices
 from hypersphere_dpp.losses import dpp_diversity_loss
-from hypersphere_dpp.subspace import ClusterFeatureQueue
+from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 
 
 class DataAndLossesTest(unittest.TestCase):
@@ -67,6 +67,42 @@ class DataAndLossesTest(unittest.TestCase):
         restored_features, restored_weights = restored.get(1, torch.device("cpu"))
         self.assertTrue(torch.allclose(original_features, restored_features))
         self.assertTrue(torch.allclose(original_weights, restored_weights))
+
+    def test_subspace_topk_clusters_limits_active_clusters(self):
+        queue = ClusterFeatureQueue(num_clusters=4, feature_dim=6, queue_size=8)
+        teacher_features = torch.randn(12, 6)
+        student_features = torch.randn(12, 6)
+        assignments = torch.tensor(
+            [
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [1.0, 0.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 1.0, 0.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 1.0, 0.0],
+                [0.0, 0.0, 0.0, 1.0],
+                [0.0, 0.0, 0.0, 1.0],
+            ]
+        )
+        queue.enqueue(teacher_features, assignments)
+
+        loss, stats = subspace_regularization_loss(
+            student_features=student_features,
+            teacher_features=teacher_features,
+            assignments=assignments,
+            queue=queue,
+            rank=2,
+            min_mass=2.0,
+            pca_q_offset=0,
+            topk_clusters=2,
+        )
+
+        self.assertTrue(torch.isfinite(loss))
+        self.assertEqual(stats.active_clusters, 2)
 
 
 if __name__ == "__main__":

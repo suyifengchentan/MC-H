@@ -112,6 +112,8 @@ def train_one_epoch(
                     queue=queue,
                     rank=config.subspace_rank,
                     min_mass=config.subspace_min_mass,
+                    pca_q_offset=config.subspace_pca_q_offset,
+                    topk_clusters=config.subspace_topk_clusters,
                 )
             else:
                 subspace_loss = student_cat.new_zeros(())

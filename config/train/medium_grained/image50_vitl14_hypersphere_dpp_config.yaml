@@ -40,6 +40,8 @@ subspace_rank: 8
 subspace_queue_size: 64
 subspace_min_mass: 6.0
 subspace_every_n_steps: 2
+subspace_pca_q_offset: 2
+subspace_topk_clusters: 32
 
 # DPP
 alpha_div_base: 0.4

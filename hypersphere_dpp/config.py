@@ -55,6 +55,8 @@ class ExperimentConfig:
     subspace_queue_size: int = 64
     subspace_min_mass: float = 4.0
     subspace_every_n_steps: int = 2
+    subspace_pca_q_offset: int = 4
+    subspace_topk_clusters: int | None = None
 
     # DPP
     alpha_div_base: float = 0.6
@@ -124,6 +126,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.subspace_every_n_steps <= 0:
         raise ValueError("subspace_every_n_steps must be a positive integer.")
+
+    if config.subspace_pca_q_offset < 0:
+        raise ValueError("subspace_pca_q_offset must be non-negative.")
+
+    if config.subspace_topk_clusters is not None and config.subspace_topk_clusters <= 0:
+        raise ValueError("subspace_topk_clusters must be a positive integer when provided.")
 
     if config.dpp_every_n_steps <= 0:
         raise ValueError("dpp_every_n_steps must be a positive integer.")

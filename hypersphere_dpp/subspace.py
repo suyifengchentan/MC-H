@@ -89,13 +89,14 @@ def top_principal_subspace(
     features: torch.Tensor,
     weights: torch.Tensor,
     rank: int,
+    q_offset: int = 4,
 ) -> torch.Tensor:
     total_weight = weights.sum().clamp_min(1e-6)
     normalized_weights = weights / total_weight
     mean = torch.sum(normalized_weights.unsqueeze(1) * features, dim=0, keepdim=True)
     centered = (features - mean) * normalized_weights.sqrt().unsqueeze(1)
     max_rank = min(centered.shape)
-    q = min(max_rank, max(rank + 4, rank))
+    q = min(max_rank, rank + q_offset)
     _, _, v = torch.pca_lowrank(centered, q=q, center=False)
     return v[:, :rank]
 
@@ -107,6 +108,8 @@ def subspace_regularization_loss(
     queue: ClusterFeatureQueue,
     rank: int,
     min_mass: float,
+    pca_q_offset: int = 4,
+    topk_clusters: int | None = None,
 ) -> tuple[torch.Tensor, SubspaceStats]:
     losses = []
     teacher_masses = []
@@ -116,7 +119,13 @@ def subspace_regularization_loss(
         detached_assignments = assignments.detach().float()
         teacher_features_f = teacher_features.detach().float()
         student_features_f = student_features.float()
-        active_cluster_ids = torch.nonzero(detached_assignments.sum(dim=0) >= min_mass, as_tuple=False).flatten().tolist()
+        cluster_masses = detached_assignments.sum(dim=0)
+        active_cluster_ids = torch.nonzero(cluster_masses >= min_mass, as_tuple=False).flatten()
+        if topk_clusters is not None and active_cluster_ids.numel() > topk_clusters:
+            active_masses = cluster_masses[active_cluster_ids]
+            _, topk_indices = torch.topk(active_masses, k=topk_clusters, largest=True, sorted=False)
+            active_cluster_ids = active_cluster_ids[topk_indices]
+        active_cluster_ids = active_cluster_ids.tolist()
 
         for cluster_id in active_cluster_ids:
             student_weights = detached_assignments[:, cluster_id]
@@ -141,6 +150,7 @@ def subspace_regularization_loss(
                 features=merged_teacher_features,
                 weights=merged_teacher_weights,
                 rank=rank,
+                q_offset=pca_q_offset,
             )
             sigma_student = weighted_covariance(
                 features=student_features_f,
