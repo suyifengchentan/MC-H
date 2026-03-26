@@ -103,7 +103,12 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         eval_base = CUB200Dataset(root=config.dataset_dir, train=False, transform=None)
         return train_base, eval_base
 
-    if config.dataset in {"Image10", "Image50"}:
+    if config.dataset == "Image10":
+        train_base = IndexedImageFolderDataset(root=config.dataset_dir, split=None, transform=None)
+        eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        return train_base, eval_base
+
+    if config.dataset == "Image50":
         train_base = IndexedImageFolderDataset(root=config.dataset_dir, split="train", transform=None)
         eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
         return train_base, eval_base

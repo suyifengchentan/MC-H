@@ -1,7 +1,7 @@
 # Image50 ViT-L/14 hypersphere-DPP prototype evaluation config
 
 dataset: "Image50"
-dataset_dir: "/home/geyingjie/gmm-data/imagenet-50-subset"
+dataset_dir: "/home/geyingjie/gmm-data/Image50"
 class_num: 50
 validation_ratio: 0.1
 validation_seed: 42
@@ -18,4 +18,3 @@ adapter_dropout: 0.1
 
 workers: 8
 seed: 42
-
