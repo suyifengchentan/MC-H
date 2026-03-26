@@ -47,6 +47,7 @@
 - `scikit-learn`
 - `scipy`
 - `pyyaml`
+- `pyarrow`
 
 ## 运行方式
 
@@ -154,13 +155,25 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
 
-Image10 和 Image50 默认假设数据目录为标准 `ImageFolder` 结构：
+Image10 默认假设数据目录为标准 `ImageFolder` 结构：
 
 ```text
 root/
   train/<class_name>/*.jpg
   val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
 ```
+
+Image50 当前仅支持 `/home/geyingjie/gmm-data/imagenet-50-subset` 这一版 parquet 导出，目录结构应为：
+
+```text
+root/
+  data/train-*.parquet
+  data/validation-*.parquet
+  label_info.json
+  metadata.json
+```
+
+其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.parquet`。
 
 Image200 默认按标准 Tiny-ImageNet 目录解析，其中 `val` 通过 `val_annotations.txt` 读取标签。
 

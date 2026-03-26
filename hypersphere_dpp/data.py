@@ -6,6 +6,7 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from datasets.cub_dataset import CUB200Dataset
+from datasets.imagenet50_parquet_dataset import ImageNet50ParquetDataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
@@ -109,8 +110,10 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "Image50":
-        train_base = IndexedImageFolderDataset(root=config.dataset_dir, split="train", transform=None)
-        eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        if official_eval_split != "val":
+            raise ValueError("Image50 only supports official_eval_split='val' in the current parquet dataset.")
+        train_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="train", transform=None)
+        eval_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="val", transform=None)
         return train_base, eval_base
 
     if config.dataset == "Image200":

@@ -5,7 +5,7 @@ eval_interval: 3
 eval_batch_size: 512
 
 dataset: "Image50"
-dataset_dir: "/home/geyingjie/gmm-data/Image50"
+dataset_dir: "/home/geyingjie/gmm-data/imagenet-50-subset"
 class_num: 50
 validation_ratio: 0.1
 validation_seed: 42
