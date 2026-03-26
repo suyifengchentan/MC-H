@@ -2,7 +2,7 @@
 
 precision: "fp16"
 eval_interval: 3
-eval_batch_size: 1024
+eval_batch_size: 512
 
 dataset: "Image100"
 dataset_dir: "/home/geyingjie/gmm-data/Image100"
