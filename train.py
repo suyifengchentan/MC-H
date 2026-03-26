@@ -86,11 +86,12 @@ def train_one_epoch(
         with amp_context:
             teacher1 = model.encode_teacher(view1)
             teacher2 = model.encode_teacher(view2)
-            student1 = model.encode_student(teacher_features=teacher1)
-            student2 = model.encode_student(teacher_features=teacher2)
+            teacher_cat = torch.cat([teacher1, teacher2], dim=0)
+            student_cat = model.encode_student(teacher_features=teacher_cat)
+            logits_cat = model.prototype_logits(student_cat)
 
-            logits1 = model.prototype_logits(student1)
-            logits2 = model.prototype_logits(student2)
+            student1, student2 = student_cat.chunk(2)
+            logits1, logits2 = logits_cat.chunk(2)
 
             inst_loss = nt_xent_loss(student1.float(), student2.float(), config.instance_temperature)
             cluster_loss, assign1, assign2 = swav_cluster_loss(
@@ -101,8 +102,6 @@ def train_one_epoch(
                 sinkhorn_iters=config.sinkhorn_iters,
             )
 
-            student_cat = torch.cat([student1, student2], dim=0)
-            teacher_cat = torch.cat([teacher1, teacher2], dim=0)
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
             subspace_loss, _ = subspace_regularization_loss(
@@ -256,6 +255,7 @@ def main():
         num_clusters=config.class_num,
         feature_dim=config.feature_dim,
         queue_size=config.subspace_queue_size,
+        device=device,
     )
 
     start_epoch, global_step, best_metric = maybe_resume_training(

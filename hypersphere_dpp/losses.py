@@ -12,9 +12,7 @@ def nt_xent_loss(features_a: torch.Tensor, features_b: torch.Tensor, temperature
     features = torch.cat([features_a, features_b], dim=0)
     logits = features @ features.t()
     logits = logits / temperature
-
-    diagonal = torch.eye(2 * batch_size, device=features.device, dtype=torch.bool)
-    logits = logits.masked_fill(diagonal, float("-inf"))
+    logits.fill_diagonal_(float("-inf"))
 
     targets = torch.arange(batch_size, device=features.device)
     targets = torch.cat([targets + batch_size, targets], dim=0)
@@ -64,8 +62,8 @@ def mean_pairwise_cosine(features: torch.Tensor) -> torch.Tensor:
     batch_size = similarity.size(0)
     if batch_size <= 1:
         return similarity.new_zeros(())
-    mask = ~torch.eye(batch_size, device=similarity.device, dtype=torch.bool)
-    return similarity[mask].mean()
+    off_diagonal_sum = similarity.sum() - batch_size
+    return off_diagonal_sum / (batch_size * (batch_size - 1))
 
 
 def dpp_diversity_loss(

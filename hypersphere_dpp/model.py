@@ -125,3 +125,12 @@ class HypersphereDPPModel(nn.Module):
     def trainable_parameters(self):
         return list(self.adapter.parameters()) + list(self.prototypes.parameters())
 
+    def trainable_state_dict(self) -> dict[str, dict[str, torch.Tensor]]:
+        return {
+            "adapter": self.adapter.state_dict(),
+            "prototypes": self.prototypes.state_dict(),
+        }
+
+    def load_trainable_state_dict(self, state_dict: dict[str, dict[str, torch.Tensor]]) -> None:
+        self.adapter.load_state_dict(state_dict["adapter"])
+        self.prototypes.load_state_dict(state_dict["prototypes"])

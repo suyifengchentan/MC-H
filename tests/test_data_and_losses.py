@@ -47,7 +47,27 @@ class DataAndLossesTest(unittest.TestCase):
         self.assertEqual(features.shape[0], 2)
         self.assertEqual(weights.shape[0], 2)
 
+    def test_queue_state_roundtrip_keeps_values(self):
+        queue = ClusterFeatureQueue(num_clusters=2, feature_dim=3, queue_size=4)
+        teacher_features = torch.randn(4, 3)
+        assignments = torch.tensor(
+            [
+                [1.0, 0.0],
+                [1.0, 0.0],
+                [0.0, 1.0],
+                [0.0, 1.0],
+            ]
+        )
+        queue.enqueue(teacher_features, assignments)
+
+        restored = ClusterFeatureQueue(num_clusters=2, feature_dim=3, queue_size=4)
+        restored.load_state_dict(queue.state_dict())
+
+        original_features, original_weights = queue.get(1, torch.device("cpu"))
+        restored_features, restored_weights = restored.get(1, torch.device("cpu"))
+        self.assertTrue(torch.allclose(original_features, restored_features))
+        self.assertTrue(torch.allclose(original_weights, restored_weights))
+
 
 if __name__ == "__main__":
     unittest.main()
-
