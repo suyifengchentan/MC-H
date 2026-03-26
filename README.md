@@ -1,6 +1,6 @@
 # Hypersphere-DPP CUB Prototype
 
-这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`Image50` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
+这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`Image50`、`Image100` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
 
 ## 方法概要
 
@@ -26,13 +26,14 @@
 
 ## 数据协议
 
-- 支持 `CUB_200_2011`、`Image10`、`Image50`、`Image200`
+- 支持 `CUB_200_2011`、`Image10`、`Image50`、`Image100`、`Image200`
 - 训练只使用官方 `train` split
 - validation 从 `train` 中按 `validation_ratio` 划分
 - 官方评估 split 由 `official_eval_split` 控制：
   - `CUB_200_2011`: 默认 `test`
   - `Image10`: 默认 `test`
   - `Image50`: 默认 `val`
+  - `Image100`: 默认 `val`
   - `Image200`: 默认 `val`
 
 这版实现不复用 `datasets/data_loader_orthogonal.py` 中的 train/test 合并逻辑。
@@ -149,10 +150,11 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 
 ## ImageNet 系列增强
 
-针对 `Image10`、`Image50`、`Image200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
+针对 `Image10`、`Image50`、`Image100`、`Image200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
 
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
+- `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
 - `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
 
 Image10 默认假设数据目录为标准 `ImageFolder` 结构：
@@ -174,6 +176,19 @@ root/
 ```
 
 其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.parquet`。
+
+Image100 默认按当前 `/home/geyingjie/gmm-data/Image100` 的 split 别名目录解析：
+
+```text
+root/
+  train.X1/<class_name>/*.jpg
+  train.X2/<class_name>/*.jpg
+  train.X3/<class_name>/*.jpg
+  train.X4/<class_name>/*.jpg
+  val.X/<class_name>/*.jpg
+```
+
+其中逻辑上的 `train` 会自动合并所有 `train.X*`，逻辑上的 `val` 会映射到 `val.X`。
 
 Image200 默认按标准 Tiny-ImageNet 目录解析，其中 `val` 通过 `val_annotations.txt` 读取标签。
 

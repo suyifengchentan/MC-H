@@ -9,7 +9,7 @@ import yaml
 
 
 SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
-SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image200"}
+SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image100", "Image200"}
 SUPPORTED_EVAL_SPLITS = {"val", "test"}
 
 

@@ -29,7 +29,24 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.dataset, "CUB_200_2011")
         self.assertTrue(any("Unsupported config field 'semantic_prototype_enabled'" in str(w.message) for w in caught))
 
+    def test_image100_is_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image100"
+            dataset_dir: "/tmp/image100"
+            class_num: 100
+            official_eval_split: "val"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.dataset, "Image100")
+        self.assertEqual(config.official_eval_split, "val")
+
 
 if __name__ == "__main__":
     unittest.main()
-

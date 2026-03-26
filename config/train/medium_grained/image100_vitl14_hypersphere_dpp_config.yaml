@@ -1,0 +1,50 @@
+# Image100 ViT-L/14 hypersphere-DPP prototype training config
+
+precision: "fp16"
+eval_interval: 3
+eval_batch_size: 512
+
+dataset: "Image100"
+dataset_dir: "/home/geyingjie/gmm-data/Image100"
+class_num: 100
+validation_ratio: 0.1
+validation_seed: 42
+official_eval_split: "val"
+
+image_size: 224
+feature_dim: 768
+batch_size: 256
+epochs: 450
+
+learning_rate: 0.00025
+weight_decay: 0.000001
+instance_temperature: 0.2
+cluster_temperature: 0.3
+lambda_instance: 1.0
+lambda_cluster: 1.0
+lambda_subspace: 0.15
+alpha_div_base: 0.35
+
+backbone_name: "ViT-L-14"
+pretrained: "laion2b_s32b_b82k"
+adapter_hidden_dim: 1024
+adapter_dropout: 0.1
+
+dpp_warmup_epochs: 20
+dpp_every_n_steps: 2
+dpp_jitter: 0.00001
+
+sinkhorn_iters: 3
+sinkhorn_epsilon: 0.05
+
+subspace_rank: 8
+subspace_queue_size: 64
+subspace_min_mass: 2.0
+
+transform_profile: "imagenet100_two_view"
+
+model_path: "save/hypersphere_dpp/Image100_CLIP_ViTL14_HypersphereDPP"
+workers: 8
+reload: false
+seed: 42
+best_checkpoint_patience: 90

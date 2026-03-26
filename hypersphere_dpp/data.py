@@ -91,7 +91,7 @@ def _build_loader(
 def _default_official_eval_split(dataset_name: str) -> str:
     if dataset_name in {"CUB_200_2011", "Image10"}:
         return "test"
-    if dataset_name in {"Image50", "Image200"}:
+    if dataset_name in {"Image50", "Image100", "Image200"}:
         return "val"
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
@@ -114,6 +114,11 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
             raise ValueError("Image50 only supports official_eval_split='val' in the current parquet dataset.")
         train_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="train", transform=None)
         eval_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="val", transform=None)
+        return train_base, eval_base
+
+    if config.dataset == "Image100":
+        train_base = IndexedImageFolderDataset(root=config.dataset_dir, split="train", transform=None)
+        eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
         return train_base, eval_base
 
     if config.dataset == "Image200":

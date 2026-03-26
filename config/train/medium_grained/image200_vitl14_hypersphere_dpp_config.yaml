@@ -6,6 +6,7 @@ eval_batch_size: 512
 
 dataset: "Image200"
 dataset_dir: "/home/geyingjie/gmm-data/tiny-imagenet-200"
+# 标准 Tiny-ImageNet: train/<wnid>/images, val/images + val_annotations.txt, test/images(无标签)
 class_num: 200
 validation_ratio: 0.1
 validation_seed: 42
@@ -48,4 +49,3 @@ workers: 8
 reload: false
 seed: 42
 best_checkpoint_patience: 100
-

@@ -104,6 +104,18 @@ def build_train_transform(image_size: int, profile: str) -> Callable:
             blur_p=0.1,
         )
 
+    if profile == "imagenet100_two_view":
+        # Image100 比 Image50 类别更多，但仍是自然图像子集；采用相近的中等强度增强。
+        return _build_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.45, 1.0),
+            crop_ratio=(0.75, 1.3333333333),
+            color_jitter=(0.3, 0.3, 0.2, 0.05),
+            color_jitter_p=0.75,
+            grayscale_p=0.05,
+            blur_p=0.1,
+        )
+
     if profile == "tiny_imagenet200_two_view":
         # Tiny-ImageNet 原图分辨率低，放大到 224 后不适合过强裁剪和模糊，因此使用温和增强。
         return _build_two_view_transform(
