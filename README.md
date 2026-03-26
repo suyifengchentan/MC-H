@@ -58,6 +58,27 @@
 python3 train.py --config config/train/fine_grained/cub_vitl14_hypersphere_dpp_config.yaml
 ```
 
+也可以直接按数据集名启动训练脚本：
+
+```bash
+bash scripts/train_by_dataset.sh Image200
+```
+
+可选参数示例：
+
+```bash
+bash scripts/train_by_dataset.sh Image10 --device cuda:0
+bash scripts/train_by_dataset.sh cub --foreground
+```
+
+脚本会自动：
+
+- 根据数据集名选择对应的训练 YAML
+- 检查数据目录是否存在
+- 默认以 `nohup` 后台运行
+- 将后台标准输出写入 `model_path/nohup.log`
+- 将训练 PID 写入 `model_path/train.pid`
+
 训练运行时会在 `model_path` 下生成：
 
 - `train.log`: 可读训练日志
