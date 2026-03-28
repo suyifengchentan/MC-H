@@ -12,14 +12,6 @@ CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
 
-class TwoViewTransform:
-    def __init__(self, transform: Callable):
-        self.transform = transform
-
-    def __call__(self, image):
-        return self.transform(image), self.transform(image)
-
-
 class TwoViewBatchTransform(nn.Module):
     def __init__(self, transform: nn.Module):
         super().__init__()
@@ -68,54 +60,6 @@ def _gaussian_blur_kernel_size(image_size: int) -> int:
     return kernel_size
 
 
-def _build_two_view_transform(
-    image_size: int,
-    crop_scale: tuple[float, float],
-    crop_ratio: tuple[float, float],
-    color_jitter: tuple[float, float, float, float],
-    color_jitter_p: float,
-    grayscale_p: float,
-    blur_p: float,
-) -> Callable:
-    ops = [
-        transforms.RandomResizedCrop(
-            image_size,
-            scale=crop_scale,
-            ratio=crop_ratio,
-            interpolation=InterpolationMode.BICUBIC,
-        ),
-        transforms.RandomHorizontalFlip(p=0.5),
-    ]
-    if color_jitter_p > 0:
-        ops.append(
-            transforms.RandomApply(
-                [transforms.ColorJitter(*color_jitter)],
-                p=color_jitter_p,
-            )
-        )
-    if grayscale_p > 0:
-        ops.append(transforms.RandomGrayscale(p=grayscale_p))
-    if blur_p > 0:
-        ops.append(
-            transforms.RandomApply(
-                [
-                    transforms.GaussianBlur(
-                        kernel_size=_gaussian_blur_kernel_size(image_size),
-                        sigma=(0.1, 2.0),
-                    )
-                ],
-                p=blur_p,
-            )
-        )
-    ops.extend(
-        [
-            transforms.ToTensor(),
-            transforms.Normalize(mean=CLIP_MEAN, std=CLIP_STD),
-        ]
-    )
-    return TwoViewTransform(transforms.Compose(ops))
-
-
 def _build_gpu_two_view_transform(
     image_size: int,
     crop_scale: tuple[float, float],
@@ -161,81 +105,6 @@ def _build_gpu_two_view_transform(
         )
     ops.append(NormalizeBatch(mean=CLIP_MEAN, std=CLIP_STD))
     return TwoViewBatchTransform(nn.Sequential(*ops))
-
-
-def build_train_transform(image_size: int, profile: str) -> Callable:
-    if profile == "fine_grained_two_view":
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.5, 1.0),
-            crop_ratio=(0.75, 1.3333333333),
-            color_jitter=(0.2, 0.2, 0.2, 0.05),
-            color_jitter_p=0.8,
-            grayscale_p=0.1,
-            blur_p=0.0,
-        )
-
-    if profile == "imagenet10_two_view":
-        # Image10 语义粒度较粗，允许更强的裁剪与颜色扰动来学习稳定的类别级不变性。
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.35, 1.0),
-            crop_ratio=(0.7, 1.4),
-            color_jitter=(0.4, 0.4, 0.25, 0.08),
-            color_jitter_p=0.8,
-            grayscale_p=0.05,
-            blur_p=0.15,
-        )
-
-    if profile == "imagenet50_two_view":
-        # Image50 仍是自然图像，但粒度更细一些；增强保持中等强度，避免过强视图偏移。
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.45, 1.0),
-            crop_ratio=(0.75, 1.3333333333),
-            color_jitter=(0.3, 0.3, 0.2, 0.05),
-            color_jitter_p=0.75,
-            grayscale_p=0.05,
-            blur_p=0.1,
-        )
-
-    if profile == "imagenet100_two_view":
-        # Image100 比 Image50 类别更多，但仍是自然图像子集；采用相近的中等强度增强。
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.45, 1.0),
-            crop_ratio=(0.75, 1.3333333333),
-            color_jitter=(0.3, 0.3, 0.2, 0.05),
-            color_jitter_p=0.75,
-            grayscale_p=0.05,
-            blur_p=0.1,
-        )
-
-    if profile == "tiny_imagenet200_two_view":
-        # Tiny-ImageNet 原图分辨率低，放大到 224 后不适合过强裁剪和模糊，因此使用温和增强。
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.6, 1.0),
-            crop_ratio=(0.9, 1.1),
-            color_jitter=(0.2, 0.2, 0.15, 0.03),
-            color_jitter_p=0.6,
-            grayscale_p=0.02,
-            blur_p=0.0,
-        )
-
-    if profile == "small_image_two_view":
-        # CIFAR / STL10 这类低分辨率自然图像需要保留主体，增强以温和裁剪为主。
-        return _build_two_view_transform(
-            image_size=image_size,
-            crop_scale=(0.7, 1.0),
-            crop_ratio=(0.9, 1.1),
-            color_jitter=(0.25, 0.25, 0.2, 0.03),
-            color_jitter_p=0.6,
-            grayscale_p=0.02,
-            blur_p=0.0,
-        )
-
-    raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
 def build_train_decode_transform(image_size: int, profile: str) -> Callable:

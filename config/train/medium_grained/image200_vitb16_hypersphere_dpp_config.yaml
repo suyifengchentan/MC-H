@@ -18,11 +18,11 @@ pretrained: "laion2b_s34b_b88k"
 pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.bin"
 adapter_hidden_dim: 768
 adapter_dropout: 0.1
-transform_profile: "tiny_imagenet200_two_view"
+transform_profile: "imagenet100_two_view"
 
 # Optimization
 precision: "bf16"
-batch_size: 256
+batch_size: 512
 eval_batch_size: 512
 epochs: 500
 learning_rate: 0.00025

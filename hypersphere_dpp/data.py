@@ -22,25 +22,6 @@ from .labels import load_label_wnids
 from .transforms import build_eval_transform, build_train_decode_transform
 
 
-class PairViewDataset(Dataset):
-    def __init__(self, dataset: Dataset, transform):
-        self.dataset = dataset
-        self.transform = transform
-
-    def __len__(self) -> int:
-        return len(self.dataset)
-
-    def __getitem__(self, index: int):
-        image, label, sample_index = self.dataset[index]
-        view1, view2 = self.transform(image)
-        return {
-            "view1": view1,
-            "view2": view2,
-            "label": label,
-            "index": sample_index,
-        }
-
-
 class TrainTensorDataset(Dataset):
     def __init__(self, dataset: Dataset, transform):
         self.dataset = dataset
@@ -198,6 +179,26 @@ def _default_official_eval_split(dataset_name: str) -> str:
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
+def _build_imagenet_h5_datasets(
+    config: ExperimentConfig,
+    official_eval_split: str,
+) -> tuple[Dataset, Dataset]:
+    label_wnids = load_label_wnids(config.dataset)
+    train_base = ImageNetH5Dataset(
+        root=config.dataset_dir,
+        split="train",
+        transform=None,
+        class_names=label_wnids,
+    )
+    eval_base = ImageNetH5Dataset(
+        root=config.dataset_dir,
+        split=official_eval_split,
+        transform=None,
+        class_names=label_wnids,
+    )
+    return train_base, eval_base
+
+
 def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
     official_eval_split = config.official_eval_split or _default_official_eval_split(
         config.dataset
@@ -244,53 +245,8 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         )
         return train_base, eval_base
 
-    if config.dataset == "Image50":
-        label_wnids = load_label_wnids(config.dataset)
-        train_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split="train",
-            transform=None,
-            class_names=label_wnids,
-        )
-        eval_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split=official_eval_split,
-            transform=None,
-            class_names=label_wnids,
-        )
-        return train_base, eval_base
-
-    if config.dataset == "Image100":
-        label_wnids = load_label_wnids(config.dataset)
-        train_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split="train",
-            transform=None,
-            class_names=label_wnids,
-        )
-        eval_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split=official_eval_split,
-            transform=None,
-            class_names=label_wnids,
-        )
-        return train_base, eval_base
-
-    if config.dataset == "Image200":
-        label_wnids = load_label_wnids(config.dataset)
-        train_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split="train",
-            transform=None,
-            class_names=label_wnids,
-        )
-        eval_base = ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split=official_eval_split,
-            transform=None,
-            class_names=label_wnids,
-        )
-        return train_base, eval_base
+    if config.dataset in {"Image50", "Image100", "Image200"}:
+        return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset == "Oxford_Flowers":
         train_base = OxfordFlowersDataset(
