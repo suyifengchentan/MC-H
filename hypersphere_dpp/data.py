@@ -93,18 +93,24 @@ def _build_loader(
     workers: int,
     shuffle: bool,
     drop_last: bool,
+    pin_memory: bool = True,
+    persistent_workers: bool | None = None,
+    prefetch_factor: int | None = None,
 ) -> DataLoader:
+    if persistent_workers is None:
+        persistent_workers = workers > 0
+
     loader_kwargs = {
         "dataset": dataset,
         "batch_size": batch_size,
         "shuffle": shuffle,
         "drop_last": drop_last,
         "num_workers": workers,
-        "pin_memory": True,
-        "persistent_workers": workers > 0,
+        "pin_memory": pin_memory,
+        "persistent_workers": persistent_workers if workers > 0 else False,
     }
-    if workers > 0:
-        loader_kwargs["prefetch_factor"] = 4
+    if workers > 0 and prefetch_factor is not None:
+        loader_kwargs["prefetch_factor"] = prefetch_factor
 
     return DataLoader(
         **loader_kwargs,
@@ -172,25 +178,44 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size))
     test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size))
 
+    # HDF5 shard datasets keep per-worker file handles and chunk caches alive.
+    # Use more conservative loader settings here to avoid host-memory spikes across epochs.
+    is_h5_dataset = config.dataset in {"Image50", "Image100", "Image200"}
+    train_workers = min(config.workers, 2) if is_h5_dataset else config.workers
+    eval_workers = min(config.workers, 2) if is_h5_dataset else config.workers
+    pin_memory = is_h5_dataset
+    persistent_workers = False if is_h5_dataset else None
+    prefetch_factor = 1 if is_h5_dataset and train_workers > 0 else (4 if train_workers > 0 else None)
+    eval_prefetch_factor = 1 if is_h5_dataset and eval_workers > 0 else (4 if eval_workers > 0 else None)
+
     train_loader = _build_loader(
         train_dataset,
         batch_size=config.batch_size,
-        workers=config.workers,
+        workers=train_workers,
         shuffle=True,
         drop_last=True,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        prefetch_factor=prefetch_factor,
     )
     val_loader = _build_loader(
         val_dataset,
         batch_size=config.eval_batch_size,
-        workers=config.workers,
+        workers=eval_workers,
         shuffle=False,
         drop_last=False,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        prefetch_factor=eval_prefetch_factor,
     )
     test_loader = _build_loader(
         test_dataset,
         batch_size=config.eval_batch_size,
-        workers=config.workers,
+        workers=eval_workers,
         shuffle=False,
         drop_last=False,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        prefetch_factor=eval_prefetch_factor,
     )
     return DatasetBundle(train_loader=train_loader, val_loader=val_loader, test_loader=test_loader)

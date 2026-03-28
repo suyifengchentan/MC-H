@@ -254,7 +254,6 @@ def main():
         config.eval_batch_size,
         config.validation_seed,
     )
-    logger.info("dataloader optimization: pin_memory=True persistent_workers=%s prefetch_factor=%d", config.workers > 0, 4)
     logger.info(
         "precision=%s amp_enabled=%s amp_device_type=%s amp_dtype=%s grad_scaler=%s",
         config.precision,
@@ -267,6 +266,14 @@ def main():
         logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
 
     datasets = build_experiment_dataloaders(config)
+    train_prefetch_factor = getattr(datasets.train_loader, "prefetch_factor", None)
+    logger.info(
+        "train dataloader: workers=%d pin_memory=%s persistent_workers=%s prefetch_factor=%s",
+        datasets.train_loader.num_workers,
+        datasets.train_loader.pin_memory,
+        datasets.train_loader.persistent_workers,
+        train_prefetch_factor,
+    )
     fixed_val_loader = build_fixed_eval_loader(datasets.val_loader, config.validation_seed)
     gpu_train_transform = build_gpu_train_transform(config.image_size, config.transform_profile).to(device)
     model = HypersphereDPPModel(
