@@ -2,7 +2,7 @@
 
 # Data
 dataset: "Image200"
-dataset_dir: "/home/geyingjie/gmm-data/Image200"
+dataset_dir: "/home/geyingjie/hypersphere-data/Image200"
 # 新逻辑统一使用 HDF5 shard:
 # data/train-*.h5, data/validation-*.h5, label_info.json
 class_num: 200
