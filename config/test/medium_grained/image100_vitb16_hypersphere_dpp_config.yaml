@@ -3,6 +3,8 @@
 # Data
 dataset: "Image100"
 dataset_dir: "/home/geyingjie/gmm-data/Image100"
+# 新逻辑统一使用 HDF5 shard:
+# data/train-*.h5, data/validation-*.h5, label_info.json
 class_num: 100
 validation_ratio: 0.1
 validation_seed: 42

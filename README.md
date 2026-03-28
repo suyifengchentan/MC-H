@@ -49,6 +49,7 @@
 - `scipy`
 - `pyyaml`
 - `pyarrow`
+- `h5py`
 
 ## 运行方式
 
@@ -186,32 +187,48 @@ root/
   val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
 ```
 
-Image50 当前仅支持 `/home/geyingjie/gmm-data/imagenet-50-subset` 这一版 parquet 导出，目录结构应为：
+`Image50`、`Image100`、`Image200` 现已统一切换到同一套 HDF5 shard 数据协议，默认目录分别是：
+
+- `Image50`: `/home/geyingjie/gmm-data/Image50`
+- `Image100`: `/home/geyingjie/gmm-data/Image100`
+- `Image200`: `/home/geyingjie/gmm-data/Image200`
+
+目录结构统一为：
 
 ```text
 root/
-  data/train-*.parquet
-  data/validation-*.parquet
+  data/train-*.h5
+  data/validation-*.h5
   label_info.json
   metadata.json
 ```
 
-其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.parquet`。
+类别子集定义放在 `config/labels/` 下：
 
-Image100 默认按当前 `/home/geyingjie/gmm-data/Image100` 的 split 别名目录解析：
+- `config/labels/imagenet_50.rtf`
+- `config/labels/imagenet_100.rtf`
+- `config/labels/imagenet_200.rtf`
 
-```text
-root/
-  train.X1/<class_name>/*.jpg
-  train.X2/<class_name>/*.jpg
-  train.X3/<class_name>/*.jpg
-  train.X4/<class_name>/*.jpg
-  val.X/<class_name>/*.jpg
+这三份文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 HDF5 shard。
+
+若需要从 Hugging Face 的 `imagenet-1k` parquet 原始导出生成这三套数据，可运行：
+
+```bash
+/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py
 ```
 
-其中逻辑上的 `train` 会自动合并所有 `train.X*`，逻辑上的 `val` 会映射到 `val.X`。
+脚本会从 `/home/geyingjie/imagenet-1k` 读取 parquet，并把三套子集写到上面的默认目录中。也可以通过 `--datasets Image50 Image100 Image200`、`--overwrite`、`--max-shards-per-split` 控制转换范围。
 
-Image200 默认按标准 Tiny-ImageNet 目录解析，其中 `val` 通过 `val_annotations.txt` 读取标签。
+每个 HDF5 shard 至少包含以下字段：
+
+```text
+image_bytes: 原始 JPEG bytes
+label: 子集内重映射后的连续标签
+path: 原始样本路径
+wnid: 样本所属 wnid
+```
+
+其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`。
 
 ## Git Ignore 规则
 

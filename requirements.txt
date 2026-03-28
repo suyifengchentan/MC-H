@@ -5,4 +5,5 @@ scikit-learn
 scipy
 pyyaml
 pyarrow
+h5py
 kornia

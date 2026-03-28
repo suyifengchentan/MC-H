@@ -6,11 +6,11 @@ import torch
 from torch.utils.data import DataLoader, Dataset, Subset
 
 from datasets.cub_dataset import CUB200Dataset
-from datasets.imagenet50_parquet_dataset import ImageNet50ParquetDataset
+from datasets.imagenet_shard_dataset import ImageNetH5Dataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
-from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
+from .labels import load_label_wnids
 from .transforms import build_eval_transform, build_train_decode_transform
 
 
@@ -133,20 +133,21 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "Image50":
-        if official_eval_split != "val":
-            raise ValueError("Image50 only supports official_eval_split='val' in the current parquet dataset.")
-        train_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="train", transform=None)
-        eval_base = ImageNet50ParquetDataset(root=config.dataset_dir, split="val", transform=None)
+        label_wnids = load_label_wnids(config.dataset)
+        train_base = ImageNetH5Dataset(root=config.dataset_dir, split="train", transform=None, class_names=label_wnids)
+        eval_base = ImageNetH5Dataset(root=config.dataset_dir, split=official_eval_split, transform=None, class_names=label_wnids)
         return train_base, eval_base
 
     if config.dataset == "Image100":
-        train_base = IndexedImageFolderDataset(root=config.dataset_dir, split="train", transform=None)
-        eval_base = IndexedImageFolderDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        label_wnids = load_label_wnids(config.dataset)
+        train_base = ImageNetH5Dataset(root=config.dataset_dir, split="train", transform=None, class_names=label_wnids)
+        eval_base = ImageNetH5Dataset(root=config.dataset_dir, split=official_eval_split, transform=None, class_names=label_wnids)
         return train_base, eval_base
 
     if config.dataset == "Image200":
-        train_base = TinyImageNetDataset(root=config.dataset_dir, split="train", transform=None)
-        eval_base = TinyImageNetDataset(root=config.dataset_dir, split=official_eval_split, transform=None)
+        label_wnids = load_label_wnids(config.dataset)
+        train_base = ImageNetH5Dataset(root=config.dataset_dir, split="train", transform=None, class_names=label_wnids)
+        eval_base = ImageNetH5Dataset(root=config.dataset_dir, split=official_eval_split, transform=None, class_names=label_wnids)
         return train_base, eval_base
 
     raise ValueError(f"Unsupported dataset for dataloader construction: {config.dataset}")
