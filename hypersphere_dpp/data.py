@@ -173,19 +173,19 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
 
     train_dataset = TrainTensorDataset(
         train_subset,
-        build_train_decode_transform(config.image_size),
+        build_train_decode_transform(config.image_size, config.transform_profile),
     )
-    val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size))
-    test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size))
+    val_dataset = SingleViewDataset(val_subset, build_eval_transform(config.image_size, config.transform_profile))
+    test_dataset = SingleViewDataset(test_base, build_eval_transform(config.image_size, config.transform_profile))
 
-    # HDF5 shard datasets keep per-worker file handles and chunk caches alive.
-    # Use more conservative loader settings here to avoid host-memory spikes across epochs.
+    # HDF5 shard datasets benefit from a small pinned prefetch window. Keep the
+    # queue shallow enough to avoid large host-memory spikes while still feeding the GPU.
     is_h5_dataset = config.dataset in {"Image50", "Image100", "Image200"}
-    train_workers = min(config.workers, 2) if is_h5_dataset else config.workers
-    eval_workers = min(config.workers, 2) if is_h5_dataset else config.workers
+    train_workers = min(config.workers, 4) if is_h5_dataset else config.workers
+    eval_workers = min(config.workers, 4) if is_h5_dataset else config.workers
     pin_memory = is_h5_dataset
-    persistent_workers = False if is_h5_dataset else None
-    prefetch_factor = 1 if is_h5_dataset and train_workers > 0 else (4 if train_workers > 0 else None)
+    persistent_workers = True if is_h5_dataset else None
+    train_prefetch_factor = 2 if is_h5_dataset and train_workers > 0 else None
     eval_prefetch_factor = 1 if is_h5_dataset and eval_workers > 0 else (4 if eval_workers > 0 else None)
 
     train_loader = _build_loader(
@@ -196,7 +196,7 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         drop_last=True,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
-        prefetch_factor=prefetch_factor,
+        prefetch_factor=train_prefetch_factor,
     )
     val_loader = _build_loader(
         val_dataset,

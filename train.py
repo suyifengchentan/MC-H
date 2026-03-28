@@ -194,13 +194,21 @@ def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
     generator = torch.Generator().manual_seed(seed)
     sample_indices = torch.randperm(dataset_size, generator=generator)[:sample_size].tolist()
     sampled_dataset = Subset(dataset, sample_indices)
+    num_workers = min(getattr(dataloader, "num_workers", 0), 2)
+    loader_kwargs = {
+        "dataset": sampled_dataset,
+        "batch_size": sample_size,
+        "shuffle": False,
+        "drop_last": False,
+        "num_workers": num_workers,
+        "pin_memory": dataloader.pin_memory,
+        "persistent_workers": getattr(dataloader, "persistent_workers", False) if num_workers > 0 else False,
+    }
+    prefetch_factor = getattr(dataloader, "prefetch_factor", None)
+    if num_workers > 0 and prefetch_factor is not None:
+        loader_kwargs["prefetch_factor"] = prefetch_factor
     return DataLoader(
-        sampled_dataset,
-        batch_size=sample_size,
-        shuffle=False,
-        drop_last=False,
-        num_workers=0,
-        pin_memory=dataloader.pin_memory,
+        **loader_kwargs,
     )
 
 

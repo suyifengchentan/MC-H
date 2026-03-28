@@ -202,12 +202,16 @@ def build_train_transform(image_size: int, profile: str) -> Callable:
     raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
-def build_train_decode_transform(image_size: int) -> Callable:
+def build_train_decode_transform(image_size: int, profile: str) -> Callable:
+    if profile == "tiny_imagenet200_two_view":
+        # Tiny-ImageNet style samples are already small; keep CPU decode cheap and
+        # let the GPU-side crop/resize path do the upscale work.
+        return transforms.PILToTensor()
+
     resize_size = int(image_size / 0.875)
     return transforms.Compose(
         [
             transforms.Resize(resize_size, interpolation=InterpolationMode.BICUBIC),
-            transforms.CenterCrop(resize_size),
             transforms.PILToTensor(),
         ]
     )
@@ -272,7 +276,16 @@ def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
     raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
-def build_eval_transform(image_size: int) -> Callable:
+def build_eval_transform(image_size: int, profile: str | None = None) -> Callable:
+    if profile == "tiny_imagenet200_two_view":
+        return transforms.Compose(
+            [
+                transforms.Resize((image_size, image_size), interpolation=InterpolationMode.BICUBIC),
+                transforms.ToTensor(),
+                transforms.Normalize(mean=CLIP_MEAN, std=CLIP_STD),
+            ]
+        )
+
     resize_size = int(image_size / 0.875)
     return transforms.Compose(
         [

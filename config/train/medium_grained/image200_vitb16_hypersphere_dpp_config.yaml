@@ -23,8 +23,8 @@ transform_profile: "tiny_imagenet200_two_view"
 
 # Optimization
 precision: "bf16"
-batch_size: 512
-eval_batch_size: 1024
+batch_size: 256
+eval_batch_size: 512
 epochs: 500
 learning_rate: 0.00025
 weight_decay: 0.000001
@@ -56,7 +56,7 @@ dpp_jitter: 0.00001
 # Runtime / output
 eval_interval: 3
 model_path: "save/hypersphere_dpp/Image200_CLIP_ViTB16_HypersphereDPP"
-workers: 2
+workers: 4
 reload: false
 seed: 42
 best_checkpoint_patience: 100
