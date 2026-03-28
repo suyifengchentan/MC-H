@@ -16,6 +16,7 @@
 !*.ini
 !*.cfg
 !*.tex
+!*.rtf
 
 .vscode/
 .vscode/*
