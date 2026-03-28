@@ -1,0 +1,58 @@
+suite_name: methodology_validation
+description: >
+  Validation experiments mapped to methodology.md. These runs verify that the
+  unified Hypersphere-DPP objective works across coarse/medium/fine granularity
+  datasets without per-dataset algorithm changes.
+
+defaults:
+  seeds: [42, 43, 44]
+  output_root: save/experiments
+  eval_split: both
+  train_overrides:
+    reload: false
+
+cases:
+  - id: coarse_cifar10_full
+    hypothesis: >
+      Section 3.1/3.6: the full objective should converge on coarse-grained data
+      with moderate DPP pressure and limited geometric restructuring.
+    granularity: coarse
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    tags: [validation, coarse, full]
+
+  - id: medium_image100_full
+    hypothesis: >
+      Section 3.1/3.3/3.6: the same unified objective should remain stable on
+      medium-grained Image100 with stronger density-driven diversity than coarse data.
+    granularity: medium
+    base_train_config: config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
+    tags: [validation, medium, full]
+
+  - id: medium_image200_full
+    hypothesis: >
+      Section 3.3.3: on denser Image200 subsets, the training logs should show
+      consistently higher rho/alpha_div than coarse datasets under the same framework.
+    granularity: medium
+    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    tags: [validation, medium, density]
+
+  - id: fine_cub_full
+    hypothesis: >
+      Section 3.3/3.5: fine-grained CUB should benefit most from DPP-driven
+      subspace expansion while preserving class-level compactness.
+    granularity: fine
+    base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    tags: [validation, fine, full]
+
+  - id: fine_aircraft_full
+    hypothesis: >
+      Section 3.1/3.6: the same loss decomposition should transfer to another
+      fine-grained domain (aircraft) without redesigning the objective.
+    granularity: fine
+    base_train_config: config/train/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml
+    tags: [validation, fine, full]
