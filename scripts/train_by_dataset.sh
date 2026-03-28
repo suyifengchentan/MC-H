@@ -153,11 +153,17 @@ PY
 
 DATASET_DIR="${CONFIG_INFO[0]}"
 MODEL_PATH_REL="${CONFIG_INFO[1]}"
-OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
+BASE_OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
+RUN_STAMP="$(date '+%Y%m%d_%H%M%S')"
+OUTPUT_DIR="${BASE_OUTPUT_DIR}_${RUN_STAMP}"
+if [[ -e "$OUTPUT_DIR" ]]; then
+  OUTPUT_DIR="${OUTPUT_DIR}_$$"
+fi
 PID_FILE="$OUTPUT_DIR/train.pid"
 LAUNCH_LOG="$OUTPUT_DIR/launcher.log"
 TRAIN_LOG="$OUTPUT_DIR/train.log"
 METRICS_LOG="$OUTPUT_DIR/metrics.jsonl"
+RUN_CONFIG_PATH="$OUTPUT_DIR/train_config.resolved.yaml"
 
 if [[ ! -d "$DATASET_DIR" ]]; then
   echo "Dataset directory does not exist for $DATASET_NAME: $DATASET_DIR" >&2
@@ -166,16 +172,20 @@ fi
 
 mkdir -p "$OUTPUT_DIR"
 
-if [[ -f "$PID_FILE" ]]; then
-  EXISTING_PID="$(tr -d '[:space:]' < "$PID_FILE")"
-  if [[ -n "$EXISTING_PID" ]] && ps -p "$EXISTING_PID" > /dev/null 2>&1; then
-    echo "Training for $DATASET_NAME is already running with PID $EXISTING_PID" >&2
-    echo "PID file: $PID_FILE" >&2
-    exit 1
-  fi
-fi
+RUN_OUTPUT_DIR="$OUTPUT_DIR" "$PYTHON_BIN" - "$CONFIG_PATH" "$RUN_CONFIG_PATH" <<'PY'
+from pathlib import Path
+import os
+import sys
+import yaml
 
-CMD=("$PYTHON_BIN" "train.py" "--config" "$CONFIG_REL")
+src = Path(sys.argv[1])
+dst = Path(sys.argv[2])
+config = yaml.safe_load(src.read_text(encoding="utf-8"))
+config["model_path"] = os.environ["RUN_OUTPUT_DIR"]
+dst.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=False), encoding="utf-8")
+PY
+
+CMD=("$PYTHON_BIN" "train.py" "--config" "$RUN_CONFIG_PATH")
 if [[ -n "$DEVICE" ]]; then
   CMD+=("--device" "$DEVICE")
 fi
@@ -187,8 +197,10 @@ cd "$ROOT_DIR"
 
 echo "dataset: $DATASET_NAME"
 echo "config: $CONFIG_REL"
+echo "resolved_config: $RUN_CONFIG_PATH"
 echo "dataset_dir: $DATASET_DIR"
-echo "output_dir: $MODEL_PATH_REL"
+echo "base_output_dir: $MODEL_PATH_REL"
+echo "run_output_dir: $OUTPUT_DIR"
 printf 'command:'
 printf ' %q' "${CMD[@]}"
 printf '\n'
