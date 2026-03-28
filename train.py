@@ -10,7 +10,7 @@ from torch.utils.data import DataLoader, Subset
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders
+from hypersphere_dpp.data import build_experiment_dataloaders, safe_default_collate
 from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
@@ -203,6 +203,7 @@ def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
         "num_workers": num_workers,
         "pin_memory": dataloader.pin_memory,
         "persistent_workers": getattr(dataloader, "persistent_workers", False) if num_workers > 0 else False,
+        "collate_fn": safe_default_collate,
     }
     prefetch_factor = getattr(dataloader, "prefetch_factor", None)
     if num_workers > 0 and prefetch_factor is not None:

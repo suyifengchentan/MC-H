@@ -4,6 +4,7 @@ from dataclasses import dataclass
 
 import torch
 from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data._utils.collate import default_collate
 
 from datasets.cub_dataset import CUB200Dataset
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
@@ -87,6 +88,22 @@ def split_train_indices(size: int, validation_ratio: float, seed: int) -> tuple[
     return train_indices, val_indices
 
 
+def _clone_cpu_tensors_for_collate(sample):
+    if torch.is_tensor(sample):
+        return sample.clone() if sample.device.type == "cpu" else sample
+    if isinstance(sample, dict):
+        return {key: _clone_cpu_tensors_for_collate(value) for key, value in sample.items()}
+    if isinstance(sample, tuple):
+        return tuple(_clone_cpu_tensors_for_collate(value) for value in sample)
+    if isinstance(sample, list):
+        return [_clone_cpu_tensors_for_collate(value) for value in sample]
+    return sample
+
+
+def safe_default_collate(batch):
+    return default_collate([_clone_cpu_tensors_for_collate(sample) for sample in batch])
+
+
 def _build_loader(
     dataset: Dataset,
     batch_size: int,
@@ -108,6 +125,7 @@ def _build_loader(
         "num_workers": workers,
         "pin_memory": pin_memory,
         "persistent_workers": persistent_workers if workers > 0 else False,
+        "collate_fn": safe_default_collate,
     }
     if workers > 0 and prefetch_factor is not None:
         loader_kwargs["prefetch_factor"] = prefetch_factor
