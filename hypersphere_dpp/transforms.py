@@ -222,7 +222,9 @@ def build_train_decode_transform(image_size: int, profile: str) -> Callable:
     resize_size = int(image_size / 0.875)
     return transforms.Compose(
         [
-            transforms.Resize(resize_size, interpolation=InterpolationMode.BICUBIC),
+            # Keep a fixed square decode size so DataLoader can stack samples,
+            # while still leaving the actual random crop to the GPU transform.
+            transforms.Resize((resize_size, resize_size), interpolation=InterpolationMode.BICUBIC),
             PILToTensorCopy(),
         ]
     )
