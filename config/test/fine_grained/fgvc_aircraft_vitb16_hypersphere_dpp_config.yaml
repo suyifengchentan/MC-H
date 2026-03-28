@@ -1,0 +1,21 @@
+# FGVC_Aircraft ViT-B/16 hypersphere-DPP prototype evaluation config
+
+# Data
+dataset: "FGVC_Aircraft"
+dataset_dir: "/home/geyingjie/hypersphere-data/FGVC_Aircraft"
+class_num: 100
+validation_ratio: 0.1
+validation_seed: 42
+official_eval_split: "test"
+
+# Model
+image_size: 224
+feature_dim: 512
+backbone_name: "ViT-B-16"
+pretrained: "laion2b_s34b_b88k"
+transform_profile: "fine_grained_two_view"
+
+# Evaluation / runtime
+eval_batch_size: 384
+workers: 8
+seed: 42
