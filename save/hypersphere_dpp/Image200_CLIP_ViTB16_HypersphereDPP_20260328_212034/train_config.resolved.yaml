@@ -37,7 +37,7 @@ dpp_every_n_steps: 6
 dpp_jitter: 1.0e-05
 eval_interval: 3
 model_path: /home/geyingjie/hypersphere/save/hypersphere_dpp/Image200_CLIP_ViTB16_HypersphereDPP_20260328_212034
-workers: 4
-reload: false
+workers: 2
+reload: true
 seed: 42
 best_checkpoint_patience: 100

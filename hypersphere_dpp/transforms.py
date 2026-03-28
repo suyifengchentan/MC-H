@@ -60,6 +60,16 @@ def _gaussian_blur_kernel_size(image_size: int) -> int:
     return kernel_size
 
 
+def _disable_kornia_extra_features(module: nn.Module) -> None:
+    # Kornia ImageModule/ImageSequential keeps a detached CPU copy of outputs by
+    # default for visualization helpers, which can cause large host-memory spikes
+    # during training. Disable those extras for the training path.
+    if hasattr(module, "disable_features"):
+        module.disable_features = True
+    for child in module.children():
+        _disable_kornia_extra_features(child)
+
+
 def _build_gpu_two_view_transform(
     image_size: int,
     crop_scale: tuple[float, float],
@@ -104,7 +114,9 @@ def _build_gpu_two_view_transform(
             )
         )
     ops.append(NormalizeBatch(mean=CLIP_MEAN, std=CLIP_STD))
-    return TwoViewBatchTransform(nn.Sequential(*ops))
+    transform = nn.Sequential(*ops)
+    _disable_kornia_extra_features(transform)
+    return TwoViewBatchTransform(transform)
 
 
 def build_train_decode_transform(image_size: int, profile: str) -> Callable:

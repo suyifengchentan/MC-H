@@ -41,6 +41,11 @@ if [[ $# -lt 1 ]]; then
   exit 1
 fi
 
+if [[ "$1" == "-h" || "$1" == "--help" ]]; then
+  usage
+  exit 0
+fi
+
 DATASET_INPUT="$1"
 shift
 
@@ -148,17 +153,25 @@ config_path = Path(sys.argv[1])
 config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
 print(config["dataset_dir"])
 print(config["model_path"])
+print("1" if config.get("reload", False) else "0")
 PY
 )
 
 DATASET_DIR="${CONFIG_INFO[0]}"
 MODEL_PATH_REL="${CONFIG_INFO[1]}"
+RELOAD_ENABLED="${CONFIG_INFO[2]}"
 BASE_OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
-RUN_STAMP="$(date '+%Y%m%d_%H%M%S')"
-OUTPUT_DIR="${BASE_OUTPUT_DIR}_${RUN_STAMP}"
-if [[ -e "$OUTPUT_DIR" ]]; then
-  OUTPUT_DIR="${OUTPUT_DIR}_$$"
+
+if [[ "$RELOAD_ENABLED" == "1" ]]; then
+  OUTPUT_DIR="$BASE_OUTPUT_DIR"
+else
+  RUN_STAMP="$(date '+%Y%m%d_%H%M%S')"
+  OUTPUT_DIR="${BASE_OUTPUT_DIR}_${RUN_STAMP}"
+  if [[ -e "$OUTPUT_DIR" ]]; then
+    OUTPUT_DIR="${OUTPUT_DIR}_$$"
+  fi
 fi
+
 PID_FILE="$OUTPUT_DIR/train.pid"
 LAUNCH_LOG="$OUTPUT_DIR/launcher.log"
 TRAIN_LOG="$OUTPUT_DIR/train.log"
@@ -200,6 +213,7 @@ echo "config: $CONFIG_REL"
 echo "resolved_config: $RUN_CONFIG_PATH"
 echo "dataset_dir: $DATASET_DIR"
 echo "base_output_dir: $MODEL_PATH_REL"
+echo "reload: $RELOAD_ENABLED"
 echo "run_output_dir: $OUTPUT_DIR"
 printf 'command:'
 printf ' %q' "${CMD[@]}"
