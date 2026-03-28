@@ -7,3 +7,4 @@ pyyaml
 pyarrow
 h5py
 kornia
+matplotlib

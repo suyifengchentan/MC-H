@@ -23,6 +23,10 @@
 - [`collect_results.py`](/home/geyingjie/hypersphere/experiments/collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
 - [`run_validation.sh`](/home/geyingjie/hypersphere/experiments/run_validation.sh): 运行验证实验套件
 - [`run_ablation.sh`](/home/geyingjie/hypersphere/experiments/run_ablation.sh): 运行消融实验套件
+- [`figures/generate_fig3.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
+- [`figures/generate_fig6.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig6.py): 图6（课程调度与训练动态）
+- [`figures/generate_fig7.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig7.py): 图7（子空间正则化可视化）
+- [`figures/ieee_style.py`](/home/geyingjie/hypersphere/experiments/figures/ieee_style.py): 统一 IEEE 风格样式（Computer Modern Roman 字体、线宽、网格、图例）
 
 ## 使用方式
 
@@ -81,3 +85,19 @@ python experiments/collect_results.py \
 - `metrics.jsonl`
 - `best.pt` / `last.pt`
 - `eval_val.json` / `eval_test.json`（执行 eval 时生成）
+
+## 论文图生成
+
+三张图默认使用 IEEE 风格（Computer Modern Roman 字体、紧凑字号、规范线宽和图例样式）。
+
+```bash
+python experiments/figures/generate_fig3.py
+python experiments/figures/generate_fig6.py
+python experiments/figures/generate_fig7.py
+```
+
+默认输出目录：
+
+- `experiments/generated/figures/fig3_density_adaptive_repulsion.png`
+- `experiments/generated/figures/fig6_curriculum_scheduling.png`
+- `experiments/generated/figures/fig7_subspace_regularization.png`
