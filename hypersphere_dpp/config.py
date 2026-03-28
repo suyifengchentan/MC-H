@@ -11,6 +11,7 @@ import yaml
 SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
 SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image100", "Image200"}
 SUPPORTED_EVAL_SPLITS = {"val", "test"}
+SUPPORTED_LR_SCHEDULERS = {"none", "cosine"}
 SUPPORTED_BACKBONE_FEATURE_DIMS = {
     "ViT-L-14": 768,
     "ViT-B-16": 512,
@@ -44,6 +45,8 @@ class ExperimentConfig:
     learning_rate: float = 2.5e-4
     weight_decay: float = 1e-6
     precision: str = "fp16"
+    lr_scheduler: str = "none"
+    min_learning_rate: float = 0.0
 
     # Compact / clustering
     instance_temperature: float = 0.2
@@ -89,11 +92,16 @@ def _field_names() -> set[str]:
     return {item.name for item in fields(ExperimentConfig)}
 
 
-def _warn_unknown_fields(values: Dict[str, Any], supported_fields: Iterable[str]) -> None:
+def _warn_unknown_fields(
+    values: Dict[str, Any], supported_fields: Iterable[str]
+) -> None:
     supported = set(supported_fields)
     unknown = sorted(set(values) - supported)
     for key in unknown:
-        warnings.warn(f"Unsupported config field '{key}' will be ignored in the CLIP prototype.", stacklevel=2)
+        warnings.warn(
+            f"Unsupported config field '{key}' will be ignored in the CLIP prototype.",
+            stacklevel=2,
+        )
 
 
 def load_experiment_config(path: str | Path) -> ExperimentConfig:
@@ -125,7 +133,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         )
 
     if not 0.0 < config.validation_ratio < 1.0:
-        raise ValueError("validation_ratio must be in (0, 1) so training always has a validation split.")
+        raise ValueError(
+            "validation_ratio must be in (0, 1) so training always has a validation split."
+        )
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
@@ -140,7 +150,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise ValueError("subspace_pca_q_offset must be non-negative.")
 
     if config.subspace_topk_clusters is not None and config.subspace_topk_clusters <= 0:
-        raise ValueError("subspace_topk_clusters must be a positive integer when provided.")
+        raise ValueError(
+            "subspace_topk_clusters must be a positive integer when provided."
+        )
 
     if config.dpp_every_n_steps <= 0:
         raise ValueError("dpp_every_n_steps must be a positive integer.")
@@ -148,7 +160,10 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.subspace_min_mass <= 0:
         raise ValueError("subspace_min_mass must be positive.")
 
-    if config.official_eval_split is not None and config.official_eval_split not in SUPPORTED_EVAL_SPLITS:
+    if (
+        config.official_eval_split is not None
+        and config.official_eval_split not in SUPPORTED_EVAL_SPLITS
+    ):
         raise ValueError(
             f"official_eval_split must be one of {sorted(SUPPORTED_EVAL_SPLITS)}, got {config.official_eval_split!r}."
         )
@@ -156,6 +171,19 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.precision not in SUPPORTED_PRECISIONS:
         raise ValueError(
             f"precision must be one of {sorted(SUPPORTED_PRECISIONS)}, got {config.precision!r}."
+        )
+
+    if config.lr_scheduler not in SUPPORTED_LR_SCHEDULERS:
+        raise ValueError(
+            f"lr_scheduler must be one of {sorted(SUPPORTED_LR_SCHEDULERS)}, got {config.lr_scheduler!r}."
+        )
+
+    if config.min_learning_rate < 0:
+        raise ValueError("min_learning_rate must be non-negative.")
+
+    if config.min_learning_rate > config.learning_rate:
+        raise ValueError(
+            "min_learning_rate must be less than or equal to learning_rate."
         )
 
     return config

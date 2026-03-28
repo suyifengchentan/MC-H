@@ -30,6 +30,7 @@ def save_checkpoint(
     model,
     optimizer,
     scaler,
+    scheduler,
     queue_state: dict,
     epoch: int,
     global_step: int,
@@ -42,6 +43,7 @@ def save_checkpoint(
         "model": _to_cpu(model.trainable_state_dict()),
         "optimizer": _to_cpu(optimizer.state_dict()),
         "scaler": scaler.state_dict() if scaler is not None else None,
+        "scheduler": _to_cpu(scheduler.state_dict()) if scheduler is not None else None,
         "queue": _to_cpu(queue_state),
         "epoch": epoch,
         "global_step": global_step,
@@ -56,14 +58,21 @@ def load_checkpoint(
     model,
     optimizer=None,
     scaler=None,
+    scheduler=None,
     map_location: str | torch.device = "cpu",
 ) -> dict[str, Any]:
     checkpoint = torch.load(checkpoint_path, map_location=map_location)
     model.load_trainable_state_dict(checkpoint["model"])
     if optimizer is not None and checkpoint.get("optimizer") is not None:
         optimizer.load_state_dict(checkpoint["optimizer"])
-        target_device = map_location if isinstance(map_location, torch.device) else torch.device(map_location)
+        target_device = (
+            map_location
+            if isinstance(map_location, torch.device)
+            else torch.device(map_location)
+        )
         _move_optimizer_state_to_device(optimizer, target_device)
     if scaler is not None and checkpoint.get("scaler") is not None:
         scaler.load_state_dict(checkpoint["scaler"])
+    if scheduler is not None and checkpoint.get("scheduler") is not None:
+        scheduler.load_state_dict(checkpoint["scheduler"])
     return checkpoint

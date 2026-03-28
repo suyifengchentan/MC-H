@@ -33,7 +33,7 @@ def setup_training_logger(output_dir: str | Path) -> logging.Logger:
 
 def append_metrics_record(output_dir: str | Path, record: Mapping[str, object]) -> None:
     metrics_path = Path(output_dir) / "metrics.jsonl"
+    metrics_path.parent.mkdir(parents=True, exist_ok=True)
     with metrics_path.open("a", encoding="utf-8") as handle:
         handle.write(json.dumps(record, ensure_ascii=False, sort_keys=True))
         handle.write("\n")
-

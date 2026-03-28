@@ -30,13 +30,21 @@ from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Train the CUB ViT-L/14 hypersphere-DPP prototype.")
-    parser.add_argument("--config", required=True, help="Path to the training config YAML.")
-    parser.add_argument("--device", default=None, help="Override device string, e.g. cuda:0.")
+    parser = argparse.ArgumentParser(
+        description="Train the CUB ViT-L/14 hypersphere-DPP prototype."
+    )
+    parser.add_argument(
+        "--config", required=True, help="Path to the training config YAML."
+    )
+    parser.add_argument(
+        "--device", default=None, help="Override device string, e.g. cuda:0."
+    )
     return parser.parse_args()
 
 
-def resolve_amp_settings(precision: str, device: torch.device) -> tuple[bool, str, torch.dtype | None, bool]:
+def resolve_amp_settings(
+    precision: str, device: torch.device
+) -> tuple[bool, str, torch.dtype | None, bool]:
     device_type = device.type
     if precision == "fp32":
         return False, device_type, None, False
@@ -64,7 +72,9 @@ def train_one_epoch(
     logger,
 ) -> dict[str, float]:
     model.train()
-    use_amp, amp_device_type, amp_dtype, _ = resolve_amp_settings(config.precision, device)
+    use_amp, amp_device_type, amp_dtype, _ = resolve_amp_settings(
+        config.precision, device
+    )
     totals = {
         "loss": 0.0,
         "inst_loss": 0.0,
@@ -96,7 +106,9 @@ def train_one_epoch(
             student1, student2 = student_cat.chunk(2)
             logits1, logits2 = logits_cat.chunk(2)
 
-            inst_loss = nt_xent_loss(student1.float(), student2.float(), config.instance_temperature)
+            inst_loss = nt_xent_loss(
+                student1.float(), student2.float(), config.instance_temperature
+            )
             cluster_loss, assign1, assign2 = swav_cluster_loss(
                 logits_a=logits1.float(),
                 logits_b=logits2.float(),
@@ -187,12 +199,16 @@ def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
     dataset = dataloader.dataset
     dataset_size = len(dataset)
     if dataset_size == 0:
-        raise ValueError("Validation dataset is empty; cannot build a fixed eval batch.")
+        raise ValueError(
+            "Validation dataset is empty; cannot build a fixed eval batch."
+        )
 
     batch_size = dataloader.batch_size or dataset_size
     sample_size = min(batch_size, dataset_size)
     generator = torch.Generator().manual_seed(seed)
-    sample_indices = torch.randperm(dataset_size, generator=generator)[:sample_size].tolist()
+    sample_indices = torch.randperm(dataset_size, generator=generator)[
+        :sample_size
+    ].tolist()
     sampled_dataset = Subset(dataset, sample_indices)
     num_workers = min(getattr(dataloader, "num_workers", 0), 2)
     loader_kwargs = {
@@ -202,7 +218,9 @@ def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
         "drop_last": False,
         "num_workers": num_workers,
         "pin_memory": dataloader.pin_memory,
-        "persistent_workers": getattr(dataloader, "persistent_workers", False) if num_workers > 0 else False,
+        "persistent_workers": getattr(dataloader, "persistent_workers", False)
+        if num_workers > 0
+        else False,
         "collate_fn": safe_default_collate,
     }
     prefetch_factor = getattr(dataloader, "prefetch_factor", None)
@@ -213,7 +231,25 @@ def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
     )
 
 
-def evaluate_splits(model, fixed_val_loader, device: torch.device) -> dict[str, dict[str, float]]:
+def build_lr_scheduler(optimizer, config):
+    if config.lr_scheduler == "none":
+        return None
+    if config.lr_scheduler == "cosine":
+        return optim.lr_scheduler.CosineAnnealingLR(
+            optimizer,
+            T_max=config.epochs,
+            eta_min=config.min_learning_rate,
+        )
+    raise ValueError(f"Unsupported lr scheduler: {config.lr_scheduler}")
+
+
+def current_learning_rate(optimizer) -> float:
+    return float(optimizer.param_groups[0]["lr"])
+
+
+def evaluate_splits(
+    model, fixed_val_loader, device: torch.device
+) -> dict[str, dict[str, float]]:
     return {"val": evaluate_clustering(model, fixed_val_loader, device)}
 
 
@@ -227,7 +263,7 @@ def select_checkpoint_score(
     return split_name, metrics, score
 
 
-def maybe_resume_training(model, optimizer, scaler, queue, config, device):
+def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, device):
     last_checkpoint = config.output_dir / "last.pt"
     if not config.reload or not last_checkpoint.exists():
         return 0, 0, float("-inf")
@@ -237,6 +273,7 @@ def maybe_resume_training(model, optimizer, scaler, queue, config, device):
         model=model,
         optimizer=optimizer,
         scaler=scaler,
+        scheduler=scheduler,
         map_location=device,
     )
     queue.load_state_dict(checkpoint.get("queue", {}))
@@ -253,11 +290,16 @@ def main():
     set_seed(config.seed)
     ensure_dir(config.output_dir)
     logger = setup_training_logger(config.output_dir)
-    use_amp, amp_device_type, amp_dtype, use_grad_scaler = resolve_amp_settings(config.precision, device)
+    use_amp, amp_device_type, amp_dtype, use_grad_scaler = resolve_amp_settings(
+        config.precision, device
+    )
     logger.info("starting training")
     logger.info("device=%s output_dir=%s", device, config.output_dir)
     logger.info("config=%s", config.as_dict())
-    logger.info("validation cadence: run val every %d epoch(s) based on config.eval_interval", config.eval_interval)
+    logger.info(
+        "validation cadence: run val every %d epoch(s) based on config.eval_interval",
+        config.eval_interval,
+    )
     logger.info(
         "validation sampling: use one fixed val batch of size up to %d per eval (seed=%d)",
         config.eval_batch_size,
@@ -272,7 +314,11 @@ def main():
         use_grad_scaler,
     )
     if config.precision in {"fp16", "bf16"} and not use_amp:
-        logger.warning("precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.", config.precision, device)
+        logger.warning(
+            "precision=%s requested but AMP is unsupported on device=%s; falling back to fp32.",
+            config.precision,
+            device,
+        )
 
     datasets = build_experiment_dataloaders(config)
     train_prefetch_factor = getattr(datasets.train_loader, "prefetch_factor", None)
@@ -283,8 +329,12 @@ def main():
         datasets.train_loader.persistent_workers,
         train_prefetch_factor,
     )
-    fixed_val_loader = build_fixed_eval_loader(datasets.val_loader, config.validation_seed)
-    gpu_train_transform = build_gpu_train_transform(config.image_size, config.transform_profile).to(device)
+    fixed_val_loader = build_fixed_eval_loader(
+        datasets.val_loader, config.validation_seed
+    )
+    gpu_train_transform = build_gpu_train_transform(
+        config.image_size, config.transform_profile
+    ).to(device)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
         pretrained=config.pretrained,
@@ -300,6 +350,7 @@ def main():
         lr=config.learning_rate,
         weight_decay=config.weight_decay,
     )
+    scheduler = build_lr_scheduler(optimizer, config)
     scaler = amp.GradScaler(
         device="cuda" if device.type == "cuda" else "cpu",
         enabled=use_grad_scaler,
@@ -315,6 +366,7 @@ def main():
         model=model,
         optimizer=optimizer,
         scaler=scaler,
+        scheduler=scheduler,
         queue=queue,
         config=config,
         device=device,
@@ -327,9 +379,17 @@ def main():
             global_step,
             best_metric,
         )
+    logger.info(
+        "optimizer: lr=%.8f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
+        current_learning_rate(optimizer),
+        config.weight_decay,
+        config.lr_scheduler,
+        config.min_learning_rate,
+    )
 
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
+        epoch_lr = current_learning_rate(optimizer)
         train_metrics = train_one_epoch(
             model=model,
             dataloader=datasets.train_loader,
@@ -349,10 +409,20 @@ def main():
             {
                 "epoch": epoch,
                 "global_step": global_step,
+                "lr": epoch_lr,
                 "split": "train",
                 **train_metrics,
             },
         )
+        if scheduler is not None:
+            scheduler.step()
+            logger.info(
+                "epoch=%03d lr=%.8f next_lr=%.8f scheduler=%s",
+                epoch,
+                epoch_lr,
+                current_learning_rate(optimizer),
+                config.lr_scheduler,
+            )
 
         if (epoch + 1) % config.eval_interval != 0:
             continue
@@ -378,7 +448,9 @@ def main():
                 },
             )
 
-        selected_split, selected_metrics, tracked_metric = select_checkpoint_score(eval_metrics, logger)
+        selected_split, selected_metrics, tracked_metric = select_checkpoint_score(
+            eval_metrics, logger
+        )
         is_best = tracked_metric > best_metric
         if is_best:
             best_metric = tracked_metric
@@ -388,6 +460,7 @@ def main():
                 model=model,
                 optimizer=optimizer,
                 scaler=scaler,
+                scheduler=scheduler,
                 queue_state=queue.state_dict(),
                 epoch=epoch,
                 global_step=global_step,
@@ -409,6 +482,7 @@ def main():
             model=model,
             optimizer=optimizer,
             scaler=scaler,
+            scheduler=scheduler,
             queue_state=queue.state_dict(),
             epoch=epoch,
             global_step=global_step,

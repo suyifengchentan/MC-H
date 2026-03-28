@@ -27,7 +27,13 @@ class ConfigLoaderTest(unittest.TestCase):
             config = load_experiment_config(config_path)
 
         self.assertEqual(config.dataset, "CUB_200_2011")
-        self.assertTrue(any("Unsupported config field 'semantic_prototype_enabled'" in str(w.message) for w in caught))
+        self.assertTrue(
+            any(
+                "Unsupported config field 'semantic_prototype_enabled'"
+                in str(w.message)
+                for w in caught
+            )
+        )
 
     def test_image100_is_supported(self):
         config_text = textwrap.dedent(
@@ -38,6 +44,8 @@ class ConfigLoaderTest(unittest.TestCase):
             feature_dim: 512
             backbone_name: "ViT-B-16"
             pretrained: "laion2b_s34b_b88k"
+            lr_scheduler: "cosine"
+            min_learning_rate: 0.00001
             subspace_every_n_steps: 2
             subspace_pca_q_offset: 2
             subspace_topk_clusters: 48
@@ -56,10 +64,33 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.feature_dim, 512)
         self.assertEqual(config.backbone_name, "ViT-B-16")
         self.assertEqual(config.pretrained, "laion2b_s34b_b88k")
+        self.assertEqual(config.lr_scheduler, "cosine")
+        self.assertEqual(config.min_learning_rate, 1e-5)
         self.assertEqual(config.subspace_every_n_steps, 2)
         self.assertEqual(config.subspace_pca_q_offset, 2)
         self.assertEqual(config.subspace_topk_clusters, 48)
         self.assertEqual(config.dpp_every_n_steps, 4)
+
+    def test_min_learning_rate_cannot_exceed_learning_rate(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image50"
+            dataset_dir: "/tmp/image50"
+            class_num: 50
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            learning_rate: 0.0001
+            min_learning_rate: 0.0002
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "min_learning_rate must be less than or equal"
+        ):
+            load_experiment_config(config_path)
 
 
 if __name__ == "__main__":
