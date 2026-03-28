@@ -35,6 +35,17 @@ class Uint8ToFloat(nn.Module):
         return images.float().div(255.0)
 
 
+class PILToTensorCopy(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.transform = transforms.PILToTensor()
+
+    def forward(self, image) -> torch.Tensor:
+        # torchvision may return tensors backed by non-resizable storages here,
+        # which breaks DataLoader's default collate path. Clone into a plain tensor.
+        return self.transform(image).clone()
+
+
 class NormalizeBatch(nn.Module):
     def __init__(self, mean: tuple[float, float, float], std: tuple[float, float, float]):
         super().__init__()
@@ -206,13 +217,13 @@ def build_train_decode_transform(image_size: int, profile: str) -> Callable:
     if profile == "tiny_imagenet200_two_view":
         # Tiny-ImageNet style samples are already small; keep CPU decode cheap and
         # let the GPU-side crop/resize path do the upscale work.
-        return transforms.PILToTensor()
+        return PILToTensorCopy()
 
     resize_size = int(image_size / 0.875)
     return transforms.Compose(
         [
             transforms.Resize(resize_size, interpolation=InterpolationMode.BICUBIC),
-            transforms.PILToTensor(),
+            PILToTensorCopy(),
         ]
     )
 
