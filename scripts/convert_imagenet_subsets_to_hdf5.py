@@ -19,9 +19,9 @@ from hypersphere_dpp.labels import LabelEntry, default_label_config_path, load_l
 
 
 DEFAULT_OUTPUT_ROOTS = {
-    "Image50": Path("/home/geyingjie/gmm-data/Image50"),
-    "Image100": Path("/home/geyingjie/gmm-data/Image100"),
-    "Image200": Path("/home/geyingjie/gmm-data/Image200"),
+    "Image50": Path("/home/geyingjie/hypersphere-data/Image50"),
+    "Image100": Path("/home/geyingjie/hypersphere-data/Image100"),
+    "Image200": Path("/home/geyingjie/hypersphere-data/Image200"),
 }
 
 
