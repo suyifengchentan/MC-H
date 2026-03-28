@@ -1,10 +1,10 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from collections.abc import Mapping, Sequence
 
 import torch
 from torch.utils.data import DataLoader, Dataset, Subset
-from torch.utils.data._utils.collate import default_collate
 
 from datasets.cub_dataset import CUB200Dataset
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
@@ -90,7 +90,7 @@ def split_train_indices(size: int, validation_ratio: float, seed: int) -> tuple[
 
 def _clone_cpu_tensors_for_collate(sample):
     if torch.is_tensor(sample):
-        return sample.clone() if sample.device.type == "cpu" else sample
+        return sample.clone().contiguous() if sample.device.type == "cpu" else sample
     if isinstance(sample, dict):
         return {key: _clone_cpu_tensors_for_collate(value) for key, value in sample.items()}
     if isinstance(sample, tuple):
@@ -101,7 +101,34 @@ def _clone_cpu_tensors_for_collate(sample):
 
 
 def safe_default_collate(batch):
-    return default_collate([_clone_cpu_tensors_for_collate(sample) for sample in batch])
+    if not batch:
+        raise ValueError("Cannot collate an empty batch.")
+
+    elem = batch[0]
+
+    if torch.is_tensor(elem):
+        tensors = [_clone_cpu_tensors_for_collate(sample) for sample in batch]
+        return torch.stack(tensors, dim=0)
+
+    if isinstance(elem, Mapping):
+        return {key: safe_default_collate([sample[key] for sample in batch]) for key in elem}
+
+    if isinstance(elem, tuple) and hasattr(elem, "_fields"):
+        return type(elem)(*(safe_default_collate(items) for items in zip(*batch)))
+
+    if isinstance(elem, tuple):
+        return tuple(safe_default_collate(list(items)) for items in zip(*batch))
+
+    if isinstance(elem, Sequence) and not isinstance(elem, (str, bytes)):
+        return [safe_default_collate(list(items)) for items in zip(*batch)]
+
+    if isinstance(elem, float):
+        return torch.tensor(batch, dtype=torch.float64)
+
+    if isinstance(elem, int):
+        return torch.tensor(batch)
+
+    return batch
 
 
 def _build_loader(
