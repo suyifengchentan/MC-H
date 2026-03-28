@@ -8,7 +8,6 @@ from torch import nn
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
 
-
 CLIP_MEAN = (0.48145466, 0.4578275, 0.40821073)
 CLIP_STD = (0.26862954, 0.26130258, 0.27577711)
 
@@ -47,10 +46,16 @@ class PILToTensorCopy(nn.Module):
 
 
 class NormalizeBatch(nn.Module):
-    def __init__(self, mean: tuple[float, float, float], std: tuple[float, float, float]):
+    def __init__(
+        self, mean: tuple[float, float, float], std: tuple[float, float, float]
+    ):
         super().__init__()
-        self.register_buffer("mean", torch.tensor(mean, dtype=torch.float32).view(1, -1, 1, 1))
-        self.register_buffer("std", torch.tensor(std, dtype=torch.float32).view(1, -1, 1, 1))
+        self.register_buffer(
+            "mean", torch.tensor(mean, dtype=torch.float32).view(1, -1, 1, 1)
+        )
+        self.register_buffer(
+            "std", torch.tensor(std, dtype=torch.float32).view(1, -1, 1, 1)
+        )
 
     def forward(self, images: torch.Tensor) -> torch.Tensor:
         return (images - self.mean) / self.std
@@ -93,7 +98,12 @@ def _build_two_view_transform(
     if blur_p > 0:
         ops.append(
             transforms.RandomApply(
-                [transforms.GaussianBlur(kernel_size=_gaussian_blur_kernel_size(image_size), sigma=(0.1, 2.0))],
+                [
+                    transforms.GaussianBlur(
+                        kernel_size=_gaussian_blur_kernel_size(image_size),
+                        sigma=(0.1, 2.0),
+                    )
+                ],
                 p=blur_p,
             )
         )
@@ -141,7 +151,10 @@ def _build_gpu_two_view_transform(
     if blur_p > 0:
         ops.append(
             K.RandomGaussianBlur(
-                kernel_size=(_gaussian_blur_kernel_size(image_size), _gaussian_blur_kernel_size(image_size)),
+                kernel_size=(
+                    _gaussian_blur_kernel_size(image_size),
+                    _gaussian_blur_kernel_size(image_size),
+                ),
                 sigma=(0.1, 2.0),
                 p=blur_p,
             )
@@ -210,11 +223,23 @@ def build_train_transform(image_size: int, profile: str) -> Callable:
             blur_p=0.0,
         )
 
+    if profile == "small_image_two_view":
+        # CIFAR / STL10 这类低分辨率自然图像需要保留主体，增强以温和裁剪为主。
+        return _build_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.7, 1.0),
+            crop_ratio=(0.9, 1.1),
+            color_jitter=(0.25, 0.25, 0.2, 0.03),
+            color_jitter_p=0.6,
+            grayscale_p=0.02,
+            blur_p=0.0,
+        )
+
     raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
 def build_train_decode_transform(image_size: int, profile: str) -> Callable:
-    if profile == "tiny_imagenet200_two_view":
+    if profile in {"tiny_imagenet200_two_view", "small_image_two_view"}:
         # Tiny-ImageNet style samples are already small; keep CPU decode cheap and
         # let the GPU-side crop/resize path do the upscale work.
         return PILToTensorCopy()
@@ -224,7 +249,9 @@ def build_train_decode_transform(image_size: int, profile: str) -> Callable:
         [
             # Keep a fixed square decode size so DataLoader can stack samples,
             # while still leaving the actual random crop to the GPU transform.
-            transforms.Resize((resize_size, resize_size), interpolation=InterpolationMode.BICUBIC),
+            transforms.Resize(
+                (resize_size, resize_size), interpolation=InterpolationMode.BICUBIC
+            ),
             PILToTensorCopy(),
         ]
     )
@@ -286,14 +313,27 @@ def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
             blur_p=0.0,
         )
 
+    if profile == "small_image_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.7, 1.0),
+            crop_ratio=(0.9, 1.1),
+            color_jitter=(0.25, 0.25, 0.2, 0.03),
+            color_jitter_p=0.6,
+            grayscale_p=0.02,
+            blur_p=0.0,
+        )
+
     raise ValueError(f"Unsupported transform_profile: {profile}")
 
 
 def build_eval_transform(image_size: int, profile: str | None = None) -> Callable:
-    if profile == "tiny_imagenet200_two_view":
+    if profile in {"tiny_imagenet200_two_view", "small_image_two_view"}:
         return transforms.Compose(
             [
-                transforms.Resize((image_size, image_size), interpolation=InterpolationMode.BICUBIC),
+                transforms.Resize(
+                    (image_size, image_size), interpolation=InterpolationMode.BICUBIC
+                ),
                 transforms.ToTensor(),
                 transforms.Normalize(mean=CLIP_MEAN, std=CLIP_STD),
             ]

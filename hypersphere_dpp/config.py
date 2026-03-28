@@ -1,16 +1,42 @@
 from __future__ import annotations
 
+import warnings
 from dataclasses import asdict, dataclass, fields
 from pathlib import Path
 from typing import Any, Dict, Iterable
-import warnings
 
 import yaml
 
-
 SUPPORTED_PRECISIONS = {"fp16", "bf16", "fp32"}
-SUPPORTED_DATASETS = {"CUB_200_2011", "Image10", "Image50", "Image100", "Image200"}
-SUPPORTED_EVAL_SPLITS = {"val", "test"}
+SUPPORTED_DATASETS = {
+    "CIFAR10",
+    "CIFAR100",
+    "CUB_200_2011",
+    "FGVC_Aircraft",
+    "Image10",
+    "Image50",
+    "Image100",
+    "Image200",
+    "Oxford_Flowers",
+    "Oxford_Pet",
+    "STL10",
+    "Stanford_Dogs",
+}
+SUPPORTED_EVAL_SPLITS = {"val", "valid", "test"}
+SUPPORTED_EVAL_SPLITS_BY_DATASET = {
+    "CIFAR10": {"test"},
+    "CIFAR100": {"test"},
+    "CUB_200_2011": {"test"},
+    "FGVC_Aircraft": {"val", "test"},
+    "Image10": {"test"},
+    "Image50": {"val"},
+    "Image100": {"val"},
+    "Image200": {"val"},
+    "Oxford_Flowers": {"valid"},
+    "Oxford_Pet": {"test"},
+    "STL10": {"test"},
+    "Stanford_Dogs": {"test"},
+}
 SUPPORTED_LR_SCHEDULERS = {"none", "cosine"}
 SUPPORTED_BACKBONE_FEATURE_DIMS = {
     "ViT-L-14": 768,
@@ -167,6 +193,13 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise ValueError(
             f"official_eval_split must be one of {sorted(SUPPORTED_EVAL_SPLITS)}, got {config.official_eval_split!r}."
         )
+    if config.official_eval_split is not None:
+        allowed_eval_splits = SUPPORTED_EVAL_SPLITS_BY_DATASET[config.dataset]
+        if config.official_eval_split not in allowed_eval_splits:
+            raise ValueError(
+                f"official_eval_split for {config.dataset} must be one of {sorted(allowed_eval_splits)}, "
+                f"got {config.official_eval_split!r}."
+            )
 
     if config.precision not in SUPPORTED_PRECISIONS:
         raise ValueError(

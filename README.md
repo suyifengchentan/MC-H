@@ -4,7 +4,7 @@
 
 ## 方法概要
 
-- 冻结 `open_clip` 的 `ViT-L-14` 图像编码器，默认使用 LAION 预训练权重。
+- 冻结 `open_clip` 的 `ViT-B-16` 图像编码器，默认使用 LAION 预训练权重。
 - 学生侧训练一个 residual MLP feature adapter，并维护 `K=class_num` 个可学习 prototypes。
 - 总损失由四部分组成：
   - `L_inst`: 双视图 InfoNCE

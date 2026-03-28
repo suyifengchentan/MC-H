@@ -24,7 +24,9 @@ def setup_training_logger(output_dir: str | Path) -> logging.Logger:
     stream_handler.setFormatter(formatter)
     logger.addHandler(stream_handler)
 
-    file_handler = logging.FileHandler(directory / "train.log", encoding="utf-8")
+    file_handler = logging.FileHandler(
+        directory / "train.log", mode="w", encoding="utf-8"
+    )
     file_handler.setFormatter(formatter)
     logger.addHandler(file_handler)
 

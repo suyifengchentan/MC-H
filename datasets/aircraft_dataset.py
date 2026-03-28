@@ -1,69 +1,54 @@
-# datasets/aircraft_dataset.py
+from pathlib import Path
 
-import os
-import pandas as pd
-from torch.utils.data import Dataset
 from PIL import Image
+from torch.utils.data import Dataset
 
 
 class AircraftDataset(Dataset):
-    """
-    自定义的 FGVC-Aircraft 数据集类。
-    通过解析官方的 .csv 文件来加载图像、类名和标签。
-    """
+    """FGVC-Aircraft variant split loader."""
 
-    def __init__(self, root, split='train', transform=None):
-        """
-        构造函数
-
-        参数:
-            root (string): FGVC-Aircraft 数据集的根目录。
-                           (e.g., '/.../data/FGVC-Aircraft/')
-            split (string): 'train', 'val', 或 'test'
-            transform (callable, optional): 应用于样本的图像变换。
-        """
-        self.root = root
+    def __init__(self, root, split="train", transform=None):
+        self.root = Path(root)
         self.transform = transform
+        self.data_root = self.root / "data"
+        self.images_base_path = self.data_root / "images"
 
-        # 1. 定义图像文件的根路径
-        #    (根据您提供的路径 .../FGVC-Aircraft/fgvc-aircraft-2013b/fgvc-aircraft-2013b/data/images/)
-        self.images_base_path = os.path.join(
-            self.root, 'fgvc-aircraft-2013b', 'fgvc-aircraft-2013b', 'data', 'images'
-        )
+        split_file = self.data_root / f"images_variant_{split}.txt"
+        classes_file = self.data_root / "variants.txt"
 
-        # 2. 定义要加载的CSV文件
-        csv_file = f"{split}.csv"
-        csv_path = os.path.join(self.root, csv_file)
+        if not self.images_base_path.is_dir():
+            raise FileNotFoundError(
+                f"FGVC_Aircraft images directory not found: {self.images_base_path}"
+            )
+        if not split_file.is_file():
+            raise FileNotFoundError(f"FGVC_Aircraft split file not found: {split_file}")
+        if not classes_file.is_file():
+            raise FileNotFoundError(
+                f"FGVC_Aircraft class file not found: {classes_file}"
+            )
 
-        print(f"[{self.__class__.__name__}] 正在从以下路径加载 {split} 数据: {csv_path}")
+        with classes_file.open("r", encoding="utf-8") as handle:
+            self.classes = [line.strip() for line in handle if line.strip()]
+        self.class_to_idx = {name: index for index, name in enumerate(self.classes)}
 
-        # 3. 使用 pandas 加载CSV
-        self.data_frame = pd.read_csv(csv_path)
-
-        # 4. 提取信息
-        #    假设 'filename' 列包含完整的 .jpg 文件名
-        self.image_files = self.data_frame['filename'].values
-        self.labels = self.data_frame['Labels'].values  # 0-99
+        self.samples: list[tuple[str, int]] = []
+        with split_file.open("r", encoding="utf-8") as handle:
+            for line in handle:
+                line = line.strip()
+                if not line:
+                    continue
+                image_id, class_name = line.split(" ", 1)
+                self.samples.append((f"{image_id}.jpg", self.class_to_idx[class_name]))
 
     def __len__(self):
-        """返回数据集中的样本数量。"""
-        return len(self.image_files)
+        return len(self.samples)
 
     def __getitem__(self, idx):
-        """根据索引 idx 获取一个样本。"""
-        # 1. 获取文件名和标签
-        image_name = self.image_files[idx]
-        label = self.labels[idx]
+        image_name, label = self.samples[idx]
+        image_path = self.images_base_path / image_name
+        image = Image.open(image_path).convert("RGB")
 
-        # 2. 构建完整图像路径
-        image_path = os.path.join(self.images_base_path, image_name)
-
-        # 3. 加载图像
-        image = Image.open(image_path).convert('RGB')
-
-        # 4. 应用变换
         if self.transform:
             image = self.transform(image)
 
-        # 返回我们框架所需的三个值
         return image, label, idx

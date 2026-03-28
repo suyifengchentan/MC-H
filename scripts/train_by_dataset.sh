@@ -16,11 +16,18 @@ Usage:
   bash scripts/train_by_dataset.sh <dataset_name> [--device DEVICE] [--foreground] [extra train.py args...]
 
 Supported dataset names:
+  CIFAR10      | cifar10
+  CIFAR100     | cifar100
   CUB_200_2011 | cub
+  FGVC_Aircraft | aircraft
   Image10      | image10
   Image50      | image50
   Image100     | image100
   Image200     | image200
+  Oxford_Flowers | flowers
+  Oxford_Pet   | pet
+  STL10        | stl10
+  Stanford_Dogs | dogs
 
 Examples:
   bash scripts/train_by_dataset.sh Image200
@@ -69,9 +76,21 @@ done
 DATASET_KEY="$(printf '%s' "$DATASET_INPUT" | tr '[:upper:]' '[:lower:]')"
 
 case "$DATASET_KEY" in
+  cifar10)
+    DATASET_NAME="CIFAR10"
+    CONFIG_REL="config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  cifar100)
+    DATASET_NAME="CIFAR100"
+    CONFIG_REL="config/train/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
+    ;;
   cub|cub_200_2011)
     DATASET_NAME="CUB_200_2011"
     CONFIG_REL="config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  aircraft|fgvc_aircraft)
+    DATASET_NAME="FGVC_Aircraft"
+    CONFIG_REL="config/train/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml"
     ;;
   image10)
     DATASET_NAME="Image10"
@@ -88,6 +107,22 @@ case "$DATASET_KEY" in
   image200)
     DATASET_NAME="Image200"
     CONFIG_REL="config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  flowers|oxford_flowers)
+    DATASET_NAME="Oxford_Flowers"
+    CONFIG_REL="config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  pet|oxford_pet)
+    DATASET_NAME="Oxford_Pet"
+    CONFIG_REL="config/train/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  stl10)
+    DATASET_NAME="STL10"
+    CONFIG_REL="config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml"
+    ;;
+  dogs|stanford_dogs)
+    DATASET_NAME="Stanford_Dogs"
+    CONFIG_REL="config/train/fine_grained/stanford_dogs_vitb16_hypersphere_dpp_config.yaml"
     ;;
   *)
     echo "Unsupported dataset name: $DATASET_INPUT" >&2
@@ -121,6 +156,8 @@ MODEL_PATH_REL="${CONFIG_INFO[1]}"
 OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
 PID_FILE="$OUTPUT_DIR/train.pid"
 LAUNCH_LOG="$OUTPUT_DIR/launcher.log"
+TRAIN_LOG="$OUTPUT_DIR/train.log"
+METRICS_LOG="$OUTPUT_DIR/metrics.jsonl"
 
 if [[ ! -d "$DATASET_DIR" ]]; then
   echo "Dataset directory does not exist for $DATASET_NAME: $DATASET_DIR" >&2
@@ -157,10 +194,15 @@ printf ' %q' "${CMD[@]}"
 printf '\n'
 
 if [[ "$FOREGROUND" -eq 1 ]]; then
+  : > "$TRAIN_LOG"
+  : > "$METRICS_LOG"
   exec "${CMD[@]}"
 fi
 
-nohup "${CMD[@]}" >> "$LAUNCH_LOG" 2>&1 < /dev/null &
+: > "$TRAIN_LOG"
+: > "$METRICS_LOG"
+: > "$LAUNCH_LOG"
+nohup "${CMD[@]}" > "$LAUNCH_LOG" 2>&1 < /dev/null &
 PID=$!
 echo "$PID" > "$PID_FILE"
 

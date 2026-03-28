@@ -71,6 +71,25 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.subspace_topk_clusters, 48)
         self.assertEqual(config.dpp_every_n_steps, 4)
 
+    def test_oxford_flowers_valid_split_is_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Oxford_Flowers"
+            dataset_dir: "/tmp/oxford-flowers"
+            class_num: 102
+            official_eval_split: "valid"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.dataset, "Oxford_Flowers")
+        self.assertEqual(config.class_num, 102)
+        self.assertEqual(config.official_eval_split, "valid")
+
     def test_min_learning_rate_cannot_exceed_learning_rate(self):
         config_text = textwrap.dedent(
             """
