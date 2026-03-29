@@ -2,7 +2,7 @@
 
 # Data
 dataset: "CUB_200_2011"
-dataset_dir: "/home/geyingjie/gmm-data/CUB_200_2011/CUB_200_2011"
+dataset_dir: "/home/geyingjie/hypersphere-data/CUB_200_2011/CUB_200_2011"
 class_num: 200
 validation_ratio: 0.1
 validation_seed: 42

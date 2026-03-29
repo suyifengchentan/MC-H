@@ -2,7 +2,7 @@
 
 # Data
 dataset: "Image10"
-dataset_dir: "/home/geyingjie/gmm-data/imagenet-10"
+dataset_dir: "/home/geyingjie/hypersphere-data/imagenet-10"
 class_num: 10
 validation_ratio: 0.1
 validation_seed: 42
