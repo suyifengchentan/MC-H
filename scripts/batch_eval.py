@@ -61,13 +61,19 @@ def find_checkpoints():
         if not ckpt_dir.is_dir():
             continue
 
-        # Find all .pt files in this directory
+        # Find all .pt files in this directory; prefer best.pt, then last.pt
         pt_files = list(ckpt_dir.glob("*.pt"))
         if not pt_files:
             continue
 
-        # Use the first .pt file found
-        pt_file = pt_files[0].name
+        # Try best.pt first, then last.pt, then any other .pt
+        pt_names = {p.name for p in pt_files}
+        if "best.pt" in pt_names:
+            pt_file = "best.pt"
+        elif "last.pt" in pt_names:
+            pt_file = "last.pt"
+        else:
+            pt_file = sorted(pt_names)[0] if pt_names else pt_files[0].name
         ckpt_path = str(ckpt_dir / pt_file)
 
         # Try to find a matching train config by prefix.
