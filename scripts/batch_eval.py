@@ -49,30 +49,54 @@ def get_train_info(train_cfg_path: Path) -> tuple[str, str]:
     return dataset_name, model_path
 
 
-def find_configs():
-    """Find all train and test config pairs, yield (dataset_name, model_path, test_config_rel)."""
+def find_checkpoints():
+    """Scan save/hypersphere_dpp/ for directories containing .pt files.
+    Yields (checkpoint_dir, test_config_rel) by matching checkpoint dir name
+    against config/train/*/*.yaml filenames.
+    """
+    save_dir = PROJECT_ROOT / "save" / "hypersphere_dpp"
     train_dir = PROJECT_ROOT / "config" / "train"
-    test_dir = PROJECT_ROOT / "config" / "test"
 
-    for category_dir in sorted(train_dir.iterdir()):
-        if not category_dir.is_dir():
+    for ckpt_dir in sorted(save_dir.iterdir()):
+        if not ckpt_dir.is_dir():
             continue
-        for train_cfg in sorted(category_dir.iterdir()):
-            if train_cfg.suffix != ".yaml":
-                continue
 
-            test_cfg = test_dir / category_dir.name / train_cfg.name
-            if not test_cfg.exists():
-                print(f"[WARN] No test config for {train_cfg.name}, skipping", file=sys.stderr)
-                continue
+        # Find all .pt files in this directory
+        pt_files = list(ckpt_dir.glob("*.pt"))
+        if not pt_files:
+            continue
 
-            dataset_name, model_path = get_train_info(train_cfg)
-            if not dataset_name or not model_path:
-                print(f"[WARN] Missing dataset or model_path in {train_cfg}, skipping", file=sys.stderr)
-                continue
+        # Use the first .pt file found
+        pt_file = pt_files[0].name
+        ckpt_path = str(ckpt_dir / pt_file)
 
-            test_config_rel = str(test_cfg.relative_to(PROJECT_ROOT / "config" / "test"))
-            yield dataset_name, model_path, test_config_rel
+        # Try to find a matching train config by checkpoint dir name
+        # e.g. "CIFAR10_CLIP_ViTB16_HypersphereDPP" -> match "cifar10_vitb16_hypersphere_dpp_config.yaml"
+        ckpt_name = ckpt_dir.name
+
+        # Find the corresponding train config
+        matched = False
+        for category_dir in sorted(train_dir.iterdir()):
+            if not category_dir.is_dir():
+                continue
+            for train_cfg in sorted(category_dir.iterdir()):
+                if train_cfg.suffix != ".yaml":
+                    continue
+                # Build expected checkpoint name from config
+                dataset_name, model_path = get_train_info(train_cfg)
+                if model_path and Path(model_path).name == ckpt_name:
+                    # Found match
+                    test_cfg = PROJECT_ROOT / "config" / "test" / category_dir.name / train_cfg.name
+                    if test_cfg.exists():
+                        test_config_rel = str(test_cfg.relative_to(PROJECT_ROOT / "config" / "test"))
+                        yield ckpt_path, test_config_rel, dataset_name
+                        matched = True
+                        break
+            if matched:
+                break
+
+        if not matched:
+            print(f"[WARN] No matching config found for checkpoint dir '{ckpt_name}', skipping", file=sys.stderr)
 
 
 def run_eval(test_config_rel: str, checkpoint_path: str) -> dict | None:
@@ -124,19 +148,18 @@ def main():
 
     rows = []
 
-    for dataset_name, model_path, test_config_rel in find_configs():
-        checkpoint_path = str(Path(model_path) / "best.pt")
-
+    for ckpt_path, test_config_rel, dataset_name in find_checkpoints():
         if args.dry_run:
-            print(f"[DRY-RUN] Would evaluate: dataset={dataset_name}, checkpoint={checkpoint_path}")
+            print(f"[DRY-RUN] Would evaluate: dataset={dataset_name}, checkpoint={ckpt_path}")
             continue
 
-        print(f"[INFO] Evaluating: dataset={dataset_name}, checkpoint={checkpoint_path}", file=sys.stderr)
-        metrics = run_eval(test_config_rel, checkpoint_path)
+        print(f"[INFO] Evaluating: dataset={dataset_name}, checkpoint={ckpt_path}", file=sys.stderr)
+        metrics = run_eval(test_config_rel, ckpt_path)
 
+        checkpoint_dir = str(Path(ckpt_path).parent)
         row = {
             "dataset": dataset_name,
-            "checkpoint_dir": model_path,
+            "checkpoint_dir": checkpoint_dir,
             "ACC": "",
             "NMI": "",
             "ARI": "",
