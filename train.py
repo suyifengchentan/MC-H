@@ -6,11 +6,10 @@ from contextlib import nullcontext
 import torch
 from torch import amp
 from torch import optim
-from torch.utils.data import DataLoader, Subset
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders, safe_default_collate
+from hypersphere_dpp.data import build_experiment_dataloaders
 from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
@@ -195,42 +194,6 @@ def train_one_epoch(
     return {key: value / denom for key, value in totals.items()}
 
 
-def build_fixed_eval_loader(dataloader, seed: int) -> DataLoader:
-    dataset = dataloader.dataset
-    dataset_size = len(dataset)
-    if dataset_size == 0:
-        raise ValueError(
-            "Validation dataset is empty; cannot build a fixed eval batch."
-        )
-
-    batch_size = dataloader.batch_size or dataset_size
-    sample_size = min(batch_size, dataset_size)
-    generator = torch.Generator().manual_seed(seed)
-    sample_indices = torch.randperm(dataset_size, generator=generator)[
-        :sample_size
-    ].tolist()
-    sampled_dataset = Subset(dataset, sample_indices)
-    num_workers = min(getattr(dataloader, "num_workers", 0), 2)
-    loader_kwargs = {
-        "dataset": sampled_dataset,
-        "batch_size": sample_size,
-        "shuffle": False,
-        "drop_last": False,
-        "num_workers": num_workers,
-        "pin_memory": dataloader.pin_memory,
-        "persistent_workers": getattr(dataloader, "persistent_workers", False)
-        if num_workers > 0
-        else False,
-        "collate_fn": safe_default_collate,
-    }
-    prefetch_factor = getattr(dataloader, "prefetch_factor", None)
-    if num_workers > 0 and prefetch_factor is not None:
-        loader_kwargs["prefetch_factor"] = prefetch_factor
-    return DataLoader(
-        **loader_kwargs,
-    )
-
-
 def build_lr_scheduler(optimizer, config):
     if config.lr_scheduler == "none":
         return None
@@ -248,9 +211,9 @@ def current_learning_rate(optimizer) -> float:
 
 
 def evaluate_splits(
-    model, fixed_val_loader, device: torch.device
+    model, val_loader, device: torch.device
 ) -> dict[str, dict[str, float]]:
-    return {"val": evaluate_clustering(model, fixed_val_loader, device)}
+    return {"val": evaluate_clustering(model, val_loader, device)}
 
 
 def select_checkpoint_score(
@@ -301,9 +264,8 @@ def main():
         config.eval_interval,
     )
     logger.info(
-        "validation sampling: use one fixed val batch of size up to %d per eval (seed=%d)",
+        "validation coverage: evaluate full val split every eval round (eval_batch_size=%d)",
         config.eval_batch_size,
-        config.validation_seed,
     )
     logger.info(
         "precision=%s amp_enabled=%s amp_device_type=%s amp_dtype=%s grad_scaler=%s",
@@ -328,9 +290,6 @@ def main():
         datasets.train_loader.pin_memory,
         datasets.train_loader.persistent_workers,
         train_prefetch_factor,
-    )
-    fixed_val_loader = build_fixed_eval_loader(
-        datasets.val_loader, config.validation_seed
     )
     gpu_train_transform = build_gpu_train_transform(
         config.image_size, config.transform_profile
@@ -427,7 +386,7 @@ def main():
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
-        eval_metrics = evaluate_splits(model, fixed_val_loader, device)
+        eval_metrics = evaluate_splits(model, datasets.val_loader, device)
         for split_name, metrics in eval_metrics.items():
             selection_score = clustering_selection_score(metrics)
             logger.info(
