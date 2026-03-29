@@ -14,6 +14,7 @@ backbone_name: "ViT-L-14"
 pretrained: "laion2b_s32b_b82k"
 adapter_hidden_dim: 1024
 adapter_dropout: 0.1
+transform_profile: "fine_grained_two_view"
 
 # Evaluation / runtime
 eval_batch_size: 256
