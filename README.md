@@ -68,6 +68,8 @@ bash scripts/train_by_dataset.sh Image200
 可选参数示例：
 
 ```bash
+bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
+bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
 bash scripts/train_by_dataset.sh Image10 --device cuda:0
 bash scripts/train_by_dataset.sh cub --foreground
 ```
@@ -75,6 +77,7 @@ bash scripts/train_by_dataset.sh cub --foreground
 脚本会自动：
 
 - 根据数据集名选择对应的训练 YAML
+- 支持一次传多个数据集名，逐个启动训练
 - 检查数据目录是否存在
 - 默认以 `nohup` 后台运行
 - 将训练 PID 写入 `model_path/train.pid`
