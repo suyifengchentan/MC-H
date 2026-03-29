@@ -16,6 +16,7 @@ import csv
 import subprocess
 import sys
 from argparse import ArgumentParser
+from datetime import datetime
 from pathlib import Path
 
 import yaml
@@ -38,6 +39,13 @@ def parse_args():
         help="Show what would be evaluated without running.",
     )
     return parser.parse_args()
+
+
+def setup_log_file():
+    """Create a log file with timestamp."""
+    log_name = f"batch_eval_{datetime.now().strftime('%Y%m%d_%H%M%S')}.log"
+    log_path = PROJECT_ROOT / log_name
+    return log_path
 
 
 def get_train_info(train_cfg_path: Path) -> tuple[str, str]:
@@ -103,7 +111,7 @@ def find_checkpoints():
             print(f"[WARN] No matching config found for checkpoint dir '{ckpt_name}', skipping", file=sys.stderr)
 
 
-def run_eval(test_config_rel: str, checkpoint_path: str) -> dict | None:
+def run_eval(test_config_rel: str, checkpoint_path: str, log_path: Path) -> dict | None:
     """
     Run eval.py on the given test_config + checkpoint.
     Returns {"acc": float, "nmi": float, "ari": float} or None on failure.
@@ -123,8 +131,15 @@ def run_eval(test_config_rel: str, checkpoint_path: str) -> dict | None:
             text=True,
             timeout=600,
         )
+
+        combined = (result.stdout or "") + "\n" + (result.stderr or "")
+
         if result.returncode != 0:
-            print(f"[ERROR] eval failed for {checkpoint_path}: {result.stderr[:300]}", file=sys.stderr)
+            with open(log_path, "a") as f:
+                f.write(f"[ERROR] eval failed for {checkpoint_path} (exit {result.returncode})\n")
+                f.write(combined)
+                f.write("\n" + "=" * 60 + "\n")
+            print(f"[ERROR] eval failed for {checkpoint_path}: see {log_path}", file=sys.stderr)
             return None
 
         # Parse output: looks like "test={'acc': 0.54, 'nmi': 0.67, 'ari': 0.41}"
@@ -136,13 +151,24 @@ def run_eval(test_config_rel: str, checkpoint_path: str) -> dict | None:
                     metrics = ast.literal_eval(dict_str)
                     return metrics
                 except Exception as e:
-                    print(f"[WARN] Could not parse eval output '{line}': {e}", file=sys.stderr)
-        print(f"[WARN] No parseable output from eval for {checkpoint_path}", file=sys.stderr)
+                    with open(log_path, "a") as f:
+                        f.write(f"[WARN] Could not parse eval output '{line}': {e}\n")
+                    print(f"[WARN] Could not parse eval output: see {log_path}", file=sys.stderr)
+        with open(log_path, "a") as f:
+            f.write(f"[WARN] No parseable output from eval for {checkpoint_path}\n")
+            f.write(f"stdout:\n{result.stdout}\n")
+            f.write(f"stderr:\n{result.stderr}\n")
+            f.write("\n" + "=" * 60 + "\n")
+        print(f"[WARN] No parseable output from eval: see {log_path}", file=sys.stderr)
         return None
     except subprocess.TimeoutExpired:
+        with open(log_path, "a") as f:
+            f.write(f"[ERROR] eval timed out for {checkpoint_path}\n")
         print(f"[ERROR] eval timed out for {checkpoint_path}", file=sys.stderr)
         return None
     except Exception as e:
+        with open(log_path, "a") as f:
+            f.write(f"[ERROR] eval exception for {checkpoint_path}: {e}\n")
         print(f"[ERROR] eval exception for {checkpoint_path}: {e}", file=sys.stderr)
         return None
 
@@ -152,13 +178,15 @@ def main():
 
     rows = []
 
+    log_path = setup_log_file()
+
     for ckpt_path, test_config_rel, dataset_name in find_checkpoints():
         if args.dry_run:
             print(f"[DRY-RUN] Would evaluate: dataset={dataset_name}, checkpoint={ckpt_path}")
             continue
 
         print(f"[INFO] Evaluating: dataset={dataset_name}, checkpoint={ckpt_path}", file=sys.stderr)
-        metrics = run_eval(test_config_rel, ckpt_path)
+        metrics = run_eval(test_config_rel, ckpt_path, log_path)
 
         checkpoint_dir = str(Path(ckpt_path).parent)
         row = {
@@ -187,6 +215,8 @@ def main():
         writer.writerows(rows)
 
     print(f"[INFO] Results written to {output_path}")
+    if log_path.exists():
+        print(f"[INFO] Error log written to {log_path}")
 
 
 if __name__ == "__main__":
