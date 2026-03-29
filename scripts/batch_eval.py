@@ -66,14 +66,12 @@ def find_checkpoints():
         if not pt_files:
             continue
 
-        # Try best.pt first, then last.pt, then any other .pt
+        # Only use best.pt; skip if not found
         pt_names = {p.name for p in pt_files}
-        if "best.pt" in pt_names:
-            pt_file = "best.pt"
-        elif "last.pt" in pt_names:
-            pt_file = "last.pt"
-        else:
-            pt_file = sorted(pt_names)[0] if pt_names else pt_files[0].name
+        if "best.pt" not in pt_names:
+            print(f"[WARN] No best.pt in '{ckpt_dir.name}', skipping", file=sys.stderr)
+            continue
+        pt_file = "best.pt"
         ckpt_path = str(ckpt_dir / pt_file)
 
         # Try to find a matching train config by prefix.
