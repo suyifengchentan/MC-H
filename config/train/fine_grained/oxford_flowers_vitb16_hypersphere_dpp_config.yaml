@@ -23,7 +23,7 @@ precision: "fp16"
 batch_size: 192
 eval_batch_size: 384
 epochs: 250
-learning_rate: 0.00025
+learning_rate: 0.0003
 weight_decay: 0.000001
 lr_scheduler: "cosine"
 min_learning_rate: 0.00001
@@ -38,17 +38,17 @@ sinkhorn_iters: 3
 sinkhorn_epsilon: 0.05
 
 # Subspace
-lambda_subspace: 0.15
+lambda_subspace: 0.18
 subspace_rank: 8
 subspace_queue_size: 64
 subspace_min_mass: 4.0
 subspace_every_n_steps: 2
 subspace_pca_q_offset: 2
-subspace_topk_clusters: 32
+subspace_topk_clusters: 36
 
 # DPP
-alpha_div_base: 0.45
-dpp_warmup_epochs: 20
+alpha_div_base: 0.48
+dpp_warmup_epochs: 18
 dpp_every_n_steps: 4
 dpp_jitter: 0.00001
 
