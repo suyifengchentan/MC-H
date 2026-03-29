@@ -84,8 +84,8 @@ def find_checkpoints():
                 if train_cfg.suffix != ".yaml":
                     continue
                 dataset_name, model_path = get_train_info(train_cfg)
-                if model_path and Path(model_path).name.startswith(ckpt_name):
-                    # Found match (checkpoint dir name is prefix of model_path)
+                if model_path and ckpt_name.startswith(Path(model_path).name):
+                    # Found match (checkpoint dir name starts with model_path name, supports timestamp suffix)
                     test_cfg = PROJECT_ROOT / "config" / "test" / category_dir.name / train_cfg.name
                     if test_cfg.exists():
                         test_config_rel = str(test_cfg.relative_to(PROJECT_ROOT / "config" / "test"))
