@@ -19,6 +19,6 @@ adapter_dropout: 0.1
 transform_profile: "fine_grained_two_view"
 
 # Evaluation / runtime
-eval_batch_size: 320
+eval_batch_size: 160
 workers: 8
 seed: 42

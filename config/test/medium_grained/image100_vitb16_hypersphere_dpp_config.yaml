@@ -21,6 +21,6 @@ adapter_dropout: 0.1
 transform_profile: "imagenet100_two_view"
 
 # Evaluation / runtime
-eval_batch_size: 512
+eval_batch_size: 128
 workers: 2
 seed: 42
