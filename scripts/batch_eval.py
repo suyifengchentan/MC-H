@@ -70,8 +70,9 @@ def find_checkpoints():
         pt_file = pt_files[0].name
         ckpt_path = str(ckpt_dir / pt_file)
 
-        # Try to find a matching train config by checkpoint dir name
-        # e.g. "CIFAR10_CLIP_ViTB16_HypersphereDPP" -> match "cifar10_vitb16_hypersphere_dpp_config.yaml"
+        # Try to find a matching train config by prefix.
+        # e.g. "Image200_CLIP_ViTB16_HypersphereDPP_20260328_212034"
+        # matches model_path "save/hypersphere_dpp/Image200_CLIP_ViTB16_HypersphereDPP_20260328_212034"
         ckpt_name = ckpt_dir.name
 
         # Find the corresponding train config
@@ -82,10 +83,9 @@ def find_checkpoints():
             for train_cfg in sorted(category_dir.iterdir()):
                 if train_cfg.suffix != ".yaml":
                     continue
-                # Build expected checkpoint name from config
                 dataset_name, model_path = get_train_info(train_cfg)
-                if model_path and Path(model_path).name == ckpt_name:
-                    # Found match
+                if model_path and Path(model_path).name.startswith(ckpt_name):
+                    # Found match (checkpoint dir name is prefix of model_path)
                     test_cfg = PROJECT_ROOT / "config" / "test" / category_dir.name / train_cfg.name
                     if test_cfg.exists():
                         test_config_rel = str(test_cfg.relative_to(PROJECT_ROOT / "config" / "test"))
