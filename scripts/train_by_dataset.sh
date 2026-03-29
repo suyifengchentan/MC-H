@@ -13,7 +13,8 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/train_by_dataset.sh <dataset_name> [--device DEVICE] [--foreground] [extra train.py args...]
+  bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
+  bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
 
 Supported dataset names:
   CIFAR10      | cifar10
@@ -31,29 +32,26 @@ Supported dataset names:
 
 Examples:
   bash scripts/train_by_dataset.sh Image200
+  bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
+  bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
   bash scripts/train_by_dataset.sh image10 --device cuda:0
   bash scripts/train_by_dataset.sh cub --foreground --device cuda:1
 EOF
 }
 
-if [[ $# -lt 1 ]]; then
-  usage
-  exit 1
-fi
-
-if [[ "$1" == "-h" || "$1" == "--help" ]]; then
-  usage
-  exit 0
-fi
-
-DATASET_INPUT="$1"
-shift
-
 DEVICE=""
 FOREGROUND=0
 EXTRA_ARGS=()
+DATASET_INPUTS=()
+PARSE_EXTRA_ARGS=0
 
 while [[ $# -gt 0 ]]; do
+  if [[ "$PARSE_EXTRA_ARGS" -eq 1 ]]; then
+    EXTRA_ARGS+=("$1")
+    shift
+    continue
+  fi
+
   case "$1" in
     --device)
       if [[ $# -lt 2 ]]; then
@@ -67,84 +65,95 @@ while [[ $# -gt 0 ]]; do
       FOREGROUND=1
       shift
       ;;
+    --datasets)
+      shift
+      if [[ $# -lt 1 || "$1" == "--" || "$1" == --* ]]; then
+        echo "Missing dataset names after --datasets" >&2
+        exit 1
+      fi
+      while [[ $# -gt 0 && "$1" != "--" && "$1" != --* ]]; do
+        DATASET_INPUTS+=("$1")
+        shift
+      done
+      ;;
+    --)
+      PARSE_EXTRA_ARGS=1
+      shift
+      ;;
     -h|--help)
       usage
       exit 0
       ;;
-    *)
+    -*)
       EXTRA_ARGS+=("$1")
+      PARSE_EXTRA_ARGS=1
+      shift
+      ;;
+    *)
+      DATASET_INPUTS+=("$1")
       shift
       ;;
   esac
 done
 
-DATASET_KEY="$(printf '%s' "$DATASET_INPUT" | tr '[:upper:]' '[:lower:]')"
-
-case "$DATASET_KEY" in
-  cifar10)
-    DATASET_NAME="CIFAR10"
-    CONFIG_REL="config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  cifar100)
-    DATASET_NAME="CIFAR100"
-    CONFIG_REL="config/train/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  cub|cub_200_2011)
-    DATASET_NAME="CUB_200_2011"
-    CONFIG_REL="config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  aircraft|fgvc_aircraft)
-    DATASET_NAME="FGVC_Aircraft"
-    CONFIG_REL="config/train/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  image10)
-    DATASET_NAME="Image10"
-    CONFIG_REL="config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  image50)
-    DATASET_NAME="Image50"
-    CONFIG_REL="config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  image100)
-    DATASET_NAME="Image100"
-    CONFIG_REL="config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  image200)
-    DATASET_NAME="Image200"
-    CONFIG_REL="config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  flowers|oxford_flowers)
-    DATASET_NAME="Oxford_Flowers"
-    CONFIG_REL="config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  pet|oxford_pet)
-    DATASET_NAME="Oxford_Pet"
-    CONFIG_REL="config/train/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  stl10)
-    DATASET_NAME="STL10"
-    CONFIG_REL="config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  dogs|stanford_dogs)
-    DATASET_NAME="Stanford_Dogs"
-    CONFIG_REL="config/train/fine_grained/stanford_dogs_vitb16_hypersphere_dpp_config.yaml"
-    ;;
-  *)
-    echo "Unsupported dataset name: $DATASET_INPUT" >&2
-    usage
-    exit 1
-    ;;
-esac
-
-CONFIG_PATH="$ROOT_DIR/$CONFIG_REL"
-
-if [[ ! -f "$CONFIG_PATH" ]]; then
-  echo "Config file not found: $CONFIG_PATH" >&2
+if [[ ${#DATASET_INPUTS[@]} -eq 0 ]]; then
+  usage
   exit 1
 fi
 
-mapfile -t CONFIG_INFO < <(
-  "$PYTHON_BIN" - "$CONFIG_PATH" <<'PY'
+resolve_dataset() {
+  local dataset_input="$1"
+  local dataset_key
+  dataset_key="$(printf '%s' "$dataset_input" | tr '[:upper:]' '[:lower:]')"
+
+  case "$dataset_key" in
+    cifar10)
+      printf '%s\n%s\n' "CIFAR10" "config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    cifar100)
+      printf '%s\n%s\n' "CIFAR100" "config/train/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    cub|cub_200_2011)
+      printf '%s\n%s\n' "CUB_200_2011" "config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    aircraft|fgvc_aircraft)
+      printf '%s\n%s\n' "FGVC_Aircraft" "config/train/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    image10)
+      printf '%s\n%s\n' "Image10" "config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    image50)
+      printf '%s\n%s\n' "Image50" "config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    image100)
+      printf '%s\n%s\n' "Image100" "config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    image200)
+      printf '%s\n%s\n' "Image200" "config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    flowers|oxford_flowers)
+      printf '%s\n%s\n' "Oxford_Flowers" "config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    pet|oxford_pet)
+      printf '%s\n%s\n' "Oxford_Pet" "config/train/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    stl10)
+      printf '%s\n%s\n' "STL10" "config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    dogs|stanford_dogs)
+      printf '%s\n%s\n' "Stanford_Dogs" "config/train/fine_grained/stanford_dogs_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    *)
+      echo "Unsupported dataset name: $dataset_input" >&2
+      usage
+      exit 1
+      ;;
+  esac
+}
+
+read_config_info() {
+  local config_path="$1"
+  "$PYTHON_BIN" - "$config_path" <<'PY'
 from pathlib import Path
 import sys
 import yaml
@@ -155,37 +164,34 @@ print(config["dataset_dir"])
 print(config["model_path"])
 print("1" if config.get("reload", False) else "0")
 PY
-)
+}
 
-DATASET_DIR="${CONFIG_INFO[0]}"
-MODEL_PATH_REL="${CONFIG_INFO[1]}"
-RELOAD_ENABLED="${CONFIG_INFO[2]}"
-BASE_OUTPUT_DIR="$ROOT_DIR/$MODEL_PATH_REL"
+build_output_dir() {
+  local base_output_dir="$1"
+  local reload_enabled="$2"
 
-if [[ "$RELOAD_ENABLED" == "1" ]]; then
-  OUTPUT_DIR="$BASE_OUTPUT_DIR"
-else
-  RUN_STAMP="$(date '+%Y%m%d_%H%M%S')"
-  OUTPUT_DIR="${BASE_OUTPUT_DIR}_${RUN_STAMP}"
-  if [[ -e "$OUTPUT_DIR" ]]; then
-    OUTPUT_DIR="${OUTPUT_DIR}_$$"
+  if [[ "$reload_enabled" == "1" ]]; then
+    printf '%s\n' "$base_output_dir"
+    return
   fi
-fi
 
-PID_FILE="$OUTPUT_DIR/train.pid"
-LAUNCH_LOG="$OUTPUT_DIR/launcher.log"
-TRAIN_LOG="$OUTPUT_DIR/train.log"
-METRICS_LOG="$OUTPUT_DIR/metrics.jsonl"
-RUN_CONFIG_PATH="$OUTPUT_DIR/train_config.resolved.yaml"
+  local run_stamp candidate suffix
+  run_stamp="$(date '+%Y%m%d_%H%M%S')"
+  candidate="${base_output_dir}_${run_stamp}"
+  suffix=0
+  while [[ -e "$candidate" ]]; do
+    suffix=$((suffix + 1))
+    candidate="${base_output_dir}_${run_stamp}_${suffix}"
+  done
+  printf '%s\n' "$candidate"
+}
 
-if [[ ! -d "$DATASET_DIR" ]]; then
-  echo "Dataset directory does not exist for $DATASET_NAME: $DATASET_DIR" >&2
-  exit 1
-fi
+write_resolved_config() {
+  local config_path="$1"
+  local run_config_path="$2"
+  local output_dir="$3"
 
-mkdir -p "$OUTPUT_DIR"
-
-RUN_OUTPUT_DIR="$OUTPUT_DIR" "$PYTHON_BIN" - "$CONFIG_PATH" "$RUN_CONFIG_PATH" <<'PY'
+  RUN_OUTPUT_DIR="$output_dir" "$PYTHON_BIN" - "$config_path" "$run_config_path" <<'PY'
 from pathlib import Path
 import os
 import sys
@@ -197,52 +203,99 @@ config = yaml.safe_load(src.read_text(encoding="utf-8"))
 config["model_path"] = os.environ["RUN_OUTPUT_DIR"]
 dst.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=False), encoding="utf-8")
 PY
+}
 
-CMD=("$PYTHON_BIN" "train.py" "--config" "$RUN_CONFIG_PATH")
-if [[ -n "$DEVICE" ]]; then
-  CMD+=("--device" "$DEVICE")
-fi
-if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
-  CMD+=("${EXTRA_ARGS[@]}")
-fi
+launch_dataset() {
+  local dataset_input="$1"
+  local dataset_name config_rel config_path
+  local -a dataset_info config_info cmd
 
-cd "$ROOT_DIR"
+  mapfile -t dataset_info < <(resolve_dataset "$dataset_input")
+  dataset_name="${dataset_info[0]}"
+  config_rel="${dataset_info[1]}"
+  config_path="$ROOT_DIR/$config_rel"
 
-echo "dataset: $DATASET_NAME"
-echo "config: $CONFIG_REL"
-echo "resolved_config: $RUN_CONFIG_PATH"
-echo "dataset_dir: $DATASET_DIR"
-echo "base_output_dir: $MODEL_PATH_REL"
-echo "reload: $RELOAD_ENABLED"
-echo "run_output_dir: $OUTPUT_DIR"
-printf 'command:'
-printf ' %q' "${CMD[@]}"
-printf '\n'
+  if [[ ! -f "$config_path" ]]; then
+    echo "Config file not found: $config_path" >&2
+    exit 1
+  fi
 
-if [[ "$FOREGROUND" -eq 1 ]]; then
-  : > "$TRAIN_LOG"
-  : > "$METRICS_LOG"
-  exec "${CMD[@]}"
-fi
+  mapfile -t config_info < <(read_config_info "$config_path")
 
-: > "$TRAIN_LOG"
-: > "$METRICS_LOG"
-: > "$LAUNCH_LOG"
-nohup "${CMD[@]}" > "$LAUNCH_LOG" 2>&1 < /dev/null &
-PID=$!
-echo "$PID" > "$PID_FILE"
+  local dataset_dir model_path_rel reload_enabled base_output_dir output_dir
+  local pid_file launch_log train_log metrics_log run_config_path
 
-sleep 1
-if ! kill -0 "$PID" > /dev/null 2>&1; then
-  rm -f "$PID_FILE"
-  echo "background training exited immediately" >&2
-  echo "inspect log: $OUTPUT_DIR/train.log" >&2
-  echo "launcher log: $LAUNCH_LOG" >&2
-  exit 1
-fi
+  dataset_dir="${config_info[0]}"
+  model_path_rel="${config_info[1]}"
+  reload_enabled="${config_info[2]}"
+  base_output_dir="$ROOT_DIR/$model_path_rel"
+  output_dir="$(build_output_dir "$base_output_dir" "$reload_enabled")"
 
-echo "started background training"
-echo "pid: $PID"
-echo "train_log: $OUTPUT_DIR/train.log"
-echo "launcher_log: $LAUNCH_LOG"
-echo "pid_file: $PID_FILE"
+  pid_file="$output_dir/train.pid"
+  launch_log="$output_dir/launcher.log"
+  train_log="$output_dir/train.log"
+  metrics_log="$output_dir/metrics.jsonl"
+  run_config_path="$output_dir/train_config.resolved.yaml"
+
+  if [[ ! -d "$dataset_dir" ]]; then
+    echo "Dataset directory does not exist for $dataset_name: $dataset_dir" >&2
+    exit 1
+  fi
+
+  mkdir -p "$output_dir"
+  write_resolved_config "$config_path" "$run_config_path" "$output_dir"
+
+  cmd=("$PYTHON_BIN" "train.py" "--config" "$run_config_path")
+  if [[ -n "$DEVICE" ]]; then
+    cmd+=("--device" "$DEVICE")
+  fi
+  if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
+    cmd+=("${EXTRA_ARGS[@]}")
+  fi
+
+  cd "$ROOT_DIR"
+
+  echo "dataset: $dataset_name"
+  echo "config: $config_rel"
+  echo "resolved_config: $run_config_path"
+  echo "dataset_dir: $dataset_dir"
+  echo "base_output_dir: $model_path_rel"
+  echo "reload: $reload_enabled"
+  echo "run_output_dir: $output_dir"
+  printf 'command:'
+  printf ' %q' "${cmd[@]}"
+  printf '\n'
+
+  if [[ "$FOREGROUND" -eq 1 ]]; then
+    : > "$train_log"
+    : > "$metrics_log"
+    "${cmd[@]}"
+    return
+  fi
+
+  : > "$train_log"
+  : > "$metrics_log"
+  : > "$launch_log"
+  nohup "${cmd[@]}" > "$launch_log" 2>&1 < /dev/null &
+  local pid=$!
+  echo "$pid" > "$pid_file"
+
+  sleep 1
+  if ! kill -0 "$pid" > /dev/null 2>&1; then
+    rm -f "$pid_file"
+    echo "background training exited immediately" >&2
+    echo "inspect log: $output_dir/train.log" >&2
+    echo "launcher log: $launch_log" >&2
+    exit 1
+  fi
+
+  echo "started background training"
+  echo "pid: $pid"
+  echo "train_log: $output_dir/train.log"
+  echo "launcher_log: $launch_log"
+  echo "pid_file: $pid_file"
+}
+
+for dataset_input in "${DATASET_INPUTS[@]}"; do
+  launch_dataset "$dataset_input"
+done

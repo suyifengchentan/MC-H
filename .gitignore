@@ -42,7 +42,7 @@ __pycache__/
 *.tar
 *.gz
 *.zip
-
+*.tex
 # Media and document artifacts generated during experiments
 *.png
 *.jpg
