@@ -4,6 +4,7 @@ from typing import Callable
 
 import kornia.augmentation as K
 import torch
+from PIL import ImageOps
 from torch import nn
 from torchvision import transforms
 from torchvision.transforms import InterpolationMode
@@ -35,6 +36,40 @@ class PILToTensorCopy(nn.Module):
         # torchvision may return tensors backed by non-resizable storages here,
         # which breaks DataLoader's default collate path. Clone into a plain tensor.
         return self.transform(image).clone()
+
+
+class ResizeKeepAspectPadToSquare(nn.Module):
+    def __init__(
+        self,
+        size: int,
+        interpolation: InterpolationMode = InterpolationMode.BICUBIC,
+        fill: tuple[int, int, int] = tuple(round(value * 255) for value in CLIP_MEAN),
+    ):
+        super().__init__()
+        self.size = size
+        self.interpolation = interpolation
+        self.fill = fill
+
+    def forward(self, image):
+        width, height = image.size
+        scale = self.size / max(width, height)
+        resized_width = max(1, round(width * scale))
+        resized_height = max(1, round(height * scale))
+        resized = transforms.functional.resize(
+            image,
+            [resized_height, resized_width],
+            interpolation=self.interpolation,
+        )
+
+        pad_width = self.size - resized_width
+        pad_height = self.size - resized_height
+        padding = (
+            pad_width // 2,
+            pad_height // 2,
+            pad_width - (pad_width // 2),
+            pad_height - (pad_height // 2),
+        )
+        return ImageOps.expand(resized, border=padding, fill=self.fill)
 
 
 class NormalizeBatch(nn.Module):
@@ -126,6 +161,20 @@ def build_train_decode_transform(image_size: int, profile: str) -> Callable:
         return PILToTensorCopy()
 
     resize_size = int(image_size / 0.875)
+    if profile == "stanford_dogs_two_view":
+        return transforms.Compose(
+            [
+                # Stanford Dogs contains many elongated full-body images; preserve
+                # aspect ratio here instead of warping them into a square before
+                # the GPU-side random crop creates the two training views.
+                ResizeKeepAspectPadToSquare(
+                    resize_size,
+                    interpolation=InterpolationMode.BICUBIC,
+                ),
+                PILToTensorCopy(),
+            ]
+        )
+
     return transforms.Compose(
         [
             # Keep a fixed square decode size so DataLoader can stack samples,
@@ -147,6 +196,17 @@ def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
             color_jitter=(0.2, 0.2, 0.2, 0.05),
             color_jitter_p=0.8,
             grayscale_p=0.1,
+            blur_p=0.0,
+        )
+
+    if profile == "stanford_dogs_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.65, 1.0),
+            crop_ratio=(0.85, 1.2),
+            color_jitter=(0.12, 0.12, 0.12, 0.03),
+            color_jitter_p=0.6,
+            grayscale_p=0.02,
             blur_p=0.0,
         )
 
