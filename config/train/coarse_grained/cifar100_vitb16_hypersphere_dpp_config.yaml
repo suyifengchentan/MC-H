@@ -33,6 +33,11 @@ instance_temperature: 0.2
 cluster_temperature: 0.3
 lambda_instance: 1.0
 lambda_cluster: 1.0
+semantic_prototype_enabled: true
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+lambda_semantic: 0.1
+semantic_temperature: 0.2
 
 sinkhorn_iters: 3
 sinkhorn_epsilon: 0.05

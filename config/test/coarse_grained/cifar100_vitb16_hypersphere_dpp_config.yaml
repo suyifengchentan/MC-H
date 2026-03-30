@@ -17,6 +17,11 @@ pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.
 adapter_hidden_dim: 768
 adapter_dropout: 0.1
 transform_profile: "small_image_two_view"
+semantic_prototype_enabled: true
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+lambda_semantic: 0.1
+semantic_temperature: 0.2
 
 # Evaluation / runtime
 eval_batch_size: 128

@@ -16,6 +16,11 @@ pretrained: "laion2b_s34b_b88k"
 adapter_hidden_dim: 1024
 adapter_dropout: 0.1
 transform_profile: "imagenet10_two_view"
+semantic_prototype_enabled: true
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+lambda_semantic: 0.1
+semantic_temperature: 0.2
 
 # Evaluation / runtime
 eval_batch_size: 128
