@@ -139,6 +139,20 @@ def build_train_decode_transform(image_size: int, profile: str) -> Callable:
 
 
 def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
+    if profile == "cub_fine_grained_two_view":
+        # CUB is a small fine-grained dataset where color/texture cues are
+        # crucial. Use milder crops and weaker color destruction to preserve
+        # discriminative local details.
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.65, 1.0),
+            crop_ratio=(0.85, 1.2),
+            color_jitter=(0.15, 0.15, 0.12, 0.03),
+            color_jitter_p=0.7,
+            grayscale_p=0.0,
+            blur_p=0.0,
+        )
+
     if profile == "fine_grained_two_view":
         return _build_gpu_two_view_transform(
             image_size=image_size,
