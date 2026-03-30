@@ -43,6 +43,12 @@ class ConfigLoaderTest(unittest.TestCase):
             class_num: 200
             feature_dim: 512
             backbone_name: "ViT-B-16"
+            clustering_mode: "spectral_free_k"
+            min_spectral_clusters: 2
+            max_spectral_clusters: 0
+            spectral_assignment_temperature: 0.2
+            spectral_sharpen_temperature: 0.1
+            spectral_proto_momentum: 0.9
             semantic_prototype_enabled: true
             semantic_prompt_style: "auto"
             semantic_prototype_aggregation: "mean"
@@ -59,6 +65,12 @@ class ConfigLoaderTest(unittest.TestCase):
 
         config = load_experiment_config(config_path)
 
+        self.assertEqual(config.clustering_mode, "spectral_free_k")
+        self.assertEqual(config.min_spectral_clusters, 2)
+        self.assertEqual(config.max_spectral_clusters, 0)
+        self.assertEqual(config.spectral_assignment_temperature, 0.2)
+        self.assertEqual(config.spectral_sharpen_temperature, 0.1)
+        self.assertEqual(config.spectral_proto_momentum, 0.9)
         self.assertTrue(config.semantic_prototype_enabled)
         self.assertEqual(config.semantic_prompt_style, "auto")
         self.assertEqual(config.semantic_prototype_aggregation, "mean")

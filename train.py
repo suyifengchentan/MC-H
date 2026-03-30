@@ -15,6 +15,7 @@ from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
     dpp_diversity_loss,
     nt_xent_loss,
+    spectral_cluster_loss,
     swav_cluster_loss,
 )
 from hypersphere_dpp.metrics import (
@@ -22,12 +23,16 @@ from hypersphere_dpp.metrics import (
     evaluate_clustering,
     format_clustering_metrics,
 )
-from hypersphere_dpp.model import HypersphereDPPModel
+from hypersphere_dpp.model import build_model_from_config
 from hypersphere_dpp.semantic import (
     build_semantic_text_features,
     semantic_cluster_alignment_loss,
 )
-from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
+from hypersphere_dpp.subspace import (
+    ClusterFeatureQueue,
+    spectral_anchor_subspace_loss,
+    subspace_regularization_loss,
+)
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
 
@@ -63,12 +68,12 @@ def resolve_amp_settings(
 
 
 def train_one_epoch(
-    model: HypersphereDPPModel,
+    model,
     dataloader,
     gpu_train_transform,
     optimizer,
     scaler,
-    queue: ClusterFeatureQueue,
+    queue: ClusterFeatureQueue | None,
     semantic_text_features: torch.Tensor | None,
     config,
     device: torch.device,
@@ -88,6 +93,7 @@ def train_one_epoch(
         "semantic_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
+        "estimated_k": 0.0,
     }
     num_steps = len(dataloader)
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
@@ -106,21 +112,45 @@ def train_one_epoch(
             teacher2 = model.encode_teacher(view2)
             teacher_cat = torch.cat([teacher1, teacher2], dim=0)
             student_cat = model.encode_student(teacher_features=teacher_cat)
-            logits_cat = model.prototype_logits(student_cat)
-
             student1, student2 = student_cat.chunk(2)
-            logits1, logits2 = logits_cat.chunk(2)
+
+            if config.clustering_mode == "spectral_free_k":
+                spectral_output = model.spectral_cluster(
+                    student_features=student_cat,
+                    temperature=config.spectral_assignment_temperature,
+                    min_clusters=config.min_spectral_clusters,
+                    max_clusters=config.max_spectral_clusters,
+                    momentum=config.spectral_proto_momentum,
+                    update_state=True,
+                )
+                logits_cat = spectral_output["logits"]
+                assignment_cat = spectral_output["assignments"]
+                estimated_k = float(spectral_output["estimated_k"])
+                logits1, logits2 = logits_cat.chunk(2)
+                assign1, assign2 = assignment_cat.chunk(2)
+            else:
+                logits_cat = model.prototype_logits(student_cat)
+                logits1, logits2 = logits_cat.chunk(2)
+                estimated_k = float(config.class_num)
 
             inst_loss = nt_xent_loss(
                 student1.float(), student2.float(), config.instance_temperature
             )
-            cluster_loss, assign1, assign2 = swav_cluster_loss(
-                logits_a=logits1.float(),
-                logits_b=logits2.float(),
-                temperature=config.cluster_temperature,
-                sinkhorn_epsilon=config.sinkhorn_epsilon,
-                sinkhorn_iters=config.sinkhorn_iters,
-            )
+            if config.clustering_mode == "spectral_free_k":
+                cluster_loss, assign1, assign2 = spectral_cluster_loss(
+                    logits_a=logits1.float(),
+                    logits_b=logits2.float(),
+                    prediction_temperature=config.cluster_temperature,
+                    sharpen_temperature=config.spectral_sharpen_temperature,
+                )
+            else:
+                cluster_loss, assign1, assign2 = swav_cluster_loss(
+                    logits_a=logits1.float(),
+                    logits_b=logits2.float(),
+                    temperature=config.cluster_temperature,
+                    sinkhorn_epsilon=config.sinkhorn_epsilon,
+                    sinkhorn_iters=config.sinkhorn_iters,
+                )
             if semantic_text_features is not None and config.lambda_semantic > 0:
                 semantic_loss = semantic_cluster_alignment_loss(
                     logits=logits_cat,
@@ -135,27 +165,43 @@ def train_one_epoch(
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
             if step % config.subspace_every_n_steps == 0:
-                subspace_loss, _ = subspace_regularization_loss(
-                    student_features=student_cat,
-                    teacher_features=teacher_cat,
-                    assignments=assignment_cat,
-                    queue=queue,
-                    rank=config.subspace_rank,
-                    min_mass=config.subspace_min_mass,
-                    pca_q_offset=config.subspace_pca_q_offset,
-                    topk_clusters=config.subspace_topk_clusters,
-                )
+                if config.clustering_mode == "spectral_free_k":
+                    subspace_loss, _ = spectral_anchor_subspace_loss(
+                        student_features=student_cat,
+                        assignments=assignment_cat,
+                        anchor_prototypes=spectral_output["prototypes"],
+                        min_mass=config.subspace_min_mass,
+                    )
+                else:
+                    subspace_loss, _ = subspace_regularization_loss(
+                        student_features=student_cat,
+                        teacher_features=teacher_cat,
+                        assignments=assignment_cat,
+                        queue=queue,
+                        rank=config.subspace_rank,
+                        min_mass=config.subspace_min_mass,
+                        pca_q_offset=config.subspace_pca_q_offset,
+                        topk_clusters=config.subspace_topk_clusters,
+                    )
             else:
                 subspace_loss = student_cat.new_zeros(())
 
             if step % config.dpp_every_n_steps == 0:
-                dpp_loss, rho, _ = dpp_diversity_loss(
-                    features=student_cat,
-                    assignments=assignment_cat,
-                    jitter=config.dpp_jitter,
-                    class_aware=config.class_aware_dpp,
-                    class_aware_min_mass=config.class_aware_dpp_min_mass,
-                )
+                if config.clustering_mode == "spectral_free_k":
+                    dpp_loss, rho, _ = dpp_diversity_loss(
+                        features=student_cat,
+                        assignments=assignment_cat,
+                        jitter=config.dpp_jitter,
+                        relative_quality=spectral_output["relative_quality"],
+                    )
+                else:
+                    dpp_loss, rho, _ = dpp_diversity_loss(
+                        features=student_cat,
+                        assignments=assignment_cat,
+                        jitter=config.dpp_jitter,
+                        class_aware=config.class_aware_dpp,
+                        class_aware_min_mass=config.class_aware_dpp_min_mass,
+                    )
                 epoch_progress = epoch + step / max(num_steps, 1)
                 alpha_div = adaptive_diversity_weight(
                     rho=rho,
@@ -180,7 +226,8 @@ def train_one_epoch(
         scaler.step(optimizer)
         scaler.update()
         model.normalize_prototypes()
-        queue.enqueue(teacher_cat, assignment_cat)
+        if queue is not None:
+            queue.enqueue(teacher_cat, assignment_cat)
 
         totals["loss"] += float(loss.item())
         totals["inst_loss"] += float(inst_loss.item())
@@ -190,13 +237,14 @@ def train_one_epoch(
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
         totals["rho"] += float(rho.item())
+        totals["estimated_k"] += estimated_k
 
         if (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps:
             running_denom = step + 1
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f k=%.2f"
                 ),
                 epoch,
                 step + 1,
@@ -209,6 +257,7 @@ def train_one_epoch(
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
                 totals["rho"] / running_denom,
+                totals["estimated_k"] / running_denom,
             )
 
     denom = max(len(dataloader), 1)
@@ -260,7 +309,8 @@ def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, de
         scheduler=scheduler,
         map_location=device,
     )
-    queue.load_state_dict(checkpoint.get("queue", {}))
+    if queue is not None:
+        queue.load_state_dict(checkpoint.get("queue", {}))
     start_epoch = int(checkpoint.get("epoch", -1)) + 1
     global_step = int(checkpoint.get("global_step", 0))
     best_metric = float(checkpoint.get("best_metric", float("-inf")))
@@ -316,18 +366,14 @@ def main():
     gpu_train_transform = build_gpu_train_transform(
         config.image_size, config.transform_profile
     ).to(device)
-    model = HypersphereDPPModel(
-        backbone_name=config.backbone_name,
-        pretrained=config.pretrained,
-        pretrained_checkpoint=config.pretrained_checkpoint,
-        feature_dim=config.feature_dim,
-        adapter_hidden_dim=config.adapter_hidden_dim,
-        adapter_dropout=config.adapter_dropout,
-        num_prototypes=config.class_num,
-        device=device,
-    ).to(device)
+    model = build_model_from_config(config, device=device).to(device)
     semantic_text_features = None
-    if config.semantic_prototype_enabled:
+    if config.clustering_mode == "spectral_free_k" and config.semantic_prototype_enabled:
+        logger.info(
+            "semantic prototypes requested but disabled for clustering_mode=%s to keep free-K spectral assignments dimensionally consistent",
+            config.clustering_mode,
+        )
+    elif config.semantic_prototype_enabled:
         semantic_text_features, semantic_info = build_semantic_text_features(
             backbone_model=model.backbone.model,
             backbone_name=config.backbone_name,
@@ -351,6 +397,12 @@ def main():
         config.class_aware_dpp,
         config.class_aware_dpp_min_mass,
     )
+    logger.info(
+        "clustering_mode=%s min_spectral_clusters=%d max_spectral_clusters=%d",
+        config.clustering_mode,
+        config.min_spectral_clusters,
+        config.max_spectral_clusters,
+    )
     optimizer = optim.AdamW(
         model.trainable_parameters(),
         lr=config.learning_rate,
@@ -361,12 +413,14 @@ def main():
         device="cuda" if device.type == "cuda" else "cpu",
         enabled=use_grad_scaler,
     )
-    queue = ClusterFeatureQueue(
-        num_clusters=config.class_num,
-        feature_dim=config.feature_dim,
-        queue_size=config.subspace_queue_size,
-        device=device,
-    )
+    queue = None
+    if config.clustering_mode == "fixed_k":
+        queue = ClusterFeatureQueue(
+            num_clusters=config.class_num,
+            feature_dim=config.feature_dim,
+            queue_size=config.subspace_queue_size,
+            device=device,
+        )
 
     start_epoch, global_step, best_metric = maybe_resume_training(
         model=model,
@@ -468,7 +522,7 @@ def main():
                 optimizer=optimizer,
                 scaler=scaler,
                 scheduler=scheduler,
-                queue_state=queue.state_dict(),
+                queue_state=queue.state_dict() if queue is not None else {},
                 epoch=epoch,
                 global_step=global_step,
                 best_metric=best_metric,
@@ -490,7 +544,7 @@ def main():
             optimizer=optimizer,
             scaler=scaler,
             scheduler=scheduler,
-            queue_state=queue.state_dict(),
+            queue_state=queue.state_dict() if queue is not None else {},
             epoch=epoch,
             global_step=global_step,
             best_metric=best_metric,

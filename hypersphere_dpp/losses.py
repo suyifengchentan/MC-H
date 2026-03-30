@@ -81,6 +81,23 @@ def swav_cluster_loss(
     return loss, assignments_a, assignments_b
 
 
+def spectral_cluster_loss(
+    logits_a: torch.Tensor,
+    logits_b: torch.Tensor,
+    prediction_temperature: float,
+    sharpen_temperature: float,
+) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+    target_a = F.softmax(logits_a.detach() / sharpen_temperature, dim=-1)
+    target_b = F.softmax(logits_b.detach() / sharpen_temperature, dim=-1)
+    log_probs_a = F.log_softmax(logits_a / prediction_temperature, dim=-1)
+    log_probs_b = F.log_softmax(logits_b / prediction_temperature, dim=-1)
+    loss = -0.5 * (
+        (target_a * log_probs_b).sum(dim=1).mean()
+        + (target_b * log_probs_a).sum(dim=1).mean()
+    )
+    return loss, target_a, target_b
+
+
 def mean_pairwise_cosine(features: torch.Tensor) -> torch.Tensor:
     features = F.normalize(features.float(), dim=-1)
     similarity = features @ features.t()
@@ -97,12 +114,15 @@ def dpp_diversity_loss(
     jitter: float = 1e-5,
     class_aware: bool = False,
     class_aware_min_mass: float = 1.0,
+    relative_quality: torch.Tensor | None = None,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=features.device.type, enabled=False):
         normalized = F.normalize(features.float(), dim=-1)
         detached_assignments = assignments.detach().float()
 
-        if class_aware:
+        if relative_quality is not None:
+            quality = relative_quality.detach().float().to(normalized.device)
+        elif class_aware:
             cluster_mass = detached_assignments.sum(dim=0)
             active_cluster_ids = torch.nonzero(
                 cluster_mass >= class_aware_min_mass, as_tuple=False
@@ -121,13 +141,13 @@ def dpp_diversity_loss(
             quality = detached_assignments.max(dim=1).values.clamp_min(1e-6)
 
         centered_log_quality = quality.log() - quality.log().mean()
-        relative_quality = centered_log_quality.exp()
+        relative_quality_out = centered_log_quality.exp()
 
-        phi = normalized * relative_quality.unsqueeze(1)
+        phi = normalized * relative_quality_out.unsqueeze(1)
         logabsdet = _dpp_logdet_from_phi(phi, jitter)
 
     rho = mean_pairwise_cosine(normalized).detach()
-    return -logabsdet, rho, relative_quality
+    return -logabsdet, rho, relative_quality_out
 
 
 def adaptive_diversity_weight(

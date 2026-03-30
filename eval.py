@@ -6,7 +6,7 @@ from hypersphere_dpp.checkpoint import load_checkpoint
 from hypersphere_dpp.config import load_experiment_config
 from hypersphere_dpp.data import build_experiment_dataloaders
 from hypersphere_dpp.metrics import evaluate_clustering
-from hypersphere_dpp.model import HypersphereDPPModel
+from hypersphere_dpp.model import build_model_from_config
 from hypersphere_dpp.utils import resolve_device, set_seed
 
 
@@ -26,16 +26,7 @@ def main():
     set_seed(config.seed)
 
     datasets = build_experiment_dataloaders(config)
-    model = HypersphereDPPModel(
-        backbone_name=config.backbone_name,
-        pretrained=config.pretrained,
-        pretrained_checkpoint=config.pretrained_checkpoint,
-        feature_dim=config.feature_dim,
-        adapter_hidden_dim=config.adapter_hidden_dim,
-        adapter_dropout=config.adapter_dropout,
-        num_prototypes=config.class_num,
-        device=device,
-    ).to(device)
+    model = build_model_from_config(config, device=device).to(device)
     load_checkpoint(args.checkpoint, model=model, map_location=device)
     model.eval()
 

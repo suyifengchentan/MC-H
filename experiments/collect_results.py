@@ -79,6 +79,12 @@ def _summarize_run(run_dir: Path) -> dict[str, Any]:
     if alpha_values:
         mean_train_alpha_div = sum(alpha_values) / len(alpha_values)
 
+    mean_train_estimated_k = None
+    estimated_k_values = [_safe_float(row.get("estimated_k")) for row in train_rows]
+    estimated_k_values = [value for value in estimated_k_values if value is not None]
+    if estimated_k_values:
+        mean_train_estimated_k = sum(estimated_k_values) / len(estimated_k_values)
+
     eval_val = _load_json(run_dir / "eval_val.json")
     eval_test = _load_json(run_dir / "eval_test.json")
 
@@ -107,8 +113,12 @@ def _summarize_run(run_dir: Path) -> dict[str, Any]:
         "last_train_dpp_loss": _safe_float(
             last_train_row.get("dpp_loss") if last_train_row else None
         ),
+        "last_train_estimated_k": _safe_float(
+            last_train_row.get("estimated_k") if last_train_row else None
+        ),
         "mean_train_rho": mean_train_rho,
         "mean_train_alpha_div": mean_train_alpha_div,
+        "mean_train_estimated_k": mean_train_estimated_k,
         "eval_val_acc": _safe_float(eval_val.get("acc") if eval_val else None),
         "eval_val_nmi": _safe_float(eval_val.get("nmi") if eval_val else None),
         "eval_val_ari": _safe_float(eval_val.get("ari") if eval_val else None),

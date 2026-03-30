@@ -44,6 +44,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 }
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
+SUPPORTED_CLUSTERING_MODES = {"fixed_k", "spectral_free_k"}
 
 
 @dataclass
@@ -65,6 +66,12 @@ class ExperimentConfig:
     adapter_hidden_dim: int = 1024
     adapter_dropout: float = 0.1
     transform_profile: str = "fine_grained_two_view"
+    clustering_mode: str = "fixed_k"
+    min_spectral_clusters: int = 2
+    max_spectral_clusters: int = 0
+    spectral_assignment_temperature: float = 0.2
+    spectral_sharpen_temperature: float = 0.1
+    spectral_proto_momentum: float = 0.9
 
     # Optimization
     batch_size: int = 128
@@ -161,6 +168,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             f"backbone_name must be one of {sorted(SUPPORTED_BACKBONE_FEATURE_DIMS)}, got {config.backbone_name!r}."
         )
 
+    if config.clustering_mode not in SUPPORTED_CLUSTERING_MODES:
+        raise ValueError(
+            "clustering_mode must be one of "
+            f"{sorted(SUPPORTED_CLUSTERING_MODES)}, got {config.clustering_mode!r}."
+        )
+
     expected_feature_dim = SUPPORTED_BACKBONE_FEATURE_DIMS[config.backbone_name]
     if config.feature_dim != expected_feature_dim:
         raise ValueError(
@@ -174,6 +187,29 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
+
+    if config.min_spectral_clusters <= 0:
+        raise ValueError("min_spectral_clusters must be a positive integer.")
+
+    if config.max_spectral_clusters < 0:
+        raise ValueError("max_spectral_clusters must be non-negative.")
+
+    if (
+        config.max_spectral_clusters > 0
+        and config.max_spectral_clusters < config.min_spectral_clusters
+    ):
+        raise ValueError(
+            "max_spectral_clusters must be >= min_spectral_clusters when provided."
+        )
+
+    if config.spectral_assignment_temperature <= 0:
+        raise ValueError("spectral_assignment_temperature must be positive.")
+
+    if config.spectral_sharpen_temperature <= 0:
+        raise ValueError("spectral_sharpen_temperature must be positive.")
+
+    if not 0.0 <= config.spectral_proto_momentum < 1.0:
+        raise ValueError("spectral_proto_momentum must be in [0, 1).")
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")

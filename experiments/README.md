@@ -14,11 +14,15 @@
    在 CUB 上做 `no_instance / no_cluster / no_subspace / no_dpp` 消融。
 5. `Section 3.7`（训练策略）  
    在 CUB 上做 `dpp_every_n_steps` 频率消融。
+6. `Section 3.6 / Appendix A.3`（free-K 谱原型与稳定化）  
+   使用 `freek_validation.yaml` 和 `freek_ablation.yaml` 验证谱估计 $\hat K$、谱原型稳定化和 free-K 训练路径。
 
 ## 文件说明
 
 - [`suites/validation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/validation_methodology.yaml): 验证实验矩阵
 - [`suites/ablation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/ablation_methodology.yaml): 消融实验矩阵
+- [`suites/freek_validation.yaml`](/home/geyingjie/hypersphere/experiments/suites/freek_validation.yaml): free-K 验证实验矩阵
+- [`suites/freek_ablation.yaml`](/home/geyingjie/hypersphere/experiments/suites/freek_ablation.yaml): free-K 消融实验矩阵
 - [`run_suite.py`](/home/geyingjie/hypersphere/experiments/run_suite.py): 实验运行器（生成配置 + 可选执行 train/eval）
 - [`collect_results.py`](/home/geyingjie/hypersphere/experiments/collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
 - [`run_validation.sh`](/home/geyingjie/hypersphere/experiments/run_validation.sh): 运行验证实验套件
@@ -35,6 +39,8 @@
 ```bash
 python experiments/run_suite.py --suite experiments/suites/validation_methodology.yaml
 python experiments/run_suite.py --suite experiments/suites/ablation_methodology.yaml
+python experiments/run_suite.py --suite experiments/suites/freek_validation.yaml
+python experiments/run_suite.py --suite experiments/suites/freek_ablation.yaml
 ```
 
 2. 执行指定 case（建议先小规模验证）：
@@ -66,12 +72,20 @@ python experiments/collect_results.py \
 
 python experiments/collect_results.py \
   --suite experiments/suites/ablation_methodology.yaml
+
+python experiments/collect_results.py \
+  --suite experiments/suites/freek_validation.yaml
+
+python experiments/collect_results.py \
+  --suite experiments/suites/freek_ablation.yaml
 ```
 
 汇总 CSV 默认写到：
 
 - `experiments/generated/methodology_validation/summary.csv`
 - `experiments/generated/methodology_ablation/summary.csv`
+- `experiments/generated/freek_validation/summary.csv`
+- `experiments/generated/freek_ablation/summary.csv`
 
 ## 产物路径规范
 

@@ -7,8 +7,16 @@ import torch
 import torch.nn.functional as F
 
 from hypersphere_dpp.data import split_train_indices
-from hypersphere_dpp.losses import _dpp_logdet_from_phi, dpp_diversity_loss
-from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
+from hypersphere_dpp.losses import (
+    _dpp_logdet_from_phi,
+    dpp_diversity_loss,
+    spectral_cluster_loss,
+)
+from hypersphere_dpp.subspace import (
+    ClusterFeatureQueue,
+    spectral_anchor_subspace_loss,
+    subspace_regularization_loss,
+)
 
 
 class DataAndLossesTest(unittest.TestCase):
@@ -67,6 +75,20 @@ class DataAndLossesTest(unittest.TestCase):
         optimized_logabsdet = _dpp_logdet_from_phi(phi, 1e-5)
 
         self.assertTrue(torch.allclose(optimized_logabsdet, original_logabsdet, atol=1e-5, rtol=1e-5))
+
+    def test_spectral_cluster_loss_is_finite(self):
+        logits_a = torch.randn(8, 5)
+        logits_b = torch.randn(8, 5)
+        loss, assign_a, assign_b = spectral_cluster_loss(
+            logits_a=logits_a,
+            logits_b=logits_b,
+            prediction_temperature=0.3,
+            sharpen_temperature=0.1,
+        )
+
+        self.assertTrue(torch.isfinite(loss))
+        self.assertEqual(assign_a.shape, logits_a.shape)
+        self.assertEqual(assign_b.shape, logits_b.shape)
 
     def test_queue_respects_capacity(self):
         queue = ClusterFeatureQueue(num_clusters=3, feature_dim=4, queue_size=2)
@@ -142,6 +164,21 @@ class DataAndLossesTest(unittest.TestCase):
 
         self.assertTrue(torch.isfinite(loss))
         self.assertEqual(stats.active_clusters, 2)
+
+    def test_spectral_anchor_subspace_loss_is_finite(self):
+        student_features = torch.randn(10, 6)
+        assignments = torch.softmax(torch.randn(10, 4), dim=-1)
+        prototypes = torch.nn.functional.normalize(torch.randn(4, 6), dim=-1)
+
+        loss, stats = spectral_anchor_subspace_loss(
+            student_features=student_features,
+            assignments=assignments,
+            anchor_prototypes=prototypes,
+            min_mass=1.0,
+        )
+
+        self.assertTrue(torch.isfinite(loss))
+        self.assertGreaterEqual(stats.active_clusters, 0)
 
 
 if __name__ == "__main__":
