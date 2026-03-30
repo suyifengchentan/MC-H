@@ -180,6 +180,7 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
+- `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
 - `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
 
 Image10 默认假设数据目录为标准 `ImageFolder` 结构：

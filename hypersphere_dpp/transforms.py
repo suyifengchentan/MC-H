@@ -183,6 +183,17 @@ def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
             blur_p=0.1,
         )
 
+    if profile == "imagenet200_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.55, 1.0),
+            crop_ratio=(0.8, 1.25),
+            color_jitter=(0.35, 0.35, 0.22, 0.06),
+            color_jitter_p=0.8,
+            grayscale_p=0.03,
+            blur_p=0.05,
+        )
+
     if profile == "tiny_imagenet200_two_view":
         return _build_gpu_two_view_transform(
             image_size=image_size,

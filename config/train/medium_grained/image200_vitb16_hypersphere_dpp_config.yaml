@@ -1,4 +1,4 @@
-# Image200 ViT-L/14 hypersphere-DPP prototype training config
+# Image200 ViT-B/16 hypersphere-DPP prototype training config
 
 # Data
 dataset: "Image200"
@@ -17,16 +17,18 @@ backbone_name: "ViT-B-16"
 pretrained: "laion2b_s34b_b88k"
 pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.bin"
 adapter_hidden_dim: 768
-adapter_dropout: 0.1
-transform_profile: "imagenet100_two_view"
+adapter_dropout: 0.12
+transform_profile: "imagenet200_two_view"
 
 # Optimization
 precision: "bf16"
 batch_size: 512
 eval_batch_size: 512
-epochs: 500
+epochs: 240
 learning_rate: 0.00025
-weight_decay: 0.000001
+weight_decay: 0.00001
+lr_scheduler: "cosine"
+min_learning_rate: 0.00001
 
 # Compact / clustering
 instance_temperature: 0.2
@@ -38,24 +40,24 @@ sinkhorn_iters: 3
 sinkhorn_epsilon: 0.05
 
 # Subspace
-lambda_subspace: 0.12
+lambda_subspace: 0.15
 subspace_rank: 8
 subspace_queue_size: 64
-subspace_min_mass: 4.0
-subspace_every_n_steps: 3
+subspace_min_mass: 5.0
+subspace_every_n_steps: 2
 subspace_pca_q_offset: 2
 subspace_topk_clusters: 64
 
 # DPP
-alpha_div_base: 0.3
-dpp_warmup_epochs: 25
-dpp_every_n_steps: 6
+alpha_div_base: 0.4
+dpp_warmup_epochs: 18
+dpp_every_n_steps: 4
 dpp_jitter: 0.00001
 
 # Runtime / output
 eval_interval: 3
-model_path: "save/hypersphere_dpp/Image200_CLIP_ViTB16_HypersphereDPP_20260328_212034"
+model_path: "save/hypersphere_dpp/Image200_CLIP_ViTB16_HypersphereDPP"
 workers: 2
-reload: true
+reload: false
 seed: 42
 best_checkpoint_patience: 10

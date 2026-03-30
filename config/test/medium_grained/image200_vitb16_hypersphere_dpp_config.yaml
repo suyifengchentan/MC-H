@@ -1,4 +1,4 @@
-# Image200 ViT-L/14 hypersphere-DPP prototype evaluation config
+# Image200 ViT-B/16 hypersphere-DPP prototype evaluation config
 
 # Data
 dataset: "Image200"
@@ -17,8 +17,8 @@ backbone_name: "ViT-B-16"
 pretrained: "laion2b_s34b_b88k"
 pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.bin"
 adapter_hidden_dim: 768
-adapter_dropout: 0.1
-transform_profile: "imagenet100_two_view"
+adapter_dropout: 0.12
+transform_profile: "imagenet200_two_view"
 
 # Evaluation / runtime
 eval_batch_size: 128
