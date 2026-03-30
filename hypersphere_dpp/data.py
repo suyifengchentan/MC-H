@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+from collections import defaultdict
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 
@@ -61,25 +62,85 @@ class DatasetBundle:
     train_loader: DataLoader
     val_loader: DataLoader
     test_loader: DataLoader
+    val_is_stratified: bool = False
 
 
 def split_train_indices(
-    size: int, validation_ratio: float, seed: int
+    size: int,
+    validation_ratio: float,
+    seed: int,
+    labels: Sequence[int] | None = None,
 ) -> tuple[list[int], list[int]]:
     if size < 2:
         raise ValueError(
             "Dataset must contain at least 2 samples to create train/val splits."
         )
+
+    if labels is not None and len(labels) != size:
+        raise ValueError("labels length must match dataset size for stratified split.")
+
     generator = torch.Generator().manual_seed(seed)
-    indices = torch.randperm(size, generator=generator).tolist()
-    val_size = max(1, int(size * validation_ratio))
-    if val_size >= size:
-        raise ValueError(
-            "validation_ratio leaves no samples for training; reduce validation_ratio."
-        )
-    val_indices = sorted(indices[:val_size])
-    train_indices = sorted(indices[val_size:])
-    return train_indices, val_indices
+
+    if labels is None:
+        indices = torch.randperm(size, generator=generator).tolist()
+        val_size = max(1, int(size * validation_ratio))
+        if val_size >= size:
+            raise ValueError(
+                "validation_ratio leaves no samples for training; reduce validation_ratio."
+            )
+        val_indices = sorted(indices[:val_size])
+        train_indices = sorted(indices[val_size:])
+        return train_indices, val_indices
+
+    label_to_indices: dict[int, list[int]] = defaultdict(list)
+    for index, label in enumerate(labels):
+        label_to_indices[int(label)].append(index)
+
+    train_indices: list[int] = []
+    val_indices: list[int] = []
+    for label in sorted(label_to_indices):
+        class_indices = label_to_indices[label]
+        class_size = len(class_indices)
+        if class_size < 2:
+            raise ValueError(
+                "Stratified validation split requires at least 2 samples per class."
+            )
+
+        class_perm = torch.randperm(class_size, generator=generator).tolist()
+        shuffled_indices = [class_indices[i] for i in class_perm]
+        class_val_size = max(1, int(round(class_size * validation_ratio)))
+        class_val_size = min(class_val_size, class_size - 1)
+        val_indices.extend(shuffled_indices[:class_val_size])
+        train_indices.extend(shuffled_indices[class_val_size:])
+
+    return sorted(train_indices), sorted(val_indices)
+
+
+def _extract_dataset_labels(dataset: Dataset) -> list[int] | None:
+    if hasattr(dataset, "targets"):
+        targets = getattr(dataset, "targets")
+        return [int(label) for label in targets]
+
+    if hasattr(dataset, "labels"):
+        labels = getattr(dataset, "labels")
+        return [int(label) for label in labels]
+
+    if hasattr(dataset, "samples"):
+        samples = getattr(dataset, "samples")
+        if (
+            isinstance(samples, list)
+            and samples
+            and isinstance(samples[0], tuple)
+            and len(samples[0]) >= 2
+        ):
+            return [int(sample[1]) for sample in samples]
+
+    if hasattr(dataset, "data"):
+        data = getattr(dataset, "data")
+        if isinstance(data, list) and data and isinstance(data[0], tuple) and len(data[0]) >= 2:
+            return [int(sample[1]) for sample in data]
+
+    return None
 
 
 def _clone_cpu_tensors_for_collate(sample):
@@ -291,11 +352,14 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
 
 def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     train_base, test_base = _build_base_datasets(config)
+    train_labels = _extract_dataset_labels(train_base)
+    val_is_stratified = train_labels is not None
 
     train_indices, val_indices = split_train_indices(
         size=len(train_base),
         validation_ratio=config.validation_ratio,
         seed=config.validation_seed,
+        labels=train_labels,
     )
 
     train_subset = Subset(train_base, train_indices)
@@ -355,5 +419,8 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         prefetch_factor=eval_prefetch_factor,
     )
     return DatasetBundle(
-        train_loader=train_loader, val_loader=val_loader, test_loader=test_loader
+        train_loader=train_loader,
+        val_loader=val_loader,
+        test_loader=test_loader,
+        val_is_stratified=val_is_stratified,
     )

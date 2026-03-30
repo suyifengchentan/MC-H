@@ -36,13 +36,13 @@ sinkhorn_iters: 3
 sinkhorn_epsilon: 0.05
 
 # Subspace
-lambda_subspace: 0.18
+lambda_subspace: 0.14
 subspace_rank: 8
 subspace_queue_size: 64
 subspace_min_mass: 4.0
 subspace_every_n_steps: 2
 subspace_pca_q_offset: 2
-subspace_topk_clusters: 32
+subspace_topk_clusters: 24
 
 # DPP
 alpha_div_base: 0.45
@@ -56,5 +56,4 @@ model_path: "save/hypersphere_dpp/CUB_200_2011_CLIP_ViTB16_HypersphereDPP"
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 30
 best_checkpoint_patience: 20

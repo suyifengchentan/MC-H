@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import unittest
+from collections import Counter
 
 import torch
 import torch.nn.functional as F
@@ -20,6 +21,27 @@ class DataAndLossesTest(unittest.TestCase):
         self.assertEqual(len(train_a), 80)
         self.assertEqual(len(val_a), 20)
         self.assertEqual(set(train_a).intersection(val_a), set())
+
+    def test_stratified_split_reproducibility(self):
+        labels = [0] * 10 + [1] * 10 + [2] * 10
+        train_a, val_a = split_train_indices(30, 0.2, 42, labels=labels)
+        train_b, val_b = split_train_indices(30, 0.2, 42, labels=labels)
+
+        self.assertEqual(train_a, train_b)
+        self.assertEqual(val_a, val_b)
+        self.assertEqual(set(train_a).intersection(val_a), set())
+
+    def test_stratified_split_keeps_all_classes_in_val(self):
+        labels = [0] * 30 + [1] * 30 + [2] * 30 + [3] * 30
+        train_indices, val_indices = split_train_indices(120, 0.1, 42, labels=labels)
+
+        val_counts = Counter(labels[index] for index in val_indices)
+        train_counts = Counter(labels[index] for index in train_indices)
+
+        self.assertEqual(len(val_counts), 4)
+        self.assertEqual(len(train_counts), 4)
+        self.assertTrue(all(count >= 1 for count in val_counts.values()))
+        self.assertTrue(all(count >= 1 for count in train_counts.values()))
 
     def test_dpp_loss_is_finite(self):
         features = torch.nn.functional.normalize(torch.randn(8, 768), dim=-1)

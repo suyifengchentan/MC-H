@@ -284,6 +284,7 @@ def main():
 
     datasets = build_experiment_dataloaders(config)
     train_prefetch_factor = getattr(datasets.train_loader, "prefetch_factor", None)
+    logger.info("validation split: stratified=%s", datasets.val_is_stratified)
     logger.info(
         "train dataloader: workers=%d pin_memory=%s persistent_workers=%s prefetch_factor=%s",
         datasets.train_loader.num_workers,
