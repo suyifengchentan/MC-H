@@ -23,6 +23,10 @@ from hypersphere_dpp.metrics import (
     format_clustering_metrics,
 )
 from hypersphere_dpp.model import HypersphereDPPModel
+from hypersphere_dpp.semantic import (
+    build_semantic_text_features,
+    semantic_cluster_alignment_loss,
+)
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
@@ -65,6 +69,7 @@ def train_one_epoch(
     optimizer,
     scaler,
     queue: ClusterFeatureQueue,
+    semantic_text_features: torch.Tensor | None,
     config,
     device: torch.device,
     epoch: int,
@@ -80,6 +85,7 @@ def train_one_epoch(
         "cluster_loss": 0.0,
         "subspace_loss": 0.0,
         "dpp_loss": 0.0,
+        "semantic_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
     }
@@ -115,6 +121,16 @@ def train_one_epoch(
                 sinkhorn_epsilon=config.sinkhorn_epsilon,
                 sinkhorn_iters=config.sinkhorn_iters,
             )
+            if semantic_text_features is not None and config.lambda_semantic > 0:
+                semantic_loss = semantic_cluster_alignment_loss(
+                    logits=logits_cat,
+                    teacher_features=teacher_cat,
+                    text_features=semantic_text_features,
+                    teacher_logit_scale=model.teacher_logit_scale(),
+                    temperature=config.semantic_temperature,
+                )
+            else:
+                semantic_loss = student_cat.new_zeros(())
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
@@ -137,6 +153,8 @@ def train_one_epoch(
                     features=student_cat,
                     assignments=assignment_cat,
                     jitter=config.dpp_jitter,
+                    class_aware=config.class_aware_dpp,
+                    class_aware_min_mass=config.class_aware_dpp_min_mass,
                 )
                 epoch_progress = epoch + step / max(num_steps, 1)
                 alpha_div = adaptive_diversity_weight(
@@ -153,6 +171,7 @@ def train_one_epoch(
             loss = (
                 config.lambda_instance * inst_loss
                 + config.lambda_cluster * cluster_loss
+                + config.lambda_semantic * semantic_loss
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -166,6 +185,7 @@ def train_one_epoch(
         totals["loss"] += float(loss.item())
         totals["inst_loss"] += float(inst_loss.item())
         totals["cluster_loss"] += float(cluster_loss.item())
+        totals["semantic_loss"] += float(semantic_loss.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -176,7 +196,7 @@ def train_one_epoch(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -184,6 +204,7 @@ def train_one_epoch(
                 totals["loss"] / running_denom,
                 totals["inst_loss"] / running_denom,
                 totals["cluster_loss"] / running_denom,
+                totals["semantic_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -305,6 +326,31 @@ def main():
         num_prototypes=config.class_num,
         device=device,
     ).to(device)
+    semantic_text_features = None
+    if config.semantic_prototype_enabled:
+        semantic_text_features, semantic_info = build_semantic_text_features(
+            backbone_model=model.backbone.model,
+            backbone_name=config.backbone_name,
+            dataset_name=config.dataset,
+            dataset_dir=config.dataset_dir,
+            prompt_style=config.semantic_prompt_style,
+            aggregation=config.semantic_prototype_aggregation,
+            device=device,
+        )
+        logger.info(
+            "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
+            True,
+            config.lambda_semantic,
+            semantic_info["prompt_style"],
+            semantic_info["aggregation"],
+            semantic_info["num_classes"],
+            semantic_info["num_templates"],
+        )
+    logger.info(
+        "class-aware dpp: enabled=%s min_mass=%.4f",
+        config.class_aware_dpp,
+        config.class_aware_dpp_min_mass,
+    )
     optimizer = optim.AdamW(
         model.trainable_parameters(),
         lr=config.learning_rate,
@@ -357,6 +403,7 @@ def main():
             optimizer=optimizer,
             scaler=scaler,
             queue=queue,
+            semantic_text_features=semantic_text_features,
             config=config,
             device=device,
             epoch=epoch,

@@ -95,10 +95,31 @@ def dpp_diversity_loss(
     features: torch.Tensor,
     assignments: torch.Tensor,
     jitter: float = 1e-5,
+    class_aware: bool = False,
+    class_aware_min_mass: float = 1.0,
 ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
     with torch.autocast(device_type=features.device.type, enabled=False):
         normalized = F.normalize(features.float(), dim=-1)
-        quality = assignments.detach().float().max(dim=1).values.clamp_min(1e-6)
+        detached_assignments = assignments.detach().float()
+
+        if class_aware:
+            cluster_mass = detached_assignments.sum(dim=0)
+            active_cluster_ids = torch.nonzero(
+                cluster_mass >= class_aware_min_mass, as_tuple=False
+            ).flatten()
+            if active_cluster_ids.numel() <= 1:
+                zero = normalized.new_zeros(())
+                return zero, zero.detach(), normalized.new_ones((0,))
+
+            selected_assignments = detached_assignments[:, active_cluster_ids]
+            mass = selected_assignments.sum(dim=0).clamp_min(1e-6)
+            cluster_features = selected_assignments.t() @ normalized
+            cluster_features = cluster_features / mass.unsqueeze(1)
+            normalized = F.normalize(cluster_features, dim=-1)
+            quality = mass
+        else:
+            quality = detached_assignments.max(dim=1).values.clamp_min(1e-6)
+
         centered_log_quality = quality.log() - quality.log().mean()
         relative_quality = centered_log_quality.exp()
 

@@ -42,6 +42,8 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
     "ViT-L-14": 768,
     "ViT-B-16": 512,
 }
+SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
+SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 
 
 @dataclass
@@ -81,6 +83,11 @@ class ExperimentConfig:
     lambda_cluster: float = 1.0
     sinkhorn_iters: int = 3
     sinkhorn_epsilon: float = 0.05
+    semantic_prototype_enabled: bool = False
+    semantic_prompt_style: str = "auto"
+    semantic_prototype_aggregation: str = "mean"
+    lambda_semantic: float = 0.0
+    semantic_temperature: float = 0.1
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -96,6 +103,8 @@ class ExperimentConfig:
     dpp_warmup_epochs: int = 20
     dpp_every_n_steps: int = 4
     dpp_jitter: float = 1e-5
+    class_aware_dpp: bool = False
+    class_aware_dpp_min_mass: float = 1.0
 
     # Runtime / output
     eval_interval: int = 1
@@ -185,6 +194,30 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.subspace_min_mass <= 0:
         raise ValueError("subspace_min_mass must be positive.")
+
+    if config.class_aware_dpp_min_mass <= 0:
+        raise ValueError("class_aware_dpp_min_mass must be positive.")
+
+    if config.semantic_prompt_style not in SUPPORTED_SEMANTIC_PROMPT_STYLES:
+        raise ValueError(
+            "semantic_prompt_style must be one of "
+            f"{sorted(SUPPORTED_SEMANTIC_PROMPT_STYLES)}, got {config.semantic_prompt_style!r}."
+        )
+
+    if (
+        config.semantic_prototype_aggregation
+        not in SUPPORTED_SEMANTIC_AGGREGATIONS
+    ):
+        raise ValueError(
+            "semantic_prototype_aggregation must be one of "
+            f"{sorted(SUPPORTED_SEMANTIC_AGGREGATIONS)}, got {config.semantic_prototype_aggregation!r}."
+        )
+
+    if config.lambda_semantic < 0:
+        raise ValueError("lambda_semantic must be non-negative.")
+
+    if config.semantic_temperature <= 0:
+        raise ValueError("semantic_temperature must be positive.")
 
     if (
         config.official_eval_split is not None

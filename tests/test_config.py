@@ -15,7 +15,7 @@ class ConfigLoaderTest(unittest.TestCase):
             dataset: "CUB_200_2011"
             dataset_dir: "/tmp/cub"
             class_num: 200
-            semantic_prototype_enabled: true
+            unsupported_future_flag: true
             """
         )
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
@@ -29,11 +29,43 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.dataset, "CUB_200_2011")
         self.assertTrue(
             any(
-                "Unsupported config field 'semantic_prototype_enabled'"
+                "Unsupported config field 'unsupported_future_flag'"
                 in str(w.message)
                 for w in caught
             )
         )
+
+    def test_semantic_and_class_aware_fields_are_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image200"
+            dataset_dir: "/tmp/image200"
+            class_num: 200
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            semantic_prototype_enabled: true
+            semantic_prompt_style: "auto"
+            semantic_prototype_aggregation: "mean"
+            lambda_semantic: 0.2
+            semantic_temperature: 0.2
+            class_aware_dpp: true
+            class_aware_dpp_min_mass: 2.0
+            official_eval_split: "val"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertTrue(config.semantic_prototype_enabled)
+        self.assertEqual(config.semantic_prompt_style, "auto")
+        self.assertEqual(config.semantic_prototype_aggregation, "mean")
+        self.assertEqual(config.lambda_semantic, 0.2)
+        self.assertEqual(config.semantic_temperature, 0.2)
+        self.assertTrue(config.class_aware_dpp)
+        self.assertEqual(config.class_aware_dpp_min_mass, 2.0)
 
     def test_image100_is_supported(self):
         config_text = textwrap.dedent(

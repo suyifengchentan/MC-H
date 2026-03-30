@@ -34,6 +34,15 @@ class FrozenCLIPBackbone(nn.Module):
         features = self.model.encode_image(images)
         return F.normalize(features.float(), dim=-1)
 
+    @torch.no_grad()
+    def encode_text(self, tokenized_text: torch.Tensor) -> torch.Tensor:
+        features = self.model.encode_text(tokenized_text)
+        return F.normalize(features.float(), dim=-1)
+
+    @torch.no_grad()
+    def logit_scale(self) -> torch.Tensor:
+        return self.model.logit_scale.exp().float()
+
 
 class FeatureAdapter(nn.Module):
     def __init__(self, feature_dim: int, hidden_dim: int, dropout: float):
@@ -117,6 +126,10 @@ class HypersphereDPPModel(nn.Module):
 
     def prototype_logits(self, student_features: torch.Tensor) -> torch.Tensor:
         return self.prototypes(student_features)
+
+    @torch.no_grad()
+    def teacher_logit_scale(self) -> torch.Tensor:
+        return self.backbone.logit_scale()
 
     @torch.no_grad()
     def normalize_prototypes(self) -> None:
