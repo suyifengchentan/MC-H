@@ -16,6 +16,10 @@ Usage:
   bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
   bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
 
+Behavior:
+  - Single dataset: defaults to background launch with nohup unless --foreground is set
+  - Multiple datasets: runs sequentially, waiting for each dataset to finish before starting the next
+
 Supported dataset names:
   CIFAR10      | cifar10
   CIFAR100     | cifar100
@@ -266,16 +270,24 @@ launch_dataset() {
   printf ' %q' "${cmd[@]}"
   printf '\n'
 
-  if [[ "$FOREGROUND" -eq 1 ]]; then
+  if [[ "$FOREGROUND" -eq 1 || ${#DATASET_INPUTS[@]} -gt 1 ]]; then
+    if [[ ${#DATASET_INPUTS[@]} -gt 1 ]]; then
+      echo "execution_mode: sequential"
+      echo "launcher_log: $launch_log"
+    else
+      echo "execution_mode: foreground"
+    fi
     : > "$train_log"
     : > "$metrics_log"
-    "${cmd[@]}"
+    : > "$launch_log"
+    "${cmd[@]}" > "$launch_log" 2>&1
     return
   fi
 
   : > "$train_log"
   : > "$metrics_log"
   : > "$launch_log"
+  echo "execution_mode: background"
   nohup "${cmd[@]}" > "$launch_log" 2>&1 < /dev/null &
   local pid=$!
   echo "$pid" > "$pid_file"
