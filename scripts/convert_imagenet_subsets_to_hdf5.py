@@ -19,10 +19,12 @@ from hypersphere_dpp.labels import LabelEntry, default_label_config_path, load_l
 
 
 DEFAULT_OUTPUT_ROOTS = {
+    "ImageNet1K": Path("/home/geyingjie/hypersphere-data/ImageNet1K"),
     "Image50": Path("/home/geyingjie/hypersphere-data/Image50"),
     "Image100": Path("/home/geyingjie/hypersphere-data/Image100"),
     "Image200": Path("/home/geyingjie/hypersphere-data/Image200"),
 }
+DEFAULT_DATASETS = ["ImageNet1K", "Image50", "Image100", "Image200"]
 
 
 @dataclass(frozen=True)
@@ -37,7 +39,11 @@ class SubsetSpec:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Convert ImageNet-1k parquet shards into Image50/Image100/Image200 HDF5 shards."
+        description=(
+            "Convert ImageNet-1k parquet shards into HDF5 shards. "
+            "ImageNet1K keeps the full label space, while Image50/Image100/Image200 "
+            "select rows by config/labels and remap labels before writing H5."
+        )
     )
     parser.add_argument(
         "--imagenet-root",
@@ -48,9 +54,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--datasets",
         nargs="+",
-        default=["Image50", "Image100", "Image200"],
+        default=DEFAULT_DATASETS,
         choices=sorted(DEFAULT_OUTPUT_ROOTS),
-        help="Subset datasets to build.",
+        help="Datasets to build from the source parquet shards.",
     )
     parser.add_argument(
         "--chunk-size",
@@ -119,11 +125,14 @@ def build_subset_specs(dataset_names: list[str], imagenet_items: list[tuple[str,
     subset_specs: list[SubsetSpec] = []
 
     for dataset_name in dataset_names:
-        label_entries = load_label_entries(dataset_name)
-        if not label_entries:
-            raise FileNotFoundError(
-                f"No label entries found for {dataset_name} at {default_label_config_path(dataset_name)}"
-            )
+        if dataset_name == "ImageNet1K":
+            label_entries = [LabelEntry(wnid=wnid, name=name) for wnid, name in imagenet_items]
+        else:
+            label_entries = load_label_entries(dataset_name)
+            if not label_entries:
+                raise FileNotFoundError(
+                    f"No label entries found for {dataset_name} at {default_label_config_path(dataset_name)}"
+                )
 
         source_label_to_subset_label: dict[int, int] = {}
         subset_label_to_wnid: dict[int, str] = {}
@@ -163,7 +172,7 @@ def convert_subset(
     output_data_root.mkdir(parents=True, exist_ok=True)
 
     split_summaries: dict[str, dict[str, int]] = {}
-    for split_prefix in ("train", "validation"):
+    for split_prefix in discover_source_splits(source_data_root):
         shard_paths = sorted(source_data_root.glob(f"{split_prefix}-*.parquet"))
         if max_shards_per_split is not None:
             shard_paths = shard_paths[:max_shards_per_split]
@@ -200,6 +209,17 @@ def convert_subset(
         }
 
     return split_summaries
+
+
+def discover_source_splits(source_data_root: Path) -> list[str]:
+    split_prefixes = [
+        split_prefix
+        for split_prefix in ("train", "validation", "test")
+        if any(source_data_root.glob(f"{split_prefix}-*.parquet"))
+    ]
+    if not split_prefixes:
+        raise FileNotFoundError(f"No parquet shards found under {source_data_root}")
+    return split_prefixes
 
 
 def convert_one_shard(
@@ -303,6 +323,7 @@ def write_metadata_files(
     split_summaries: dict[str, dict[str, int]],
 ) -> None:
     spec.output_root.mkdir(parents=True, exist_ok=True)
+    label_config_path = default_label_config_path(spec.dataset_name)
 
     label_info = {
         "idx_to_wnid": {str(index): spec.subset_label_to_wnid[index] for index in range(len(spec.entries))},
@@ -315,7 +336,7 @@ def write_metadata_files(
     metadata = {
         "dataset": spec.dataset_name,
         "source_root": str(imagenet_root),
-        "label_config_path": str(default_label_config_path(spec.dataset_name)),
+        "label_config_path": str(label_config_path) if label_config_path is not None else None,
         "class_num": len(spec.entries),
         "splits": split_summaries,
         "format": {

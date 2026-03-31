@@ -130,6 +130,16 @@ def _load_oxford_pet_class_texts(dataset_dir: str) -> list[str]:
 
 
 def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
+    label_info_path = Path(dataset_dir) / "label_info.json"
+    if label_info_path.is_file():
+        with label_info_path.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+
+        idx_to_class_name = raw.get("idx_to_class_name")
+        if isinstance(idx_to_class_name, dict) and idx_to_class_name:
+            sorted_pairs = sorted((int(index), name) for index, name in idx_to_class_name.items())
+            return [str(name).strip() for _, name in sorted_pairs]
+
     classes_path = Path(dataset_dir) / "classes.py"
     spec = importlib.util.spec_from_file_location(
         "imagenet1k_classes_module",

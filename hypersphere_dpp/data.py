@@ -12,7 +12,6 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
-from datasets.imagenet50_parquet_dataset import ImageNetParquetDataset
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
@@ -251,38 +250,20 @@ def _build_imagenet_h5_datasets(
     official_eval_split: str,
 ) -> tuple[Dataset, Dataset]:
     label_wnids = load_label_wnids(config.dataset)
+    class_names = label_wnids or None
     train_base = ImageNetH5Dataset(
         root=config.dataset_dir,
         split="train",
         transform=None,
-        class_names=label_wnids,
+        class_names=class_names,
     )
     eval_base = ImageNetH5Dataset(
         root=config.dataset_dir,
         split=official_eval_split,
         transform=None,
-        class_names=label_wnids,
+        class_names=class_names,
     )
     return train_base, eval_base
-
-
-def _build_imagenet_parquet_datasets(
-    config: ExperimentConfig,
-    official_eval_split: str,
-) -> tuple[Dataset, Dataset]:
-    train_base = ImageNetParquetDataset(
-        root=config.dataset_dir,
-        split="train",
-        transform=None,
-    )
-    eval_base = ImageNetParquetDataset(
-        root=config.dataset_dir,
-        split=official_eval_split,
-        transform=None,
-    )
-    return train_base, eval_base
-
-
 def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
     official_eval_split = config.official_eval_split or _default_official_eval_split(
         config.dataset
@@ -330,7 +311,7 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "ImageNet1K":
-        return _build_imagenet_parquet_datasets(config, official_eval_split)
+        return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset in {"Image50", "Image100", "Image200"}:
         return _build_imagenet_h5_datasets(config, official_eval_split)

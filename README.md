@@ -182,7 +182,7 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 针对 `Image10`、`Image50`、`Image100`、`Image200`、`TinyImageNet200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
 
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
-- `imagenet1k_two_view`: 面向完整 `ImageNet1K` parquet 导出，采用中等强度的自然图像增强
+- `imagenet1k_two_view`: 面向完整 `ImageNet1K` HDF5 shard 导出，采用中等强度的自然图像增强
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
 - `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
@@ -196,11 +196,12 @@ root/
   val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
 ```
 
-`Image50`、`Image100`、`Image200` 现已统一切换到同一套 HDF5 shard 数据协议，默认目录分别是：
+`ImageNet1K`、`Image50`、`Image100`、`Image200` 现已统一切换到同一套 HDF5 shard 数据协议，默认目录分别是：
 
-- `Image50`: `/home/geyingjie/gmm-data/Image50`
-- `Image100`: `/home/geyingjie/gmm-data/Image100`
-- `Image200`: `/home/geyingjie/gmm-data/Image200`
+- `ImageNet1K`: `/home/geyingjie/hypersphere-data/ImageNet1K`
+- `Image50`: `/home/geyingjie/hypersphere-data/Image50`
+- `Image100`: `/home/geyingjie/hypersphere-data/Image100`
+- `Image200`: `/home/geyingjie/hypersphere-data/Image200`
 
 目录结构统一为：
 
@@ -220,13 +221,13 @@ root/
 
 这三份文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 HDF5 shard。
 
-若需要从 Hugging Face 的 `imagenet-1k` parquet 原始导出生成这三套数据，可运行：
+若需要从 Hugging Face 的 `imagenet-1k` parquet 原始导出生成 HDF5 shard，可运行：
 
 ```bash
 /home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py
 ```
 
-脚本会从 `/home/geyingjie/imagenet-1k` 读取 parquet，并把三套子集写到上面的默认目录中。也可以通过 `--datasets Image50 Image100 Image200`、`--overwrite`、`--max-shards-per-split` 控制转换范围。
+脚本会从 `/home/geyingjie/imagenet-1k` 读取 parquet，并把 `ImageNet1K`、`Image50`、`Image100`、`Image200` 写成 HDF5 shard。对 `Image50/100/200`，脚本会按 `config/labels/*.rtf` 过滤对应类的 parquet 样本，再重映射子集标签后落盘。也可以通过 `--datasets ImageNet1K Image50 Image100 Image200`、`--overwrite`、`--max-shards-per-split` 控制转换范围。
 
 每个 HDF5 shard 至少包含以下字段：
 
@@ -237,22 +238,17 @@ path: 原始样本路径
 wnid: 样本所属 wnid
 ```
 
-其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`。
+其中 `Image50/Image100/Image200` 的 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`；`ImageNet1K` 默认使用 `test`，内部会读取 `test-*.h5`。
 
-`ImageNet1K` 支持直接读取 Hugging Face parquet 导出目录，默认可指向：
-
-- `/home/geyingjie/hypersphere-data/imagenet-1k`
-
-目录结构为：
+统一目录结构为：
 
 ```text
 root/
-  classes.py
-  data/train-*.parquet
-  data/test-*.parquet
+  data/train-*.h5
+  data/validation-*.h5 或 data/test-*.h5
+  label_info.json
+  metadata.json
 ```
-
-其中 `official_eval_split` 使用 `test`。
 
 ## Git Ignore 规则
 
