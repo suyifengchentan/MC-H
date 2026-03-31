@@ -31,7 +31,7 @@ SUPPORTED_EVAL_SPLITS_BY_DATASET = {
     "CUB_200_2011": {"test"},
     "FGVC_Aircraft": {"val", "test"},
     "Image10": {"test"},
-    "ImageNet1K": {"test"},
+    "ImageNet1K": {"val", "test"},
     "Image50": {"val"},
     "Image100": {"val"},
     "Image200": {"val"},

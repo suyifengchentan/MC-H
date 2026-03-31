@@ -229,13 +229,14 @@ def _default_official_eval_split(dataset_name: str) -> str:
         "CUB_200_2011",
         "FGVC_Aircraft",
         "Image10",
-        "ImageNet1K",
         "TinyImageNet200",
         "Oxford_Pet",
         "STL10",
         "Stanford_Dogs",
     }:
         return "test"
+    if dataset_name == "ImageNet1K":
+        return "val"
     if dataset_name == "TinyImageNet200":
         return "val"
     if dataset_name in {"Image50", "Image100", "Image200"}:

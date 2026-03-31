@@ -112,7 +112,7 @@ class ConfigLoaderTest(unittest.TestCase):
             feature_dim: 512
             backbone_name: "ViT-B-16"
             transform_profile: "imagenet1k_two_view"
-            official_eval_split: "test"
+            official_eval_split: "val"
             """
         )
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
@@ -124,7 +124,7 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.dataset, "ImageNet1K")
         self.assertEqual(config.class_num, 1000)
         self.assertEqual(config.transform_profile, "imagenet1k_two_view")
-        self.assertEqual(config.official_eval_split, "test")
+        self.assertEqual(config.official_eval_split, "val")
 
     def test_tiny_imagenet200_is_supported(self):
         config_text = textwrap.dedent(

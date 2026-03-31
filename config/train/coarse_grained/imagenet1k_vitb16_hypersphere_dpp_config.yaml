@@ -6,9 +6,9 @@ dataset_dir: "/home/geyingjie/hypersphere-data/ImageNet1K"
 class_num: 1000
 validation_ratio: 0.1
 validation_seed: 42
-official_eval_split: "test"
+official_eval_split: "val"
 # HDF5 shard layout:
-# data/train-*.h5, data/test-*.h5, label_info.json
+# data/train-*.h5, data/validation-*.h5, label_info.json
 
 # Model
 image_size: 224

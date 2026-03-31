@@ -32,7 +32,7 @@
 - 官方评估 split 由 `official_eval_split` 控制：
   - `CUB_200_2011`: 默认 `test`
   - `Image10`: 默认 `test`
-  - `ImageNet1K`: 默认 `test`
+  - `ImageNet1K`: 默认 `val`
   - `Image50`: 默认 `val`
   - `Image100`: 默认 `val`
   - `Image200`: 默认 `val`
@@ -238,7 +238,7 @@ path: 原始样本路径
 wnid: 样本所属 wnid
 ```
 
-其中 `Image50/Image100/Image200` 的 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`；`ImageNet1K` 默认使用 `test`，内部会读取 `test-*.h5`。
+其中 `ImageNet1K/Image50/Image100/Image200` 的 `official_eval_split` 默认都使用 `val`，内部会读取 `validation-*.h5`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
 
 统一目录结构为：
 
