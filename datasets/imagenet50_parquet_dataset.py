@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import bisect
+import importlib.util
 import io
 import json
 from dataclasses import dataclass
@@ -19,27 +20,51 @@ class _ParquetShard:
     row_group_offsets: tuple[int, ...]
 
 
-class ImageNet50ParquetDataset(Dataset):
+def _load_imagenet2012_classes(root: Path) -> tuple[list[str], dict[str, int]]:
+    classes_path = root / "classes.py"
+    if not classes_path.is_file():
+        raise FileNotFoundError(f"Expected ImageNet classes definition at: {classes_path}")
+
+    spec = importlib.util.spec_from_file_location(
+        "imagenet_classes_module",
+        classes_path,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to import ImageNet classes from: {classes_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    imagenet_classes = getattr(module, "IMAGENET2012_CLASSES", None)
+    if not isinstance(imagenet_classes, dict) or not imagenet_classes:
+        raise ValueError(f"IMAGENET2012_CLASSES is missing or invalid in {classes_path}")
+
+    classes = [str(wnid).strip() for wnid in imagenet_classes]
+    class_to_idx = {class_name: index for index, class_name in enumerate(classes)}
+    return classes, class_to_idx
+
+
+class ImageNetParquetDataset(Dataset):
     """
-    仅支持当前 imagenet-50-subset parquet 版本的数据集包装器。
+    通用的 ImageNet parquet shard 数据集包装器。
 
     目录结构要求:
     - root/data/train-*.parquet
-    - root/data/validation-*.parquet
-    - root/label_info.json
+    - root/data/validation-*.parquet 或 root/data/test-*.parquet
+    - root/label_info.json 或 root/classes.py
 
     返回 (image, label, index)，与当前训练框架保持一致。
     """
 
-    _SPLIT_TO_PREFIX = {
-        "train": "train",
-        "val": "validation",
+    _SPLIT_TO_PREFIXES = {
+        "train": ("train",),
+        "val": ("validation", "val"),
+        "test": ("test", "validation", "val"),
     }
 
     def __init__(self, root: str, split: str, transform=None):
-        if split not in self._SPLIT_TO_PREFIX:
+        if split not in self._SPLIT_TO_PREFIXES:
             raise ValueError(
-                f"ImageNet50ParquetDataset only supports split='train' or 'val', got {split!r}."
+                f"ImageNetParquetDataset only supports split='train', 'val', or 'test', got {split!r}."
             )
 
         self.root = Path(root)
@@ -51,7 +76,7 @@ class ImageNet50ParquetDataset(Dataset):
             raise FileNotFoundError(f"Expected parquet shard directory at: {self.data_root}")
 
         self.classes, self.class_to_idx = self._load_classes()
-        self.shards = self._build_shards(self._SPLIT_TO_PREFIX[split])
+        self.shards = self._build_shards(self._SPLIT_TO_PREFIXES[split])
         self._shard_start_indices = [shard.start_index for shard in self.shards]
         self._size = sum(shard.num_rows for shard in self.shards)
 
@@ -68,26 +93,31 @@ class ImageNet50ParquetDataset(Dataset):
 
     def _load_classes(self) -> tuple[list[str], dict[str, int]]:
         label_info_path = self.root / "label_info.json"
-        if not label_info_path.is_file():
-            raise FileNotFoundError(f"Expected label mapping file at: {label_info_path}")
+        if label_info_path.is_file():
+            with label_info_path.open("r", encoding="utf-8") as handle:
+                raw = json.load(handle)
 
-        with label_info_path.open("r", encoding="utf-8") as handle:
-            raw = json.load(handle)
+            idx_to_wnid = raw.get("idx_to_wnid")
+            if not isinstance(idx_to_wnid, dict) or not idx_to_wnid:
+                raise ValueError(f"Invalid idx_to_wnid mapping in {label_info_path}")
 
-        idx_to_wnid = raw.get("idx_to_wnid")
-        if not isinstance(idx_to_wnid, dict) or not idx_to_wnid:
-            raise ValueError(f"Invalid idx_to_wnid mapping in {label_info_path}")
+            sorted_pairs = sorted((int(index), wnid) for index, wnid in idx_to_wnid.items())
+            classes = [wnid for _, wnid in sorted_pairs]
+            class_to_idx = {wnid: index for index, wnid in sorted_pairs}
+            return classes, class_to_idx
 
-        sorted_pairs = sorted((int(index), wnid) for index, wnid in idx_to_wnid.items())
-        classes = [wnid for _, wnid in sorted_pairs]
-        class_to_idx = {wnid: index for index, wnid in sorted_pairs}
-        return classes, class_to_idx
+        return _load_imagenet2012_classes(self.root)
 
-    def _build_shards(self, split_prefix: str) -> list[_ParquetShard]:
-        shard_paths = sorted(self.data_root.glob(f"{split_prefix}-*.parquet"))
+    def _build_shards(self, split_prefixes: tuple[str, ...]) -> list[_ParquetShard]:
+        shard_paths: list[Path] = []
+        for split_prefix in split_prefixes:
+            shard_paths = sorted(self.data_root.glob(f"{split_prefix}-*.parquet"))
+            if shard_paths:
+                break
         if not shard_paths:
+            expected = ", ".join(f"{prefix}-*.parquet" for prefix in split_prefixes)
             raise FileNotFoundError(
-                f"Couldn't find parquet shards matching {split_prefix}-*.parquet under {self.data_root}"
+                f"Couldn't find parquet shards matching any of [{expected}] under {self.data_root}"
             )
 
         shards: list[_ParquetShard] = []
@@ -160,3 +190,6 @@ class ImageNet50ParquetDataset(Dataset):
             image = self.transform(image)
 
         return image, label, index
+
+
+ImageNet50ParquetDataset = ImageNetParquetDataset

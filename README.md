@@ -1,6 +1,6 @@
 # Hypersphere-DPP CUB Prototype
 
-这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`Image50`、`Image100` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
+这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`ImageNet1K`、`Image50`、`Image100` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
 
 ## 方法概要
 
@@ -26,12 +26,13 @@
 
 ## 数据协议
 
-- 支持 `CUB_200_2011`、`Image10`、`Image50`、`Image100`、`Image200`
+- 支持 `CUB_200_2011`、`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200`
 - 训练只使用官方 `train` split
 - validation 从 `train` 中按 `validation_ratio` 划分
 - 官方评估 split 由 `official_eval_split` 控制：
   - `CUB_200_2011`: 默认 `test`
   - `Image10`: 默认 `test`
+  - `ImageNet1K`: 默认 `test`
   - `Image50`: 默认 `val`
   - `Image100`: 默认 `val`
   - `Image200`: 默认 `val`
@@ -178,6 +179,7 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 针对 `Image10`、`Image50`、`Image100`、`Image200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
 
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
+- `imagenet1k_two_view`: 面向完整 `ImageNet1K` parquet 导出，采用中等强度的自然图像增强
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
 - `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
@@ -233,6 +235,21 @@ wnid: 样本所属 wnid
 ```
 
 其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`。
+
+`ImageNet1K` 支持直接读取 Hugging Face parquet 导出目录，默认可指向：
+
+- `/home/geyingjie/hypersphere-data/imagenet-1k`
+
+目录结构为：
+
+```text
+root/
+  classes.py
+  data/train-*.parquet
+  data/test-*.parquet
+```
+
+其中 `official_eval_split` 使用 `test`。
 
 ## Git Ignore 规则
 

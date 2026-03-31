@@ -235,6 +235,17 @@ def build_gpu_train_transform(image_size: int, profile: str) -> nn.Module:
             blur_p=0.15,
         )
 
+    if profile == "imagenet1k_two_view":
+        return _build_gpu_two_view_transform(
+            image_size=image_size,
+            crop_scale=(0.45, 1.0),
+            crop_ratio=(0.75, 1.3333333333),
+            color_jitter=(0.3, 0.3, 0.2, 0.05),
+            color_jitter_p=0.75,
+            grayscale_p=0.05,
+            blur_p=0.1,
+        )
+
     if profile == "imagenet50_two_view":
         return _build_gpu_two_view_transform(
             image_size=image_size,

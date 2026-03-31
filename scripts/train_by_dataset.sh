@@ -26,6 +26,7 @@ Supported dataset names:
   CUB_200_2011 | cub
   FGVC_Aircraft | aircraft
   Image10      | image10
+  ImageNet1K   | imagenet1k | imagenet-1k
   Image50      | image50
   Image100     | image100
   Image200     | image200
@@ -36,6 +37,7 @@ Supported dataset names:
 
 Examples:
   bash scripts/train_by_dataset.sh Image200
+  bash scripts/train_by_dataset.sh ImageNet1K --device cuda:0
   bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
   bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
   bash scripts/train_by_dataset.sh image10 --device cuda:0
@@ -125,6 +127,9 @@ resolve_dataset() {
       ;;
     image10)
       printf '%s\n%s\n' "Image10" "config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    imagenet1k|imagenet-1k|image1k)
+      printf '%s\n%s\n' "ImageNet1K" "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml"
       ;;
     image50)
       printf '%s\n%s\n' "Image50" "config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"

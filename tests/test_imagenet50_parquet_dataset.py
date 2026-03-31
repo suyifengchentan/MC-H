@@ -10,7 +10,7 @@ import pyarrow as pa
 import pyarrow.parquet as pq
 from PIL import Image
 
-from datasets.imagenet50_parquet_dataset import ImageNet50ParquetDataset
+from datasets.imagenet50_parquet_dataset import ImageNet50ParquetDataset, ImageNetParquetDataset
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
@@ -93,6 +93,53 @@ class ImageNet50ParquetDatasetTest(unittest.TestCase):
             self.assertEqual(image.size, (8, 8))
             self.assertEqual(label, 1)
             self.assertEqual(sample_index, 1)
+
+    def test_dataset_can_load_classes_from_python_and_test_split(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            data_root = root / "data"
+            data_root.mkdir(parents=True)
+            (root / "classes.py").write_text(
+                "IMAGENET2012_CLASSES = {\n"
+                "    'n00000001': 'red bird',\n"
+                "    'n00000002': 'green bird',\n"
+                "}\n",
+                encoding="utf-8",
+            )
+
+            _write_parquet(
+                data_root / "train-00000-of-00001.parquet",
+                [
+                    {
+                        "image": {"bytes": _jpeg_bytes((255, 0, 0)), "path": "red.jpg"},
+                        "label": 0,
+                        "wnid": "n00000001",
+                        "class_name": "red bird",
+                    }
+                ],
+            )
+            _write_parquet(
+                data_root / "test-00000-of-00001.parquet",
+                [
+                    {
+                        "image": {"bytes": _jpeg_bytes((0, 255, 0)), "path": "green.jpg"},
+                        "label": 1,
+                        "wnid": "n00000002",
+                        "class_name": "green bird",
+                    }
+                ],
+            )
+
+            train_dataset = ImageNetParquetDataset(root=str(root), split="train")
+            test_dataset = ImageNetParquetDataset(root=str(root), split="test")
+
+            _, label, sample_index = test_dataset[0]
+
+            self.assertEqual(len(train_dataset.classes), 2)
+            self.assertEqual(train_dataset.class_to_idx["n00000002"], 1)
+            self.assertEqual(len(test_dataset), 1)
+            self.assertEqual(label, 1)
+            self.assertEqual(sample_index, 0)
 
 
 if __name__ == "__main__":

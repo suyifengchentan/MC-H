@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
+from datasets.imagenet50_parquet_dataset import ImageNetParquetDataset
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
@@ -228,6 +229,7 @@ def _default_official_eval_split(dataset_name: str) -> str:
         "CUB_200_2011",
         "FGVC_Aircraft",
         "Image10",
+        "ImageNet1K",
         "Oxford_Pet",
         "STL10",
         "Stanford_Dogs",
@@ -256,6 +258,23 @@ def _build_imagenet_h5_datasets(
         split=official_eval_split,
         transform=None,
         class_names=label_wnids,
+    )
+    return train_base, eval_base
+
+
+def _build_imagenet_parquet_datasets(
+    config: ExperimentConfig,
+    official_eval_split: str,
+) -> tuple[Dataset, Dataset]:
+    train_base = ImageNetParquetDataset(
+        root=config.dataset_dir,
+        split="train",
+        transform=None,
+    )
+    eval_base = ImageNetParquetDataset(
+        root=config.dataset_dir,
+        split=official_eval_split,
+        transform=None,
     )
     return train_base, eval_base
 
@@ -305,6 +324,9 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
             root=config.dataset_dir, split=official_eval_split, transform=None
         )
         return train_base, eval_base
+
+    if config.dataset == "ImageNet1K":
+        return _build_imagenet_parquet_datasets(config, official_eval_split)
 
     if config.dataset in {"Image50", "Image100", "Image200"}:
         return _build_imagenet_h5_datasets(config, official_eval_split)
@@ -376,16 +398,30 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         test_base, build_eval_transform(config.image_size, config.transform_profile)
     )
 
-    # HDF5 shard datasets benefit from a small pinned prefetch window. Keep the
-    # queue shallow enough to avoid large host-memory spikes while still feeding the GPU.
-    is_h5_dataset = config.dataset in {"Image50", "Image100", "Image200"}
-    train_workers = min(config.workers, 4) if is_h5_dataset else config.workers
-    eval_workers = min(config.workers, 4) if is_h5_dataset else config.workers
-    pin_memory = is_h5_dataset
-    persistent_workers = True if is_h5_dataset else None
-    train_prefetch_factor = 2 if is_h5_dataset and train_workers > 0 else None
+    # Sharded ImageNet-style datasets benefit from a small pinned prefetch
+    # window. Keep the queue shallow enough to avoid large host-memory spikes
+    # while still feeding the GPU.
+    is_sharded_imagenet_dataset = config.dataset in {
+        "ImageNet1K",
+        "Image50",
+        "Image100",
+        "Image200",
+    }
+    train_workers = (
+        min(config.workers, 4) if is_sharded_imagenet_dataset else config.workers
+    )
+    eval_workers = (
+        min(config.workers, 4) if is_sharded_imagenet_dataset else config.workers
+    )
+    pin_memory = is_sharded_imagenet_dataset
+    persistent_workers = True if is_sharded_imagenet_dataset else None
+    train_prefetch_factor = (
+        2 if is_sharded_imagenet_dataset and train_workers > 0 else None
+    )
     eval_prefetch_factor = (
-        1 if is_h5_dataset and eval_workers > 0 else (4 if eval_workers > 0 else None)
+        1
+        if is_sharded_imagenet_dataset and eval_workers > 0
+        else (4 if eval_workers > 0 else None)
     )
 
     train_loader = _build_loader(

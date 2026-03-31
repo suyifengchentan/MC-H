@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 import os
+import importlib.util
 from pathlib import Path
 
 import open_clip
@@ -43,6 +44,7 @@ _SEMANTIC_DATASET_TEMPLATE_PRESETS = {
     "CUB_200_2011": "clip_ensemble",
     "FGVC_Aircraft": "clip_ensemble",
     "Image10": "clip_ensemble",
+    "ImageNet1K": "clip_ensemble",
     "Image50": "clip_ensemble",
     "Image100": "clip_ensemble",
     "Image200": "clip_ensemble",
@@ -125,6 +127,23 @@ def _load_oxford_pet_class_texts(dataset_dir: str) -> list[str]:
     ]
 
 
+def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
+    classes_path = Path(dataset_dir) / "classes.py"
+    spec = importlib.util.spec_from_file_location(
+        "imagenet1k_classes_module",
+        classes_path,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to import ImageNet-1K classes from: {classes_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    imagenet_classes = getattr(module, "IMAGENET2012_CLASSES", None)
+    if not isinstance(imagenet_classes, dict) or not imagenet_classes:
+        raise ValueError(f"IMAGENET2012_CLASSES is missing or invalid in {classes_path}")
+    return [str(name).strip() for name in imagenet_classes.values()]
+
+
 def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     label_entries = load_label_entries(dataset_name)
     if label_entries:
@@ -155,6 +174,8 @@ def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     if dataset_name == "Image10":
         dataset = IndexedImageFolderDataset(root=dataset_dir, split="train", transform=None)
         return [class_name.replace("_", " ").replace("-", " ") for class_name in dataset.classes]
+    if dataset_name == "ImageNet1K":
+        return _load_imagenet1k_class_texts(dataset_dir)
 
     raise ValueError(f"Semantic class texts are unsupported for dataset {dataset_name!r}.")
 
