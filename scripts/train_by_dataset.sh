@@ -30,6 +30,7 @@ Supported dataset names:
   Image50      | image50
   Image100     | image100
   Image200     | image200
+  TinyImageNet200 | tinyimagenet200 | tiny-imagenet-200 | tiny200
   Oxford_Flowers | flowers
   Oxford_Pet   | pet
   STL10        | stl10
@@ -37,6 +38,7 @@ Supported dataset names:
 
 Examples:
   bash scripts/train_by_dataset.sh Image200
+  bash scripts/train_by_dataset.sh TinyImageNet200 --device cuda:0
   bash scripts/train_by_dataset.sh ImageNet1K --device cuda:0
   bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
   bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
@@ -139,6 +141,9 @@ resolve_dataset() {
       ;;
     image200)
       printf '%s\n%s\n' "Image200" "config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml"
+      ;;
+    tinyimagenet200|tiny-imagenet-200|tiny_imagenet200|tiny200)
+      printf '%s\n%s\n' "TinyImageNet200" "config/train/medium_grained/tiny_imagenet200_vitb16_hypersphere_dpp_config.yaml"
       ;;
     flowers|oxford_flowers)
       printf '%s\n%s\n' "Oxford_Flowers" "config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"

@@ -18,6 +18,7 @@ from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
 from datasets.stanford_dogs_dataset import StanfordDogsDataset
+from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
 from .labels import load_label_wnids
@@ -230,11 +231,14 @@ def _default_official_eval_split(dataset_name: str) -> str:
         "FGVC_Aircraft",
         "Image10",
         "ImageNet1K",
+        "TinyImageNet200",
         "Oxford_Pet",
         "STL10",
         "Stanford_Dogs",
     }:
         return "test"
+    if dataset_name == "TinyImageNet200":
+        return "val"
     if dataset_name in {"Image50", "Image100", "Image200"}:
         return "val"
     if dataset_name == "Oxford_Flowers":
@@ -330,6 +334,15 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
 
     if config.dataset in {"Image50", "Image100", "Image200"}:
         return _build_imagenet_h5_datasets(config, official_eval_split)
+
+    if config.dataset == "TinyImageNet200":
+        train_base = TinyImageNetDataset(
+            root=config.dataset_dir, split="train", transform=None
+        )
+        eval_base = TinyImageNetDataset(
+            root=config.dataset_dir, split=official_eval_split, transform=None
+        )
+        return train_base, eval_base
 
     if config.dataset == "Oxford_Flowers":
         train_base = OxfordFlowersDataset(

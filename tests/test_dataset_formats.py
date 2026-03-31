@@ -2,12 +2,16 @@ from __future__ import annotations
 
 import tempfile
 import unittest
+import zipfile
 from pathlib import Path
 
 from PIL import Image
 
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
-from datasets.tiny_imagenet_dataset import TinyImageNetDataset
+from datasets.tiny_imagenet_dataset import (
+    TinyImageNetDataset,
+    load_tiny_imagenet_class_texts,
+)
 
 
 def _write_image(path: Path, color: tuple[int, int, int]) -> None:
@@ -63,6 +67,43 @@ class DatasetFormatsTest(unittest.TestCase):
             self.assertEqual({target for _, target in train_dataset.samples}, {0, 1})
             self.assertEqual({target for _, target in val_dataset.samples}, {0, 1})
             self.assertEqual(test_dataset.samples[0][1], -1)
+
+    def test_tiny_imagenet_can_load_from_zip_container_directory(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            container_root = Path(tmp_dir)
+            archive_path = container_root / "Tiny-ImageNet-200.zip"
+
+            with zipfile.ZipFile(archive_path, "w") as archive:
+                archive.writestr("Tiny-ImageNet-200/wnids.txt", "n0001\nn0002\n")
+                archive.writestr(
+                    "Tiny-ImageNet-200/words.txt",
+                    "n0001\tred fox, fox\nn0002\tgoldfish, carp\n",
+                )
+                archive.writestr(
+                    "Tiny-ImageNet-200/val/val_annotations.txt",
+                    "val_1.JPEG\tn0002\t0\t0\t0\t0\n",
+                )
+
+                for member_name, color in {
+                    "Tiny-ImageNet-200/train/n0001/images/train_1.JPEG": (255, 0, 0),
+                    "Tiny-ImageNet-200/train/n0002/images/train_2.JPEG": (0, 255, 0),
+                    "Tiny-ImageNet-200/val/images/val_1.JPEG": (0, 0, 255),
+                    "Tiny-ImageNet-200/test/images/test_1.JPEG": (255, 255, 0),
+                }.items():
+                    image_path = container_root / f"{Path(member_name).name}.JPEG"
+                    _write_image(image_path, color)
+                    archive.write(image_path, member_name)
+                    image_path.unlink()
+
+            train_dataset = TinyImageNetDataset(str(container_root), split="train")
+            val_dataset = TinyImageNetDataset(str(container_root), split="val")
+            test_dataset = TinyImageNetDataset(str(container_root), split="test")
+            class_texts = load_tiny_imagenet_class_texts(str(container_root))
+
+            self.assertEqual(len(train_dataset), 2)
+            self.assertEqual(len(val_dataset), 1)
+            self.assertEqual(len(test_dataset), 1)
+            self.assertEqual(class_texts, ["red fox", "goldfish"])
 
 
 if __name__ == "__main__":

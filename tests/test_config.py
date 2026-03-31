@@ -126,6 +126,29 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.transform_profile, "imagenet1k_two_view")
         self.assertEqual(config.official_eval_split, "test")
 
+    def test_tiny_imagenet200_is_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "TinyImageNet200"
+            dataset_dir: "/tmp/tiny-imagenet-200"
+            class_num: 200
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            transform_profile: "tiny_imagenet200_two_view"
+            official_eval_split: "val"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.dataset, "TinyImageNet200")
+        self.assertEqual(config.class_num, 200)
+        self.assertEqual(config.transform_profile, "tiny_imagenet200_two_view")
+        self.assertEqual(config.official_eval_split, "val")
+
     def test_oxford_flowers_valid_split_is_supported(self):
         config_text = textwrap.dedent(
             """

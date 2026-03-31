@@ -13,6 +13,7 @@ from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar100_dataset import CIFAR100Dataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.stl10_dataset import STL10Dataset
+from datasets.tiny_imagenet_dataset import load_tiny_imagenet_class_texts
 
 from .labels import load_label_entries
 
@@ -48,6 +49,7 @@ _SEMANTIC_DATASET_TEMPLATE_PRESETS = {
     "Image50": "clip_ensemble",
     "Image100": "clip_ensemble",
     "Image200": "clip_ensemble",
+    "TinyImageNet200": "clip_ensemble",
     "Oxford_Flowers": "clip_ensemble",
     "Oxford_Pet": "clip_ensemble",
     "Stanford_Dogs": "clip_ensemble",
@@ -176,6 +178,8 @@ def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
         return [class_name.replace("_", " ").replace("-", " ") for class_name in dataset.classes]
     if dataset_name == "ImageNet1K":
         return _load_imagenet1k_class_texts(dataset_dir)
+    if dataset_name == "TinyImageNet200":
+        return load_tiny_imagenet_class_texts(dataset_dir)
 
     raise ValueError(f"Semantic class texts are unsupported for dataset {dataset_name!r}.")
 
