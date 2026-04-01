@@ -43,24 +43,26 @@ def apply_neurips_style() -> None:
         "mathtext.fontset": "cm",
         "mathtext.rm": "cmr10",
         "axes.formatter.use_mathtext": True,
-        "font.size": 10,
+        "font.size": 11,
+        "font.weight": "semibold",
         # --- Axes -----------------------------------------------------------
-        "axes.titlesize": 11,
+        "axes.titlesize": 12,
         "axes.titleweight": "bold",
-        "axes.labelsize": 9,
+        "axes.labelsize": 10,
+        "axes.labelweight": "semibold",
         "axes.linewidth": 0.0,
         "axes.edgecolor": "#ffffff",
         "axes.facecolor": "#ffffff",
         "axes.grid": False,
         # --- Ticks ----------------------------------------------------------
-        "xtick.labelsize": 8,
-        "ytick.labelsize": 8,
+        "xtick.labelsize": 9,
+        "ytick.labelsize": 9,
         "xtick.major.width": 0.5,
         "ytick.major.width": 0.5,
         "xtick.direction": "in",
         "ytick.direction": "in",
         # --- Legend ----------------------------------------------------------
-        "legend.fontsize": 7.0,
+        "legend.fontsize": 7.6,
         "legend.frameon": False,
         "legend.borderpad": 0.3,
         "legend.handletextpad": 0.4,
@@ -484,7 +486,7 @@ def _scatter_panel(
         edgecolors="white",
         rasterized=True,
     )
-    ax.set_title(title, fontsize=15.5, pad=10, fontweight="bold", y=1.055)
+    ax.set_title(title, fontsize=17, pad=10, fontweight="bold", y=1.055)
     ax.text(
         0.5,
         1.005,
@@ -492,7 +494,8 @@ def _scatter_panel(
         transform=ax.transAxes,
         ha="center",
         va="bottom",
-        fontsize=8.2,
+        fontsize=9.2,
+        fontweight="semibold",
         color="#444444",
     )
     ax.set_xticks([])
@@ -622,7 +625,8 @@ def main() -> None:
         meta_caption,
         ha="center",
         va="top",
-        fontsize=7.2,
+        fontsize=8.2,
+        fontweight="semibold",
         color="#666666",
     )
 
@@ -636,7 +640,7 @@ def main() -> None:
         handletextpad=0.35,
         columnspacing=0.9,
         borderaxespad=0.0,
-        fontsize=7,
+        prop={"size": 7.6, "weight": "semibold"},
     )
 
     fig.subplots_adjust(
@@ -663,7 +667,8 @@ def main() -> None:
             caption,
             ha="center",
             va="top",
-            fontsize=9.6,
+            fontsize=10.6,
+            fontweight="bold",
             color="#222222",
             linespacing=1.05,
         )
