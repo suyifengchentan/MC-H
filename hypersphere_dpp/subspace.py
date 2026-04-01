@@ -175,6 +175,64 @@ def subspace_regularization_loss(
     return stacked_losses.mean(), stats
 
 
+def teacher_pca_subspace_loss(
+    student_features: torch.Tensor,
+    teacher_features: torch.Tensor,
+    assignments: torch.Tensor,
+    rank: int,
+    min_mass: float,
+    pca_q_offset: int = 4,
+    topk_clusters: int | None = None,
+) -> tuple[torch.Tensor, SubspaceStats]:
+    losses = []
+    teacher_masses = []
+    student_masses = []
+
+    with torch.autocast(device_type=student_features.device.type, enabled=False):
+        detached_assignments = assignments.detach().float()
+        teacher_features_f = teacher_features.detach().float()
+        student_features_f = student_features.float()
+        cluster_masses = detached_assignments.sum(dim=0)
+        active_cluster_ids = torch.nonzero(cluster_masses >= min_mass, as_tuple=False).flatten()
+        if topk_clusters is not None and active_cluster_ids.numel() > topk_clusters:
+            active_masses = cluster_masses[active_cluster_ids]
+            _, topk_indices = torch.topk(active_masses, k=topk_clusters, largest=True, sorted=False)
+            active_cluster_ids = active_cluster_ids[topk_indices]
+        active_cluster_ids = active_cluster_ids.tolist()
+
+        for cluster_id in active_cluster_ids:
+            weights = detached_assignments[:, cluster_id]
+            teacher_mass = float(weights.sum().item())
+            if teacher_mass < min_mass or teacher_features_f.size(0) < rank:
+                continue
+
+            anchor_basis = top_principal_subspace(
+                features=teacher_features_f,
+                weights=weights,
+                rank=rank,
+                q_offset=pca_q_offset,
+            )
+            sigma_student = weighted_covariance(
+                features=student_features_f,
+                weights=weights,
+            )
+            projection = anchor_basis @ anchor_basis.t()
+            projected_sigma = projection @ sigma_student @ projection
+            residual = sigma_student - projected_sigma
+            losses.append(torch.linalg.norm(residual, ord="fro"))
+            teacher_masses.append(teacher_mass)
+            student_masses.append(teacher_mass)
+
+    if not losses:
+        return student_features.new_zeros(()), SubspaceStats(0, 0.0, 0.0)
+
+    return torch.stack(losses).mean(), SubspaceStats(
+        active_clusters=len(losses),
+        mean_teacher_mass=sum(teacher_masses) / len(teacher_masses),
+        mean_student_mass=sum(student_masses) / len(student_masses),
+    )
+
+
 def spectral_anchor_subspace_loss(
     student_features: torch.Tensor,
     assignments: torch.Tensor,

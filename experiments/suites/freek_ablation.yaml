@@ -20,6 +20,8 @@ cases:
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "fixed_k"
+      semantic_prototype_enabled: false
+      lambda_semantic: 0.0
     tags: [freek, ablation, baseline, fixed_k]
 
   - id: cub_freek_full

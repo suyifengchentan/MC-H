@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import math
 from pathlib import Path
 from typing import Any
 
@@ -52,7 +53,21 @@ def _safe_float(value: Any) -> float | None:
         return None
 
 
-def _summarize_run(run_dir: Path) -> dict[str, Any]:
+def _load_generated_train_config(
+    repo_root: Path,
+    suite_name: str,
+    case_id: str,
+    seed: int,
+) -> dict[str, Any]:
+    config_path = (
+        repo_root / "experiments" / "generated" / suite_name / case_id / f"seed_{seed}_train.yaml"
+    )
+    if not config_path.exists():
+        return {}
+    return _load_yaml(config_path)
+
+
+def _summarize_run(run_dir: Path, train_config: dict[str, Any]) -> dict[str, Any]:
     metrics_rows = _load_metrics_jsonl(run_dir / "metrics.jsonl")
     train_rows = [row for row in metrics_rows if row.get("split") == "train"]
     val_rows = [row for row in metrics_rows if row.get("split") == "val"]
@@ -87,11 +102,24 @@ def _summarize_run(run_dir: Path) -> dict[str, Any]:
 
     eval_val = _load_json(run_dir / "eval_val.json")
     eval_test = _load_json(run_dir / "eval_test.json")
+    true_k = _safe_float(train_config.get("class_num"))
+    last_train_estimated_k = _safe_float(
+        last_train_row.get("estimated_k") if last_train_row else None
+    )
+    abs_last_k_error = None
+    relative_last_k_error = None
+    if true_k is not None and last_train_estimated_k is not None and true_k > 0:
+        abs_last_k_error = abs(last_train_estimated_k - true_k)
+        relative_last_k_error = abs_last_k_error / true_k
 
     return {
         "has_metrics": bool(metrics_rows),
         "best_checkpoint_exists": (run_dir / "best.pt").exists(),
         "last_checkpoint_exists": (run_dir / "last.pt").exists(),
+        "class_num": true_k,
+        "clustering_mode": train_config.get("clustering_mode", ""),
+        "diversity_weight_mode": train_config.get("diversity_weight_mode", ""),
+        "subspace_anchor_mode": train_config.get("subspace_anchor_mode", ""),
         "best_val_selection_score": _safe_float(
             best_val_row.get("selection_score") if best_val_row else None
         ),
@@ -113,12 +141,12 @@ def _summarize_run(run_dir: Path) -> dict[str, Any]:
         "last_train_dpp_loss": _safe_float(
             last_train_row.get("dpp_loss") if last_train_row else None
         ),
-        "last_train_estimated_k": _safe_float(
-            last_train_row.get("estimated_k") if last_train_row else None
-        ),
+        "last_train_estimated_k": last_train_estimated_k,
         "mean_train_rho": mean_train_rho,
         "mean_train_alpha_div": mean_train_alpha_div,
         "mean_train_estimated_k": mean_train_estimated_k,
+        "abs_last_k_error": abs_last_k_error,
+        "relative_last_k_error": relative_last_k_error,
         "eval_val_acc": _safe_float(eval_val.get("acc") if eval_val else None),
         "eval_val_nmi": _safe_float(eval_val.get("nmi") if eval_val else None),
         "eval_val_ari": _safe_float(eval_val.get("ari") if eval_val else None),
@@ -126,6 +154,66 @@ def _summarize_run(run_dir: Path) -> dict[str, Any]:
         "eval_test_nmi": _safe_float(eval_test.get("nmi") if eval_test else None),
         "eval_test_ari": _safe_float(eval_test.get("ari") if eval_test else None),
     }
+
+
+def _mean(values: list[float]) -> float | None:
+    if not values:
+        return None
+    return sum(values) / len(values)
+
+
+def _std(values: list[float]) -> float | None:
+    if not values:
+        return None
+    if len(values) == 1:
+        return 0.0
+    mean_value = _mean(values)
+    if mean_value is None:
+        return None
+    variance = sum((value - mean_value) ** 2 for value in values) / (len(values) - 1)
+    return math.sqrt(variance)
+
+
+def _aggregate_rows(rows: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    groups: dict[str, list[dict[str, Any]]] = {}
+    for row in rows:
+        groups.setdefault(str(row["case_id"]), []).append(row)
+
+    aggregated_rows: list[dict[str, Any]] = []
+    for case_id, group_rows in sorted(groups.items()):
+        base = group_rows[0]
+        aggregate: dict[str, Any] = {
+            "suite_name": base["suite_name"],
+            "case_id": case_id,
+            "granularity": base.get("granularity", ""),
+            "tags": base.get("tags", ""),
+            "num_seeds": len(group_rows),
+            "class_num": base.get("class_num"),
+            "clustering_mode": base.get("clustering_mode", ""),
+            "diversity_weight_mode": base.get("diversity_weight_mode", ""),
+            "subspace_anchor_mode": base.get("subspace_anchor_mode", ""),
+        }
+
+        numeric_keys = sorted(
+            {
+                key
+                for row in group_rows
+                for key, value in row.items()
+                if isinstance(value, (int, float)) and not isinstance(value, bool)
+            }
+            - {"seed"}
+        )
+        for key in numeric_keys:
+            values = [
+                float(row[key])
+                for row in group_rows
+                if isinstance(row.get(key), (int, float)) and not isinstance(row.get(key), bool)
+            ]
+            aggregate[f"{key}_mean"] = _mean(values)
+            aggregate[f"{key}_std"] = _std(values)
+        aggregated_rows.append(aggregate)
+
+    return aggregated_rows
 
 
 def parse_args() -> argparse.Namespace:
@@ -177,7 +265,13 @@ def main() -> None:
         case_seeds = case.get("seeds") or seeds
         for seed in case_seeds:
             run_dir = output_root / suite_name / case_id / f"seed_{seed}"
-            summary = _summarize_run(run_dir)
+            train_config = _load_generated_train_config(
+                repo_root=repo_root,
+                suite_name=suite_name,
+                case_id=case_id,
+                seed=int(seed),
+            )
+            summary = _summarize_run(run_dir, train_config)
             row = {
                 "suite_name": suite_name,
                 "case_id": case_id,
@@ -202,6 +296,23 @@ def main() -> None:
 
     print(f"[summary] wrote {generated_summary_path}")
     print(f"[summary] rows={len(rows)}")
+
+    grouped_rows = _aggregate_rows(rows)
+    grouped_summary_path = generated_summary_path.with_name(
+        generated_summary_path.stem + "_grouped.csv"
+    )
+    if grouped_rows:
+        grouped_fieldnames = list(grouped_rows[0].keys())
+    else:
+        grouped_fieldnames = ["suite_name", "case_id", "num_seeds"]
+    with grouped_summary_path.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=grouped_fieldnames)
+        writer.writeheader()
+        for row in grouped_rows:
+            writer.writerow(row)
+
+    print(f"[summary] wrote {grouped_summary_path}")
+    print(f"[summary] grouped_rows={len(grouped_rows)}")
 
 
 if __name__ == "__main__":

@@ -32,6 +32,7 @@ from hypersphere_dpp.subspace import (
     ClusterFeatureQueue,
     spectral_anchor_subspace_loss,
     subspace_regularization_loss,
+    teacher_pca_subspace_loss,
 )
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
@@ -67,6 +68,22 @@ def resolve_amp_settings(
     raise ValueError(f"Unsupported precision mode: {precision}")
 
 
+def resolve_spectral_cluster_cap(config, epoch: int) -> int:
+    target_cap = config.max_spectral_clusters if config.max_spectral_clusters > 0 else config.class_num
+    target_cap = max(config.min_spectral_clusters, int(target_cap))
+    if config.initial_spectral_clusters > 0:
+        initial_cap = int(config.initial_spectral_clusters)
+    else:
+        initial_cap = int(round(target_cap * 1.5))
+    initial_cap = max(target_cap, initial_cap)
+    if config.epochs <= 1 or initial_cap == target_cap:
+        return target_cap
+
+    progress = min(max(epoch / max(config.epochs - 1, 1), 0.0), 1.0)
+    scheduled_cap = int(round(initial_cap + (target_cap - initial_cap) * progress))
+    return max(target_cap, scheduled_cap)
+
+
 def train_one_epoch(
     model,
     dataloader,
@@ -97,6 +114,14 @@ def train_one_epoch(
     }
     num_steps = len(dataloader)
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
+    resolved_anchor_mode = config.subspace_anchor_mode
+    if resolved_anchor_mode == "auto":
+        resolved_anchor_mode = (
+            "spectral_prototype" if config.clustering_mode == "spectral_free_k" else "teacher_pca"
+        )
+    spectral_cluster_cap = None
+    if config.clustering_mode == "spectral_free_k":
+        spectral_cluster_cap = resolve_spectral_cluster_cap(config, epoch)
 
     for step, batch in enumerate(dataloader):
         images = batch["image"].to(device, non_blocking=True)
@@ -119,7 +144,7 @@ def train_one_epoch(
                     student_features=student_cat,
                     temperature=config.spectral_assignment_temperature,
                     min_clusters=config.min_spectral_clusters,
-                    max_clusters=config.max_spectral_clusters,
+                    max_clusters=spectral_cluster_cap,
                     momentum=config.spectral_proto_momentum,
                     update_state=True,
                 )
@@ -165,12 +190,22 @@ def train_one_epoch(
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
             if step % config.subspace_every_n_steps == 0:
-                if config.clustering_mode == "spectral_free_k":
+                if config.clustering_mode == "spectral_free_k" and resolved_anchor_mode == "spectral_prototype":
                     subspace_loss, _ = spectral_anchor_subspace_loss(
                         student_features=student_cat,
                         assignments=assignment_cat,
                         anchor_prototypes=spectral_output["prototypes"],
                         min_mass=config.subspace_min_mass,
+                    )
+                elif resolved_anchor_mode == "teacher_pca":
+                    subspace_loss, _ = teacher_pca_subspace_loss(
+                        student_features=student_cat,
+                        teacher_features=teacher_cat,
+                        assignments=assignment_cat,
+                        rank=config.subspace_rank,
+                        min_mass=config.subspace_min_mass,
+                        pca_q_offset=config.subspace_pca_q_offset,
+                        topk_clusters=config.subspace_topk_clusters,
                     )
                 else:
                     subspace_loss, _ = subspace_regularization_loss(
@@ -203,12 +238,15 @@ def train_one_epoch(
                         class_aware_min_mass=config.class_aware_dpp_min_mass,
                     )
                 epoch_progress = epoch + step / max(num_steps, 1)
-                alpha_div = adaptive_diversity_weight(
-                    rho=rho,
-                    alpha_div_base=config.alpha_div_base,
-                    epoch_progress=epoch_progress,
-                    warmup_epochs=config.dpp_warmup_epochs,
-                )
+                if config.diversity_weight_mode == "constant":
+                    alpha_div = rho.new_tensor(max(config.alpha_div_base, 0.0))
+                else:
+                    alpha_div = adaptive_diversity_weight(
+                        rho=rho,
+                        alpha_div_base=config.alpha_div_base,
+                        epoch_progress=epoch_progress,
+                        warmup_epochs=config.dpp_warmup_epochs,
+                    )
             else:
                 dpp_loss = student_cat.new_zeros(())
                 rho = student_cat.new_zeros(())
@@ -368,7 +406,12 @@ def main():
     ).to(device)
     model = build_model_from_config(config, device=device).to(device)
     semantic_text_features = None
-    if config.clustering_mode == "spectral_free_k" and config.semantic_prototype_enabled:
+    if config.clustering_mode == "fixed_k" and config.semantic_prototype_enabled:
+        logger.info(
+            "semantic prototypes requested but disabled for clustering_mode=%s to keep fixed-K baselines comparable",
+            config.clustering_mode,
+        )
+    elif config.clustering_mode == "spectral_free_k" and config.semantic_prototype_enabled:
         logger.info(
             "semantic prototypes requested but disabled for clustering_mode=%s to keep free-K spectral assignments dimensionally consistent",
             config.clustering_mode,
@@ -403,6 +446,24 @@ def main():
         config.min_spectral_clusters,
         config.max_spectral_clusters,
     )
+    if config.clustering_mode == "spectral_free_k":
+        target_spectral_cap = config.max_spectral_clusters if config.max_spectral_clusters > 0 else config.class_num
+        initial_spectral_cap = (
+            config.initial_spectral_clusters
+            if config.initial_spectral_clusters > 0
+            else int(round(target_spectral_cap * 1.5))
+        )
+        logger.info(
+            "spectral cluster cap schedule: initial=%d target=%d epochs=%d",
+            initial_spectral_cap,
+            target_spectral_cap,
+            config.epochs,
+        )
+    logger.info(
+        "diversity_weight_mode=%s subspace_anchor_mode=%s",
+        config.diversity_weight_mode,
+        config.subspace_anchor_mode,
+    )
     optimizer = optim.AdamW(
         model.trainable_parameters(),
         lr=config.learning_rate,
@@ -414,7 +475,12 @@ def main():
         enabled=use_grad_scaler,
     )
     queue = None
-    if config.clustering_mode == "fixed_k":
+    resolved_anchor_mode = config.subspace_anchor_mode
+    if resolved_anchor_mode == "auto":
+        resolved_anchor_mode = (
+            "spectral_prototype" if config.clustering_mode == "spectral_free_k" else "teacher_pca"
+        )
+    if config.clustering_mode == "fixed_k" and resolved_anchor_mode == "teacher_pca":
         queue = ClusterFeatureQueue(
             num_clusters=config.class_num,
             feature_dim=config.feature_dim,
@@ -450,6 +516,12 @@ def main():
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
         epoch_lr = current_learning_rate(optimizer)
+        if config.clustering_mode == "spectral_free_k":
+            logger.info(
+                "epoch=%03d spectral_max_clusters=%d",
+                epoch,
+                resolve_spectral_cluster_cap(config, epoch),
+            )
         train_metrics = train_one_epoch(
             model=model,
             dataloader=datasets.train_loader,

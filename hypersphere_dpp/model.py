@@ -294,28 +294,29 @@ class HypersphereFreeKModel(nn.Module):
         momentum: float,
         update_state: bool,
     ) -> dict[str, torch.Tensor | int]:
-        normalized = F.normalize(student_features.float(), dim=-1)
-        raw_log_quality = self.quality_head(normalized)
-        centered_log_quality = raw_log_quality - raw_log_quality.mean()
-        relative_quality = centered_log_quality.exp().clamp_min(1e-6)
-        phi = normalized * relative_quality.unsqueeze(1)
-        kernel = 0.5 * (phi @ phi.t() + (phi @ phi.t()).t())
-        eigenvalues, eigenvectors = torch.linalg.eigh(kernel)
-        order = torch.argsort(eigenvalues, descending=True)
-        eigenvalues = eigenvalues[order].clamp_min(0.0)
-        eigenvectors = eigenvectors[:, order]
-        estimated_k = self._estimate_cluster_count(
-            eigenvalues=eigenvalues,
-            min_clusters=min_clusters,
-            max_clusters=max_clusters,
-            num_samples=student_features.size(0),
-        )
-        prototypes = self._prototypes_from_spectrum(
-            phi=phi,
-            eigenvalues=eigenvalues,
-            eigenvectors=eigenvectors,
-            estimated_k=estimated_k,
-        )
+        with torch.autocast(device_type=student_features.device.type, enabled=False):
+            normalized = F.normalize(student_features.float(), dim=-1)
+            raw_log_quality = self.quality_head(normalized)
+            centered_log_quality = raw_log_quality - raw_log_quality.mean()
+            relative_quality = centered_log_quality.exp().clamp_min(1e-6)
+            phi = normalized * relative_quality.unsqueeze(1)
+            kernel = 0.5 * (phi @ phi.t() + (phi @ phi.t()).t())
+            eigenvalues, eigenvectors = torch.linalg.eigh(kernel)
+            order = torch.argsort(eigenvalues, descending=True)
+            eigenvalues = eigenvalues[order].clamp_min(0.0)
+            eigenvectors = eigenvectors[:, order]
+            estimated_k = self._estimate_cluster_count(
+                eigenvalues=eigenvalues,
+                min_clusters=min_clusters,
+                max_clusters=max_clusters,
+                num_samples=student_features.size(0),
+            )
+            prototypes = self._prototypes_from_spectrum(
+                phi=phi,
+                eigenvalues=eigenvalues,
+                eigenvectors=eigenvectors,
+                estimated_k=estimated_k,
+            )
         if update_state:
             prototypes = self._stabilize_prototypes(prototypes, momentum=momentum)
             self.spectral_prototypes = prototypes.detach()

@@ -1,0 +1,63 @@
+suite_name: oracle_k_fairness
+description: >
+  Fair comparison suite between fixed-K baselines with oracle class counts and
+  free-K spectral discovery under the same training backbone and schedule.
+
+defaults:
+  seeds: [42, 43, 44]
+  output_root: save/experiments
+  eval_split: both
+  train_overrides:
+    reload: false
+
+cases:
+  - id: coarse_stl10_fixed_k
+    granularity: coarse
+    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "fixed_k"
+      semantic_prototype_enabled: false
+      lambda_semantic: 0.0
+    tags: [fairness, coarse, oracle_k, fixed_k]
+  - id: coarse_stl10_freek
+    granularity: coarse
+    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "spectral_free_k"
+    tags: [fairness, coarse, free_k]
+
+  - id: medium_image200_fixed_k
+    granularity: medium
+    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "fixed_k"
+      semantic_prototype_enabled: false
+      lambda_semantic: 0.0
+    tags: [fairness, medium, oracle_k, fixed_k]
+  - id: medium_image200_freek
+    granularity: medium
+    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "spectral_free_k"
+    tags: [fairness, medium, free_k]
+
+  - id: fine_cub_fixed_k
+    granularity: fine
+    base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "fixed_k"
+      semantic_prototype_enabled: false
+      lambda_semantic: 0.0
+    tags: [fairness, fine, oracle_k, fixed_k]
+  - id: fine_cub_freek
+    granularity: fine
+    base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      clustering_mode: "spectral_free_k"
+    tags: [fairness, fine, free_k]

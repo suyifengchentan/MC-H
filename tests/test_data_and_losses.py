@@ -16,6 +16,7 @@ from hypersphere_dpp.subspace import (
     ClusterFeatureQueue,
     spectral_anchor_subspace_loss,
     subspace_regularization_loss,
+    teacher_pca_subspace_loss,
 )
 
 
@@ -175,6 +176,24 @@ class DataAndLossesTest(unittest.TestCase):
             assignments=assignments,
             anchor_prototypes=prototypes,
             min_mass=1.0,
+        )
+
+        self.assertTrue(torch.isfinite(loss))
+        self.assertGreaterEqual(stats.active_clusters, 0)
+
+    def test_teacher_pca_subspace_loss_is_finite(self):
+        teacher_features = torch.randn(12, 6)
+        student_features = torch.randn(12, 6)
+        assignments = torch.softmax(torch.randn(12, 4), dim=-1)
+
+        loss, stats = teacher_pca_subspace_loss(
+            student_features=student_features,
+            teacher_features=teacher_features,
+            assignments=assignments,
+            rank=2,
+            min_mass=1.0,
+            pca_q_offset=1,
+            topk_clusters=3,
         )
 
         self.assertTrue(torch.isfinite(loss))

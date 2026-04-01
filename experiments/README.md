@@ -21,15 +21,22 @@
 
 - [`suites/validation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/validation_methodology.yaml): 验证实验矩阵
 - [`suites/ablation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/ablation_methodology.yaml): 消融实验矩阵
+- [`suites/core_ablation_matrix.yaml`](/home/geyingjie/hypersphere/experiments/suites/core_ablation_matrix.yaml): 面向投稿主文的跨粒度核心消融矩阵
 - [`suites/freek_validation.yaml`](/home/geyingjie/hypersphere/experiments/suites/freek_validation.yaml): free-K 验证实验矩阵
 - [`suites/freek_ablation.yaml`](/home/geyingjie/hypersphere/experiments/suites/freek_ablation.yaml): free-K 消融实验矩阵
+- [`suites/k_estimation_benchmark.yaml`](/home/geyingjie/hypersphere/experiments/suites/k_estimation_benchmark.yaml): 自动聚类数估计基准
+- [`suites/oracle_k_fairness.yaml`](/home/geyingjie/hypersphere/experiments/suites/oracle_k_fairness.yaml): oracle-K 与 free-K 公平对比
 - [`run_suite.py`](/home/geyingjie/hypersphere/experiments/run_suite.py): 实验运行器（生成配置 + 可选执行 train/eval）
 - [`collect_results.py`](/home/geyingjie/hypersphere/experiments/collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
 - [`run_validation.sh`](/home/geyingjie/hypersphere/experiments/run_validation.sh): 运行验证实验套件
 - [`run_ablation.sh`](/home/geyingjie/hypersphere/experiments/run_ablation.sh): 运行消融实验套件
+- [`generate_core_ablation_table.py`](/home/geyingjie/hypersphere/experiments/generate_core_ablation_table.py): 从 grouped summary 生成核心消融 LaTeX 表
+- [`generate_k_estimation_table.py`](/home/geyingjie/hypersphere/experiments/generate_k_estimation_table.py): 从 grouped summary 生成 K 估计 LaTeX 表
 - [`figures/generate_fig3.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
 - [`figures/generate_fig6.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig6.py): 图6（课程调度与训练动态）
 - [`figures/generate_fig7.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig7.py): 图7（子空间正则化可视化）
+- [`figures/generate_fig3_empirical.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3_empirical.py): 从真实 summary 生成 density 机制分析图
+- [`figures/generate_fig6_empirical.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig6_empirical.py): 从真实 `metrics.jsonl` 生成训练动态曲线
 - [`figures/ieee_style.py`](/home/geyingjie/hypersphere/experiments/figures/ieee_style.py): 统一 IEEE 风格样式（Computer Modern Roman 字体、线宽、网格、图例）
 
 ## 使用方式
@@ -39,8 +46,11 @@
 ```bash
 python experiments/run_suite.py --suite experiments/suites/validation_methodology.yaml
 python experiments/run_suite.py --suite experiments/suites/ablation_methodology.yaml
+python experiments/run_suite.py --suite experiments/suites/core_ablation_matrix.yaml
 python experiments/run_suite.py --suite experiments/suites/freek_validation.yaml
 python experiments/run_suite.py --suite experiments/suites/freek_ablation.yaml
+python experiments/run_suite.py --suite experiments/suites/k_estimation_benchmark.yaml
+python experiments/run_suite.py --suite experiments/suites/oracle_k_fairness.yaml
 ```
 
 2. 执行指定 case（建议先小规模验证）：
@@ -74,18 +84,34 @@ python experiments/collect_results.py \
   --suite experiments/suites/ablation_methodology.yaml
 
 python experiments/collect_results.py \
+  --suite experiments/suites/core_ablation_matrix.yaml
+
+python experiments/collect_results.py \
   --suite experiments/suites/freek_validation.yaml
 
 python experiments/collect_results.py \
   --suite experiments/suites/freek_ablation.yaml
+
+python experiments/collect_results.py \
+  --suite experiments/suites/k_estimation_benchmark.yaml
+
+python experiments/collect_results.py \
+  --suite experiments/suites/oracle_k_fairness.yaml
 ```
 
 汇总 CSV 默认写到：
 
 - `experiments/generated/methodology_validation/summary.csv`
 - `experiments/generated/methodology_ablation/summary.csv`
+- `experiments/generated/core_ablation_matrix/summary.csv`
 - `experiments/generated/freek_validation/summary.csv`
 - `experiments/generated/freek_ablation/summary.csv`
+- `experiments/generated/k_estimation_benchmark/summary.csv`
+- `experiments/generated/oracle_k_fairness/summary.csv`
+
+同时还会自动生成按 `case_id` 聚合后的：
+
+- `experiments/generated/<suite_name>/summary_grouped.csv`
 
 ## 产物路径规范
 
@@ -108,6 +134,12 @@ python experiments/collect_results.py \
 python experiments/figures/generate_fig3.py
 python experiments/figures/generate_fig6.py
 python experiments/figures/generate_fig7.py
+python experiments/figures/generate_fig3_empirical.py \
+  --summary experiments/generated/methodology_validation/summary_grouped.csv
+python experiments/figures/generate_fig6_empirical.py \
+  --metrics save/experiments/core_ablation_matrix/fine_cub_full/seed_42/metrics.jsonl
+python experiments/generate_core_ablation_table.py
+python experiments/generate_k_estimation_table.py
 ```
 
 默认输出目录：
@@ -115,3 +147,7 @@ python experiments/figures/generate_fig7.py
 - `experiments/generated/figures/fig3_density_adaptive_repulsion.png`
 - `experiments/generated/figures/fig6_curriculum_scheduling.png`
 - `experiments/generated/figures/fig7_subspace_regularization.png`
+- `experiments/generated/figures/fig3_density_adaptive_empirical.png`
+- `experiments/generated/figures/fig6_training_dynamics_empirical.png`
+- `experiments/generated/tables/core_ablation_matrix_table.tex`
+- `experiments/generated/tables/k_estimation_results_table.tex`

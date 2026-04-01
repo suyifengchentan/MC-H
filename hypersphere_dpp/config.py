@@ -45,6 +45,8 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_CLUSTERING_MODES = {"fixed_k", "spectral_free_k"}
+SUPPORTED_DIVERSITY_WEIGHT_MODES = {"adaptive", "constant"}
+SUPPORTED_SUBSPACE_ANCHOR_MODES = {"auto", "teacher_pca", "spectral_prototype"}
 
 
 @dataclass
@@ -69,9 +71,12 @@ class ExperimentConfig:
     clustering_mode: str = "fixed_k"
     min_spectral_clusters: int = 2
     max_spectral_clusters: int = 0
+    initial_spectral_clusters: int = 0
     spectral_assignment_temperature: float = 0.2
     spectral_sharpen_temperature: float = 0.1
     spectral_proto_momentum: float = 0.9
+    diversity_weight_mode: str = "adaptive"
+    subspace_anchor_mode: str = "auto"
 
     # Optimization
     batch_size: int = 128
@@ -174,6 +179,22 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             f"{sorted(SUPPORTED_CLUSTERING_MODES)}, got {config.clustering_mode!r}."
         )
 
+    if config.diversity_weight_mode not in SUPPORTED_DIVERSITY_WEIGHT_MODES:
+        raise ValueError(
+            "diversity_weight_mode must be one of "
+            f"{sorted(SUPPORTED_DIVERSITY_WEIGHT_MODES)}, got {config.diversity_weight_mode!r}."
+        )
+
+    if config.subspace_anchor_mode not in SUPPORTED_SUBSPACE_ANCHOR_MODES:
+        raise ValueError(
+            "subspace_anchor_mode must be one of "
+            f"{sorted(SUPPORTED_SUBSPACE_ANCHOR_MODES)}, got {config.subspace_anchor_mode!r}."
+        )
+    if config.clustering_mode == "fixed_k" and config.subspace_anchor_mode == "spectral_prototype":
+        raise ValueError(
+            "subspace_anchor_mode='spectral_prototype' requires clustering_mode='spectral_free_k'."
+        )
+
     expected_feature_dim = SUPPORTED_BACKBONE_FEATURE_DIMS[config.backbone_name]
     if config.feature_dim != expected_feature_dim:
         raise ValueError(
@@ -194,12 +215,24 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.max_spectral_clusters < 0:
         raise ValueError("max_spectral_clusters must be non-negative.")
 
+    if config.initial_spectral_clusters < 0:
+        raise ValueError("initial_spectral_clusters must be non-negative.")
+
     if (
         config.max_spectral_clusters > 0
         and config.max_spectral_clusters < config.min_spectral_clusters
     ):
         raise ValueError(
             "max_spectral_clusters must be >= min_spectral_clusters when provided."
+        )
+
+    if (
+        config.initial_spectral_clusters > 0
+        and config.max_spectral_clusters > 0
+        and config.initial_spectral_clusters < config.max_spectral_clusters
+    ):
+        raise ValueError(
+            "initial_spectral_clusters must be >= max_spectral_clusters when both are provided."
         )
 
     if config.spectral_assignment_temperature <= 0:

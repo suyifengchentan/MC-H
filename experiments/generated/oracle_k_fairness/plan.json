@@ -1,0 +1,153 @@
+{
+  "execute": false,
+  "generated_at_utc": "2026-04-01T01:28:03.582613+00:00",
+  "run_count": 6,
+  "runs": [
+    {
+      "case_id": "coarse_stl10_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/coarse_stl10_fixed_k/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/coarse_stl10_fixed_k/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/coarse_stl10_fixed_k/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/coarse_stl10_fixed_k/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/coarse_stl10_fixed_k/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/coarse_stl10_fixed_k/seed_42_train.yaml"
+    },
+    {
+      "case_id": "coarse_stl10_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/coarse_stl10_freek/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/coarse_stl10_freek/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/coarse_stl10_freek/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/coarse_stl10_freek/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/coarse_stl10_freek/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/coarse_stl10_freek/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image200_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/medium_image200_fixed_k/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/medium_image200_fixed_k/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/medium_image200_fixed_k/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/medium_image200_fixed_k/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/medium_image200_fixed_k/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/medium_image200_fixed_k/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image200_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/medium_image200_freek/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/medium_image200_freek/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/medium_image200_freek/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/medium_image200_freek/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/medium_image200_freek/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/medium_image200_freek/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/fine_cub_fixed_k/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/fine_cub_fixed_k/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/fine_cub_fixed_k/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/fine_cub_fixed_k/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/fine_cub_fixed_k/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/fine_cub_fixed_k/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/fine_cub_freek/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/oracle_k_fairness/fine_cub_freek/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/oracle_k_fairness/fine_cub_freek/seed_42_eval.yaml",
+      "run_dir": "save/experiments/oracle_k_fairness/fine_cub_freek/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/oracle_k_fairness/fine_cub_freek/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/oracle_k_fairness/fine_cub_freek/seed_42_train.yaml"
+    }
+  ],
+  "suite_name": "oracle_k_fairness",
+  "suite_path": "/home/geyingjie/hypersphere/experiments/suites/oracle_k_fairness.yaml"
+}

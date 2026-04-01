@@ -18,7 +18,8 @@ adapter_dropout: 0.1
 transform_profile: "imagenet10_two_view"
 clustering_mode: "spectral_free_k"
 min_spectral_clusters: 2
-max_spectral_clusters: 0
+max_spectral_clusters: 10
+initial_spectral_clusters: 15
 spectral_assignment_temperature: 0.2
 spectral_sharpen_temperature: 0.1
 spectral_proto_momentum: 0.9

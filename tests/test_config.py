@@ -45,10 +45,13 @@ class ConfigLoaderTest(unittest.TestCase):
             backbone_name: "ViT-B-16"
             clustering_mode: "spectral_free_k"
             min_spectral_clusters: 2
-            max_spectral_clusters: 0
+            max_spectral_clusters: 200
+            initial_spectral_clusters: 300
             spectral_assignment_temperature: 0.2
             spectral_sharpen_temperature: 0.1
             spectral_proto_momentum: 0.9
+            diversity_weight_mode: "constant"
+            subspace_anchor_mode: "teacher_pca"
             semantic_prototype_enabled: true
             semantic_prompt_style: "auto"
             semantic_prototype_aggregation: "mean"
@@ -67,10 +70,13 @@ class ConfigLoaderTest(unittest.TestCase):
 
         self.assertEqual(config.clustering_mode, "spectral_free_k")
         self.assertEqual(config.min_spectral_clusters, 2)
-        self.assertEqual(config.max_spectral_clusters, 0)
+        self.assertEqual(config.max_spectral_clusters, 200)
+        self.assertEqual(config.initial_spectral_clusters, 300)
         self.assertEqual(config.spectral_assignment_temperature, 0.2)
         self.assertEqual(config.spectral_sharpen_temperature, 0.1)
         self.assertEqual(config.spectral_proto_momentum, 0.9)
+        self.assertEqual(config.diversity_weight_mode, "constant")
+        self.assertEqual(config.subspace_anchor_mode, "teacher_pca")
         self.assertTrue(config.semantic_prototype_enabled)
         self.assertEqual(config.semantic_prompt_style, "auto")
         self.assertEqual(config.semantic_prototype_aggregation, "mean")
@@ -78,6 +84,49 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.semantic_temperature, 0.2)
         self.assertTrue(config.class_aware_dpp)
         self.assertEqual(config.class_aware_dpp_min_mass, 2.0)
+
+    def test_fixed_k_cannot_use_spectral_prototype_anchor_mode(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR10"
+            dataset_dir: "/tmp/cifar10"
+            class_num: 10
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            clustering_mode: "fixed_k"
+            subspace_anchor_mode: "spectral_prototype"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "subspace_anchor_mode='spectral_prototype' requires clustering_mode='spectral_free_k'"
+        ):
+            load_experiment_config(config_path)
+
+    def test_initial_spectral_clusters_cannot_be_smaller_than_max(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CUB_200_2011"
+            dataset_dir: "/tmp/cub"
+            class_num: 200
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            clustering_mode: "spectral_free_k"
+            max_spectral_clusters: 200
+            initial_spectral_clusters: 150
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "initial_spectral_clusters must be >= max_spectral_clusters"
+        ):
+            load_experiment_config(config_path)
 
     def test_image100_is_supported(self):
         config_text = textwrap.dedent(
