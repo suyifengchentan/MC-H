@@ -10,107 +10,108 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
     clustering_mode: "spectral_free_k"
     diversity_weight_mode: "adaptive"
     subspace_anchor_mode: "auto"
 
 cases:
-  - id: coarse_stl10_full
+  - id: coarse_cifar10_full
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     tags: [ablation, coarse, full]
-  - id: coarse_stl10_no_dpp
+  - id: coarse_cifar10_no_dpp
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       alpha_div_base: 0.0
     tags: [ablation, coarse, no_dpp]
-  - id: coarse_stl10_no_density_weighting
+  - id: coarse_cifar10_no_density_weighting
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       diversity_weight_mode: "constant"
     tags: [ablation, coarse, no_density_weighting]
-  - id: coarse_stl10_fixed_k
+  - id: coarse_cifar10_fixed_k
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
     tags: [ablation, coarse, fixed_k]
-  - id: coarse_stl10_no_stabilization
+  - id: coarse_cifar10_no_stabilization
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       spectral_proto_momentum: 0.0
     tags: [ablation, coarse, no_stabilization]
-  - id: coarse_stl10_no_subspace
+  - id: coarse_cifar10_no_subspace
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       lambda_subspace: 0.0
     tags: [ablation, coarse, no_subspace]
-  - id: coarse_stl10_pca_anchor
+  - id: coarse_cifar10_pca_anchor
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       subspace_anchor_mode: "teacher_pca"
     tags: [ablation, coarse, pca_anchor]
 
-  - id: medium_image200_full
+  - id: medium_image50_full
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     tags: [ablation, medium, full]
-  - id: medium_image200_no_dpp
+  - id: medium_image50_no_dpp
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       alpha_div_base: 0.0
     tags: [ablation, medium, no_dpp]
-  - id: medium_image200_no_density_weighting
+  - id: medium_image50_no_density_weighting
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       diversity_weight_mode: "constant"
     tags: [ablation, medium, no_density_weighting]
-  - id: medium_image200_fixed_k
+  - id: medium_image50_fixed_k
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
     tags: [ablation, medium, fixed_k]
-  - id: medium_image200_no_stabilization
+  - id: medium_image50_no_stabilization
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       spectral_proto_momentum: 0.0
     tags: [ablation, medium, no_stabilization]
-  - id: medium_image200_no_subspace
+  - id: medium_image50_no_subspace
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       lambda_subspace: 0.0
     tags: [ablation, medium, no_subspace]
-  - id: medium_image200_pca_anchor
+  - id: medium_image50_pca_anchor
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       subspace_anchor_mode: "teacher_pca"
     tags: [ablation, medium, pca_anchor]

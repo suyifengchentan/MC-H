@@ -70,4 +70,4 @@ model_path: "save/hypersphere_dpp/Image100_CLIP_ViTB16_HypersphereDPP_20260328_2
 workers: 2
 reload: true
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10

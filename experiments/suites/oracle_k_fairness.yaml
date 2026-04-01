@@ -9,38 +9,39 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
 
 cases:
-  - id: coarse_stl10_fixed_k
+  - id: coarse_cifar10_fixed_k
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
     tags: [fairness, coarse, oracle_k, fixed_k]
-  - id: coarse_stl10_freek
+  - id: coarse_cifar10_freek
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "spectral_free_k"
     tags: [fairness, coarse, free_k]
 
-  - id: medium_image200_fixed_k
+  - id: medium_image50_fixed_k
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
     tags: [fairness, medium, oracle_k, fixed_k]
-  - id: medium_image200_freek
+  - id: medium_image50_freek
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "spectral_free_k"
     tags: [fairness, medium, free_k]

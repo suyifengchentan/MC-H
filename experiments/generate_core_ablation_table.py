@@ -17,8 +17,8 @@ _VARIANT_LABELS = {
 }
 
 _DATASET_LABELS = {
-    "stl10": "STL-10",
-    "image200": "ImageNet-200",
+    "cifar10": "CIFAR-10",
+    "image50": "ImageNet-50",
     "cub": "CUB-200-2011",
 }
 
@@ -70,7 +70,7 @@ def main() -> None:
         grouped.setdefault(dataset_key, []).append((variant_key, row))
 
     variant_order = list(_VARIANT_LABELS)
-    dataset_order = ["stl10", "image200", "cub"]
+    dataset_order = ["cifar10", "image50", "cub"]
 
     lines = [
         "% Auto-generated from core_ablation_matrix/summary_grouped.csv.",

@@ -10,6 +10,7 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
 
 cases:
   - id: coarse_cifar10_full

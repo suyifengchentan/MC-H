@@ -70,4 +70,4 @@ model_path: "save/hypersphere_dpp/CIFAR10_CLIP_ViTB16_HypersphereDPP_20260328_23
 workers: 8
 reload: true
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10

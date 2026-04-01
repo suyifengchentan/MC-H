@@ -9,6 +9,7 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
 
 cases:
   - id: cub_fixed_k_baseline
@@ -47,13 +48,13 @@ cases:
       spectral_proto_momentum: 0.0
     tags: [freek, ablation, no_stabilization]
 
-  - id: image200_freek_no_semantic
+  - id: image50_freek_no_semantic
     hypothesis: >
-      Free-K spectral discovery should remain viable on Image200 even after
+      Free-K spectral discovery should remain viable on Image50 even after
       removing semantic text guidance, isolating the effect of spectral clustering.
     granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
       clustering_mode: "spectral_free_k"
       semantic_prototype_enabled: false

@@ -7,12 +7,9 @@ from pathlib import Path
 
 
 _CASE_LABELS = {
-    "coarse_stl10_freek": "STL-10",
-    "coarse_cifar100_freek": "CIFAR-100",
-    "medium_image100_freek": "ImageNet-100",
-    "medium_image200_freek": "ImageNet-200",
+    "coarse_cifar10_freek": "CIFAR-10",
+    "medium_image50_freek": "ImageNet-50",
     "fine_cub_freek": "CUB-200-2011",
-    "fine_oxford_pet_freek": "Oxford Pet",
 }
 
 
@@ -49,12 +46,9 @@ def main() -> None:
     output_path = Path(args.output)
 
     ordered_case_ids = [
-        "coarse_stl10_freek",
-        "coarse_cifar100_freek",
-        "medium_image100_freek",
-        "medium_image200_freek",
+        "coarse_cifar10_freek",
+        "medium_image50_freek",
         "fine_cub_freek",
-        "fine_oxford_pet_freek",
     ]
     lines = [
         "% Auto-generated from k_estimation_benchmark/summary_grouped.csv.",

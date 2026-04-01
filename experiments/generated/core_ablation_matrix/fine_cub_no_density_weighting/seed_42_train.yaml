@@ -12,14 +12,15 @@ adapter_dropout: 0.15
 transform_profile: cub_fine_grained_two_view
 clustering_mode: spectral_free_k
 min_spectral_clusters: 2
-max_spectral_clusters: 0
+max_spectral_clusters: 200
+initial_spectral_clusters: 300
 spectral_assignment_temperature: 0.2
 spectral_sharpen_temperature: 0.1
 spectral_proto_momentum: 0.9
 precision: fp16
 batch_size: 96
 eval_batch_size: 256
-epochs: 120
+epochs: 15
 learning_rate: 0.00025
 weight_decay: 1.0e-05
 lr_scheduler: cosine
@@ -51,6 +52,6 @@ model_path: save/experiments/core_ablation_matrix/fine_cub_no_density_weighting/
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10
 diversity_weight_mode: constant
 subspace_anchor_mode: auto

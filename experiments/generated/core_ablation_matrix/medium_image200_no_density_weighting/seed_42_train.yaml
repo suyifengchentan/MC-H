@@ -21,7 +21,7 @@ spectral_proto_momentum: 0.9
 precision: bf16
 batch_size: 512
 eval_batch_size: 512
-epochs: 240
+epochs: 15
 learning_rate: 0.00025
 weight_decay: 1.0e-05
 lr_scheduler: cosine
@@ -55,6 +55,6 @@ model_path: save/experiments/core_ablation_matrix/medium_image200_no_density_wei
 workers: 2
 reload: false
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10
 diversity_weight_mode: constant
 subspace_anchor_mode: auto

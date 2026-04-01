@@ -9,38 +9,24 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
     clustering_mode: "spectral_free_k"
     diversity_weight_mode: "adaptive"
     subspace_anchor_mode: "auto"
 
 cases:
-  - id: coarse_stl10_freek
+  - id: coarse_cifar10_freek
     granularity: coarse
-    base_train_config: config/train/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     tags: [k_estimation, coarse]
-  - id: coarse_cifar100_freek
-    granularity: coarse
-    base_train_config: config/train/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml
-    tags: [k_estimation, coarse]
-  - id: medium_image100_freek
+  - id: medium_image50_freek
     granularity: medium
-    base_train_config: config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
-    tags: [k_estimation, medium]
-  - id: medium_image200_freek
-    granularity: medium
-    base_train_config: config/train/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     tags: [k_estimation, medium]
   - id: fine_cub_freek
     granularity: fine
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
-    tags: [k_estimation, fine]
-  - id: fine_oxford_pet_freek
-    granularity: fine
-    base_train_config: config/train/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml
     tags: [k_estimation, fine]

@@ -21,7 +21,7 @@ spectral_proto_momentum: 0.9
 precision: fp16
 batch_size: 384
 eval_batch_size: 768
-epochs: 300
+epochs: 15
 learning_rate: 0.00025
 weight_decay: 1.0e-05
 lr_scheduler: cosine
@@ -53,6 +53,6 @@ model_path: save/experiments/core_ablation_matrix/coarse_stl10_fixed_k/seed_42
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10
 diversity_weight_mode: adaptive
 subspace_anchor_mode: auto

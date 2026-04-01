@@ -21,7 +21,7 @@ spectral_proto_momentum: 0.9
 precision: fp16
 batch_size: 256
 eval_batch_size: 512
-epochs: 350
+epochs: 15
 learning_rate: 0.00025
 weight_decay: 1.0e-05
 lr_scheduler: cosine
@@ -53,6 +53,6 @@ model_path: save/experiments/k_estimation_benchmark/coarse_cifar100_freek/seed_4
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 10
 diversity_weight_mode: adaptive
 subspace_anchor_mode: auto

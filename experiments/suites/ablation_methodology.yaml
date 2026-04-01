@@ -9,6 +9,7 @@ defaults:
   eval_split: both
   train_overrides:
     reload: false
+    epochs: 15
 
 cases:
   - id: cub_full
