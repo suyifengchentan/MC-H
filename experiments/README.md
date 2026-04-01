@@ -26,6 +26,7 @@
 - [`figures/generate_fig3.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
 - [`figures/generate_fig6.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig6.py): 图6（课程调度与训练动态）
 - [`figures/generate_fig7.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig7.py): 图7（子空间正则化可视化）
+- [`figures/generate_cifar100_tsne.py`](/home/geyingjie/hypersphere/experiments/figures/generate_cifar100_tsne.py): CIFAR-100 t-SNE（聚类前后特征分布对比）
 - [`figures/ieee_style.py`](/home/geyingjie/hypersphere/experiments/figures/ieee_style.py): 统一 IEEE 风格样式（Computer Modern Roman 字体、线宽、网格、图例）
 
 ## 使用方式
@@ -94,6 +95,7 @@ python experiments/collect_results.py \
 python experiments/figures/generate_fig3.py
 python experiments/figures/generate_fig6.py
 python experiments/figures/generate_fig7.py
+python experiments/figures/generate_cifar100_tsne.py
 ```
 
 默认输出目录：
@@ -101,3 +103,4 @@ python experiments/figures/generate_fig7.py
 - `experiments/generated/figures/fig3_density_adaptive_repulsion.png`
 - `experiments/generated/figures/fig6_curriculum_scheduling.png`
 - `experiments/generated/figures/fig7_subspace_regularization.png`
+- `experiments/generated/figures/cifar100_tsne_before_after.png`

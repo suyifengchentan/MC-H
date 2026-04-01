@@ -20,8 +20,8 @@ transform_profile: "small_image_two_view"
 
 # Optimization
 precision: "fp16"
-batch_size: 256
-eval_batch_size: 512
+batch_size: 192
+eval_batch_size: 256
 epochs: 350
 learning_rate: 0.00025
 weight_decay: 0.00001
