@@ -17,6 +17,7 @@ cases:
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 30
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
@@ -26,6 +27,7 @@ cases:
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 30
       clustering_mode: "spectral_free_k"
     tags: [fairness, coarse, free_k]
 
@@ -34,6 +36,7 @@ cases:
     base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 15
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
@@ -43,6 +46,7 @@ cases:
     base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 15
       clustering_mode: "spectral_free_k"
     tags: [fairness, medium, free_k]
 
@@ -51,6 +55,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       clustering_mode: "fixed_k"
       semantic_prototype_enabled: false
       lambda_semantic: 0.0
@@ -60,5 +65,6 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       clustering_mode: "spectral_free_k"
     tags: [fairness, fine, free_k]

@@ -27,6 +27,7 @@ from hypersphere_dpp.model import build_model_from_config
 from hypersphere_dpp.semantic import (
     build_semantic_text_features,
     semantic_cluster_alignment_loss,
+    semantic_spectral_alignment_loss,
 )
 from hypersphere_dpp.subspace import (
     ClusterFeatureQueue,
@@ -176,18 +177,28 @@ def train_one_epoch(
                     sinkhorn_epsilon=config.sinkhorn_epsilon,
                     sinkhorn_iters=config.sinkhorn_iters,
                 )
+            assignment_cat = torch.cat([assign1, assign2], dim=0)
+
             if semantic_text_features is not None and config.lambda_semantic > 0:
-                semantic_loss = semantic_cluster_alignment_loss(
-                    logits=logits_cat,
-                    teacher_features=teacher_cat,
-                    text_features=semantic_text_features,
-                    teacher_logit_scale=model.teacher_logit_scale(),
-                    temperature=config.semantic_temperature,
-                )
+                if config.clustering_mode == "spectral_free_k":
+                    semantic_loss = semantic_spectral_alignment_loss(
+                        prototypes=spectral_output["prototypes"],
+                        assignments=assignment_cat,
+                        teacher_features=teacher_cat,
+                        text_features=semantic_text_features,
+                        teacher_logit_scale=model.teacher_logit_scale(),
+                        temperature=config.semantic_temperature,
+                    )
+                else:
+                    semantic_loss = semantic_cluster_alignment_loss(
+                        logits=logits_cat,
+                        teacher_features=teacher_cat,
+                        text_features=semantic_text_features,
+                        teacher_logit_scale=model.teacher_logit_scale(),
+                        temperature=config.semantic_temperature,
+                    )
             else:
                 semantic_loss = student_cat.new_zeros(())
-
-            assignment_cat = torch.cat([assign1, assign2], dim=0)
 
             if step % config.subspace_every_n_steps == 0:
                 if config.clustering_mode == "spectral_free_k" and resolved_anchor_mode == "spectral_prototype":
@@ -409,11 +420,6 @@ def main():
     if config.clustering_mode == "fixed_k" and config.semantic_prototype_enabled:
         logger.info(
             "semantic prototypes requested but disabled for clustering_mode=%s to keep fixed-K baselines comparable",
-            config.clustering_mode,
-        )
-    elif config.clustering_mode == "spectral_free_k" and config.semantic_prototype_enabled:
-        logger.info(
-            "semantic prototypes requested but disabled for clustering_mode=%s to keep free-K spectral assignments dimensionally consistent",
             config.clustering_mode,
         )
     elif config.semantic_prototype_enabled:

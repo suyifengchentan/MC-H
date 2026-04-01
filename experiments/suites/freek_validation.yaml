@@ -21,6 +21,8 @@ cases:
     granularity: coarse
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 30
     tags: [freek, validation, coarse]
 
   - id: freek_medium_image50
@@ -30,6 +32,8 @@ cases:
     granularity: medium
     base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 15
     tags: [freek, validation, medium]
 
   - id: freek_fine_cub
@@ -39,4 +43,6 @@ cases:
     granularity: fine
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 50
     tags: [freek, validation, fine]

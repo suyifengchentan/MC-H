@@ -19,14 +19,20 @@ cases:
     granularity: coarse
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 30
     tags: [k_estimation, coarse]
   - id: medium_image50_freek
     granularity: medium
     base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 15
     tags: [k_estimation, medium]
   - id: fine_cub_freek
     granularity: fine
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 50
     tags: [k_estimation, fine]

@@ -16,6 +16,8 @@ cases:
     hypothesis: "Reference baseline for all CUB ablations."
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 50
     tags: [ablation, cub, baseline]
 
   - id: cub_no_dpp
@@ -25,6 +27,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       alpha_div_base: 0.0
     tags: [ablation, cub, dpp]
 
@@ -35,6 +38,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       lambda_subspace: 0.0
     tags: [ablation, cub, subspace]
 
@@ -45,6 +49,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       lambda_cluster: 0.0
     tags: [ablation, cub, cluster]
 
@@ -55,6 +60,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       lambda_instance: 0.0
     tags: [ablation, cub, instance]
 
@@ -65,6 +71,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       dpp_warmup_epochs: 0
     tags: [ablation, cub, warmup]
 
@@ -75,6 +82,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       dpp_warmup_epochs: 60
     tags: [ablation, cub, warmup]
 
@@ -85,6 +93,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       dpp_every_n_steps: 1
     tags: [ablation, cub, dpp_frequency]
 
@@ -95,6 +104,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       dpp_every_n_steps: 8
     tags: [ablation, cub, dpp_frequency]
 
@@ -104,6 +114,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       alpha_div_base: 0.2
     tags: [ablation, cub, alpha]
 
@@ -114,6 +125,7 @@ cases:
     base_train_config: config/train/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 50
       alpha_div_base: 0.9
     tags: [ablation, cub, alpha]
 
@@ -121,6 +133,8 @@ cases:
     hypothesis: "Reference baseline for coarse-grained DPP benefit comparison."
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 30
     tags: [ablation, cifar10, baseline]
 
   - id: cifar10_no_dpp
@@ -130,21 +144,25 @@ cases:
     base_train_config: config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     base_eval_config: config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 30
       alpha_div_base: 0.0
     tags: [ablation, cifar10, dpp]
 
-  - id: image100_full
+  - id: image50_full
     hypothesis: "Reference baseline for medium-grained DPP benefit comparison."
-    base_train_config: config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
-    tags: [ablation, image100, baseline]
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    train_overrides:
+      epochs: 15
+    tags: [ablation, image50, baseline]
 
-  - id: image100_no_dpp
+  - id: image50_no_dpp
     hypothesis: >
       Section 3.3.3: medium-grained drop after removing DPP should fall between
       coarse CIFAR10 and fine-grained CUB.
-    base_train_config: config/train/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
-    base_eval_config: config/test/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml
+    base_train_config: config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
+    base_eval_config: config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml
     train_overrides:
+      epochs: 15
       alpha_div_base: 0.0
-    tags: [ablation, image100, dpp]
+    tags: [ablation, image50, dpp]

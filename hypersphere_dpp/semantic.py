@@ -218,3 +218,34 @@ def semantic_cluster_alignment_loss(
         target_probs = F.softmax(teacher_logits, dim=-1).detach()
         student_log_probs = F.log_softmax(logits.float() / temperature, dim=-1)
         return -(target_probs * student_log_probs).sum(dim=1).mean()
+
+
+def semantic_spectral_alignment_loss(
+    prototypes: torch.Tensor,
+    assignments: torch.Tensor,
+    teacher_features: torch.Tensor,
+    text_features: torch.Tensor,
+    teacher_logit_scale: torch.Tensor,
+    temperature: float,
+) -> torch.Tensor:
+    if prototypes.size(0) == 0 or assignments.size(0) == 0:
+        return prototypes.new_zeros(())
+
+    with torch.autocast(device_type=prototypes.device.type, enabled=False):
+        prototypes_f = F.normalize(prototypes.float(), dim=-1)
+        teacher_features_f = F.normalize(teacher_features.float(), dim=-1)
+        text_features_f = F.normalize(text_features.float(), dim=-1)
+
+        teacher_logits = teacher_logit_scale.float() * (teacher_features_f @ text_features_f.t())
+        sample_text_probs = F.softmax(teacher_logits, dim=-1).detach()
+
+        assignment_weights = assignments.detach().float()
+        cluster_mass = assignment_weights.sum(dim=0).clamp_min(1e-6)
+        cluster_text_probs = assignment_weights.t() @ sample_text_probs
+        cluster_text_probs = cluster_text_probs / cluster_mass.unsqueeze(1)
+
+        prototype_logits = teacher_logit_scale.float() * (prototypes_f @ text_features_f.t())
+        prototype_log_probs = F.log_softmax(prototype_logits / temperature, dim=-1)
+        per_cluster_loss = -(cluster_text_probs * prototype_log_probs).sum(dim=1)
+        normalized_mass = cluster_mass / cluster_mass.sum().clamp_min(1e-6)
+        return (normalized_mass * per_cluster_loss).sum()
