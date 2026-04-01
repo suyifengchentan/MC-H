@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+from dataclasses import dataclass
 from pathlib import Path
 import sys
 
@@ -11,7 +12,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
-from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader, Subset
@@ -27,6 +27,46 @@ from hypersphere_dpp.data import SingleViewDataset, build_experiment_dataloaders
 from hypersphere_dpp.labels import load_label_name_map
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.utils import resolve_device, set_seed
+
+
+DEFAULT_CONFIG = "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
+DATASET_CONFIG_MAP = {
+    "cifar10": "config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml",
+    "cifar100": "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml",
+    "cub": "config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml",
+    "cub_200_2011": "config/test/fine_grained/cub_vitb16_hypersphere_dpp_config.yaml",
+    "aircraft": "config/test/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml",
+    "fgvc_aircraft": "config/test/fine_grained/fgvc_aircraft_vitb16_hypersphere_dpp_config.yaml",
+    "image10": "config/test/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml",
+    "imagenet1k": "config/test/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml",
+    "imagenet-1k": "config/test/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml",
+    "image1k": "config/test/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml",
+    "image50": "config/test/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml",
+    "image100": "config/test/medium_grained/image100_vitb16_hypersphere_dpp_config.yaml",
+    "image200": "config/test/medium_grained/image200_vitb16_hypersphere_dpp_config.yaml",
+    "tinyimagenet200": "config/test/medium_grained/tiny_imagenet200_vitb16_hypersphere_dpp_config.yaml",
+    "tiny-imagenet-200": "config/test/medium_grained/tiny_imagenet200_vitb16_hypersphere_dpp_config.yaml",
+    "tiny_imagenet200": "config/test/medium_grained/tiny_imagenet200_vitb16_hypersphere_dpp_config.yaml",
+    "tiny200": "config/test/medium_grained/tiny_imagenet200_vitb16_hypersphere_dpp_config.yaml",
+    "flowers": "config/test/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml",
+    "oxford_flowers": "config/test/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml",
+    "pet": "config/test/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml",
+    "oxford_pet": "config/test/fine_grained/oxford_pet_vitb16_hypersphere_dpp_config.yaml",
+    "stl10": "config/test/coarse_grained/stl10_vitb16_hypersphere_dpp_config.yaml",
+    "dogs": "config/test/fine_grained/stanford_dogs_vitb16_hypersphere_dpp_config.yaml",
+    "stanford_dogs": "config/test/fine_grained/stanford_dogs_vitb16_hypersphere_dpp_config.yaml",
+}
+
+
+@dataclass
+class TSNEResult:
+    dataset_name: str
+    checkpoint_path: Path
+    split: str
+    sample_count: int
+    raw_tsne: np.ndarray
+    student_tsne: np.ndarray
+    display_labels: np.ndarray
 
 
 def apply_neurips_style() -> None:
@@ -82,22 +122,34 @@ def apply_neurips_style() -> None:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Generate dataset t-SNE plots before and after Hypersphere-DPP clustering."
+        description="Generate before/after t-SNE plots for one or more datasets."
     )
     parser.add_argument(
         "--config",
-        default="config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml",
-        help="Path to the evaluation config YAML.",
+        default=DEFAULT_CONFIG,
+        help="Path to a single evaluation config YAML. Kept for backward compatibility.",
+    )
+    parser.add_argument(
+        "--configs",
+        nargs="+",
+        default=None,
+        help="One or more evaluation config YAMLs to visualize in a single figure.",
+    )
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        default=None,
+        help="One or more dataset names, e.g. CIFAR100 Image100 CUB_200_2011.",
     )
     parser.add_argument(
         "--checkpoint",
         default=None,
-        help="Checkpoint path. If omitted, the script resolves it from eval_results.csv.",
+        help="Checkpoint path for single-config mode. If omitted, the script resolves it from eval_results.csv.",
     )
     parser.add_argument(
         "--results-csv",
         default="eval_results.csv",
-        help="CSV used to auto-resolve the CIFAR100 checkpoint directory.",
+        help="CSV used to auto-resolve checkpoint directories.",
     )
     parser.add_argument(
         "--split",
@@ -205,6 +257,26 @@ def _resolve_checkpoint(
     raise FileNotFoundError(
         f"Could not resolve a best checkpoint for dataset={config.dataset!r} from {results_csv}."
     )
+
+
+def _resolve_config_path_list(args: argparse.Namespace) -> list[Path]:
+    if args.datasets:
+        config_paths: list[Path] = []
+        for dataset_name in args.datasets:
+            dataset_key = dataset_name.strip().lower()
+            config_rel = DATASET_CONFIG_MAP.get(dataset_key)
+            if config_rel is None:
+                supported = ", ".join(sorted(DATASET_CONFIG_MAP))
+                raise ValueError(
+                    f"Unsupported dataset name {dataset_name!r}. Supported aliases: {supported}."
+                )
+            config_paths.append(Path(config_rel))
+        return config_paths
+
+    if args.configs:
+        return [Path(config_path) for config_path in args.configs]
+
+    return [Path(args.config)]
 
 
 def _balanced_indices(
@@ -503,31 +575,21 @@ def _scatter_panel(
         spine.set_visible(False)
 
 
-def main() -> None:
-    args = parse_args()
-
-    # ---- Apply NeurIPS style instead of IEEE ----
-    apply_neurips_style()
-
-    set_seed(args.seed)
-
-    config_path = Path(args.config)
+def _generate_tsne_result(
+    config_path: Path,
+    args: argparse.Namespace,
+    checkpoint_arg: str | None = None,
+) -> TSNEResult:
     config = load_experiment_config(config_path)
     checkpoint_path = _resolve_checkpoint(
         config_path=config_path,
-        checkpoint_arg=args.checkpoint,
+        checkpoint_arg=checkpoint_arg,
         results_csv=Path(args.results_csv),
     )
-    default_output = (
-        f"experiments/generated/figures/{config.dataset.lower()}_tsne_before_after.png"
-    )
-    output_path = Path(args.output or default_output)
-    output_path = output_path.with_suffix(".png")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
 
     device = resolve_device(args.device or config.device)
     split = args.split or config.official_eval_split or "test"
-    loader, raw_subset, selected_class_ids, selected_class_names = _build_visualization_loader(
+    loader, raw_subset, selected_class_ids, _ = _build_visualization_loader(
         config_path=config_path,
         split=split,
         samples_per_class=args.samples_per_class,
@@ -570,111 +632,107 @@ def main() -> None:
 
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
     display_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
+    return TSNEResult(
+        dataset_name=config.dataset,
+        checkpoint_path=checkpoint_path,
+        split=split,
+        sample_count=int(labels.shape[0]),
+        raw_tsne=raw_tsne,
+        student_tsne=student_tsne,
+        display_labels=display_labels,
+    )
 
-    cmap = _build_label_colormap(len(selected_class_ids))
+
+def main() -> None:
+    args = parse_args()
+
+    # ---- Apply NeurIPS style instead of IEEE ----
+    apply_neurips_style()
+
+    set_seed(args.seed)
+
+    config_paths = _resolve_config_path_list(args)
+    if args.checkpoint is not None and len(config_paths) > 1:
+        raise ValueError("--checkpoint only supports single-config mode.")
+
+    checkpoint_arg = args.checkpoint if len(config_paths) == 1 else None
+    results = [
+        _generate_tsne_result(config_path, args, checkpoint_arg=checkpoint_arg)
+        for config_path in config_paths
+    ]
+    if len(results) == 1:
+        default_output = (
+            f"experiments/generated/figures/{results[0].dataset_name.lower()}_tsne_before_after.png"
+        )
+    else:
+        default_output = "experiments/generated/figures/multi_dataset_tsne_before_after.png"
+
+    output_path = Path(args.output or default_output)
+    output_path = output_path.with_suffix(".png")
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+
+    fig_height = max(4.6, 4.2 * len(results))
     fig, axes = plt.subplots(
-        1, 2,
-        figsize=(9.2, 5.8),
+        len(results),
+        2,
+        figsize=(9.2, fig_height),
         constrained_layout=False,
+        squeeze=False,
     )
     fig.patch.set_facecolor("#ffffff")
 
-    _scatter_panel(
-        axes[0],
-        raw_tsne,
-        display_labels,
-        cmap=cmap,
-        title="Original Distribution",
-        subtitle=f"Raw pixel features ({args.raw_image_size}x{args.raw_image_size})",
-    )
-    _scatter_panel(
-        axes[1],
-        student_tsne,
-        display_labels,
-        cmap=cmap,
-        title="After Clustering",
-        subtitle="Hypersphere-DPP student features",
-    )
-
-    # ---- Legend handles -----------------------------------------------------
-    legend_handles = [
-        Line2D(
-            [0],
-            [0],
-            marker="o",
-            color="none",
-            markerfacecolor=cmap.colors[index],
-            markeredgecolor="white",
-            markeredgewidth=0.4,
-            markersize=5,
-            label=class_name,
+    for row_index, result in enumerate(results):
+        cmap = _build_label_colormap(int(result.display_labels.max()) + 1)
+        row_axes = axes[row_index]
+        _scatter_panel(
+            row_axes[0],
+            result.raw_tsne,
+            result.display_labels,
+            cmap=cmap,
+            title="Before Clustering",
+            subtitle=f"Raw image manifold on the {result.split} split",
         )
-        for index, class_name in enumerate(selected_class_names)
-    ]
-
-    meta_caption = (
-        f"Top-{len(selected_class_ids)} classes on the {split} split, "
-        f"{args.samples_per_class} images per class, {labels.shape[0]} samples total."
-    )
-    fig.text(
-        0.5,
-        0.085,
-        meta_caption,
-        ha="center",
-        va="top",
-        fontsize=7.2,
-        color="#666666",
-    )
-
-    ncol = min(5, len(selected_class_names))
-    fig.legend(
-        handles=legend_handles,
-        loc="lower center",
-        bbox_to_anchor=(0.5, 0.018),
-        ncol=ncol,
-        frameon=False,
-        handletextpad=0.35,
-        columnspacing=0.9,
-        borderaxespad=0.0,
-        fontsize=7,
-    )
+        _scatter_panel(
+            row_axes[1],
+            result.student_tsne,
+            result.display_labels,
+            cmap=cmap,
+            title="After Clustering",
+            subtitle="Hypersphere-DPP yields a more compact embedding",
+        )
 
     fig.subplots_adjust(
         left=0.04,
         right=0.98,
-        top=0.83,
-        bottom=0.22,
+        top=0.96,
+        bottom=0.04,
+        hspace=0.34,
         wspace=0.10,
     )
 
-    dataset_title = config.dataset.replace("_", " ")
-    left_caption = f"{dataset_title}\noriginal image manifold"
-    right_caption = "Hypersphere-DPP\ncompact and separated embedding"
-    left_center_x = (axes[0].get_position().x0 + axes[0].get_position().x1) / 2.0
-    right_center_x = (axes[1].get_position().x0 + axes[1].get_position().x1) / 2.0
-    caption_y = 0.145
-    for center_x, caption in (
-        (left_center_x, left_caption),
-        (right_center_x, right_caption),
-    ):
+    for row_index, result in enumerate(results):
+        row_axes = axes[row_index]
+        row_left = row_axes[0].get_position().x0
+        row_right = row_axes[1].get_position().x1
+        row_top = max(row_axes[0].get_position().y1, row_axes[1].get_position().y1)
         fig.text(
-            center_x,
-            caption_y,
-            caption,
+            (row_left + row_right) / 2.0,
+            min(0.985, row_top + 0.03),
+            result.dataset_name.replace("_", " "),
             ha="center",
-            va="top",
-            fontsize=9.6,
+            va="bottom",
+            fontsize=12.5,
+            fontweight="bold",
             color="#222222",
-            linespacing=1.05,
         )
 
     fig.savefig(output_path, dpi=args.dpi)
     print(f"Saved figure to {output_path}")
-    print(f"Checkpoint: {checkpoint_path}")
-    print(f"Split: {split}")
-    print(f"Samples: {labels.shape[0]}")
-    print(f"Selected classes: {selected_class_names}")
-    print(f"Device: {device}")
+    for result in results:
+        print(
+            f"[{result.dataset_name}] checkpoint={result.checkpoint_path} "
+            f"split={result.split} samples={result.sample_count}"
+        )
 
 
 if __name__ == "__main__":
