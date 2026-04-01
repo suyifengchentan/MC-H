@@ -25,5 +25,5 @@ semantic_temperature: 0.2
 eval_batch_size: 256
 workers: 8
 seed: 42
-subspace_anchor_mode: auto
 diversity_weight_mode: constant
+subspace_anchor_mode: auto

@@ -1,7 +1,7 @@
 {
   "execute": false,
-  "generated_at_utc": "2026-04-01T01:32:47.438185+00:00",
-  "run_count": 3,
+  "generated_at_utc": "2026-04-01T14:29:42.584086+00:00",
+  "run_count": 9,
   "runs": [
     {
       "case_id": "coarse_cifar10_freek",
@@ -28,6 +28,54 @@
       "train_config": "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_42_train.yaml"
     },
     {
+      "case_id": "coarse_cifar10_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/coarse_cifar10_freek/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_43_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/coarse_cifar10_freek/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/coarse_cifar10_freek/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_44_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/coarse_cifar10_freek/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/coarse_cifar10_freek/seed_44_train.yaml"
+    },
+    {
       "case_id": "medium_image50_freek",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -52,6 +100,54 @@
       "train_config": "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_42_train.yaml"
     },
     {
+      "case_id": "medium_image50_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/medium_image50_freek/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_43_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/medium_image50_freek/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/medium_image50_freek/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_44_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/medium_image50_freek/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/medium_image50_freek/seed_44_train.yaml"
+    },
+    {
       "case_id": "fine_cub_freek",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -74,6 +170,54 @@
         "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/fine_cub_freek/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_43_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/fine_cub_freek/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_freek",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/k_estimation_benchmark/fine_cub_freek/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_44_eval.yaml",
+      "run_dir": "save/experiments/k_estimation_benchmark/fine_cub_freek/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/k_estimation_benchmark/fine_cub_freek/seed_44_train.yaml"
     }
   ],
   "suite_name": "k_estimation_benchmark",

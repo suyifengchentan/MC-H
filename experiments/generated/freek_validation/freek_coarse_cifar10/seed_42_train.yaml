@@ -22,7 +22,7 @@ spectral_proto_momentum: 0.9
 precision: fp16
 batch_size: 256
 eval_batch_size: 512
-epochs: 15
+epochs: 30
 learning_rate: 0.0003
 weight_decay: 1.0e-05
 lr_scheduler: cosine

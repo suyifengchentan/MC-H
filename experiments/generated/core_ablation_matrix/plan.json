@@ -1,7 +1,7 @@
 {
   "execute": false,
-  "generated_at_utc": "2026-04-01T01:32:47.298008+00:00",
-  "run_count": 21,
+  "generated_at_utc": "2026-04-01T14:29:42.785416+00:00",
+  "run_count": 63,
   "runs": [
     {
       "case_id": "coarse_cifar10_full",
@@ -28,6 +28,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_42_train.yaml"
     },
     {
+      "case_id": "coarse_cifar10_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_full/seed_44_train.yaml"
+    },
+    {
       "case_id": "coarse_cifar10_no_dpp",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -50,6 +98,54 @@
         "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_42_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_dpp/seed_44_train.yaml"
     },
     {
       "case_id": "coarse_cifar10_no_density_weighting",
@@ -76,6 +172,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_42_train.yaml"
     },
     {
+      "case_id": "coarse_cifar10_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_density_weighting/seed_44_train.yaml"
+    },
+    {
       "case_id": "coarse_cifar10_fixed_k",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -98,6 +242,54 @@
         "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_42_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_fixed_k/seed_44_train.yaml"
     },
     {
       "case_id": "coarse_cifar10_no_stabilization",
@@ -124,6 +316,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_42_train.yaml"
     },
     {
+      "case_id": "coarse_cifar10_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_stabilization/seed_44_train.yaml"
+    },
+    {
       "case_id": "coarse_cifar10_no_subspace",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -146,6 +386,54 @@
         "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_42_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_no_subspace/seed_44_train.yaml"
     },
     {
       "case_id": "coarse_cifar10_pca_anchor",
@@ -172,6 +460,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_42_train.yaml"
     },
     {
+      "case_id": "coarse_cifar10_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_43_train.yaml"
+    },
+    {
+      "case_id": "coarse_cifar10_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/coarse_cifar10_pca_anchor/seed_44_train.yaml"
+    },
+    {
       "case_id": "medium_image50_full",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -194,6 +530,54 @@
         "experiments/generated/core_ablation_matrix/medium_image50_full/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_full/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_full/seed_44_train.yaml"
     },
     {
       "case_id": "medium_image50_no_dpp",
@@ -220,6 +604,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_42_train.yaml"
     },
     {
+      "case_id": "medium_image50_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_dpp/seed_44_train.yaml"
+    },
+    {
       "case_id": "medium_image50_no_density_weighting",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -242,6 +674,54 @@
         "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_density_weighting/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_density_weighting/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_density_weighting/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_density_weighting/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_density_weighting/seed_44_train.yaml"
     },
     {
       "case_id": "medium_image50_fixed_k",
@@ -268,6 +748,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_42_train.yaml"
     },
     {
+      "case_id": "medium_image50_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_fixed_k/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_fixed_k/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_fixed_k/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_fixed_k/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_fixed_k/seed_44_train.yaml"
+    },
+    {
       "case_id": "medium_image50_no_stabilization",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -290,6 +818,54 @@
         "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_stabilization/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_stabilization/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_stabilization/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_stabilization/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_stabilization/seed_44_train.yaml"
     },
     {
       "case_id": "medium_image50_no_subspace",
@@ -316,6 +892,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_42_train.yaml"
     },
     {
+      "case_id": "medium_image50_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_subspace/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_subspace/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_no_subspace/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_no_subspace/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_no_subspace/seed_44_train.yaml"
+    },
+    {
       "case_id": "medium_image50_pca_anchor",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -338,6 +962,54 @@
         "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_42_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_pca_anchor/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_pca_anchor/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_43_train.yaml"
+    },
+    {
+      "case_id": "medium_image50_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/medium_image50_pca_anchor/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/medium_image50_pca_anchor/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/medium_image50_pca_anchor/seed_44_train.yaml"
     },
     {
       "case_id": "fine_cub_full",
@@ -364,6 +1036,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_full/seed_42_train.yaml"
     },
     {
+      "case_id": "fine_cub_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_full/seed_44_train.yaml"
+    },
+    {
       "case_id": "fine_cub_no_dpp",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -386,6 +1106,54 @@
         "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_dpp/seed_44_train.yaml"
     },
     {
       "case_id": "fine_cub_no_density_weighting",
@@ -412,6 +1180,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_42_train.yaml"
     },
     {
+      "case_id": "fine_cub_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_density_weighting/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_density_weighting/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_no_density_weighting",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_density_weighting/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_density_weighting/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_density_weighting/seed_44_train.yaml"
+    },
+    {
       "case_id": "fine_cub_fixed_k",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -434,6 +1250,54 @@
         "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_fixed_k/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_fixed_k/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_fixed_k",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_fixed_k/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_fixed_k/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_fixed_k/seed_44_train.yaml"
     },
     {
       "case_id": "fine_cub_no_stabilization",
@@ -460,6 +1324,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_42_train.yaml"
     },
     {
+      "case_id": "fine_cub_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_stabilization/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_stabilization/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_no_stabilization",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_stabilization/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_stabilization/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_stabilization/seed_44_train.yaml"
+    },
+    {
       "case_id": "fine_cub_no_subspace",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -484,6 +1396,54 @@
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_42_train.yaml"
     },
     {
+      "case_id": "fine_cub_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_subspace/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_subspace/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_no_subspace/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_no_subspace/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_no_subspace/seed_44_train.yaml"
+    },
+    {
       "case_id": "fine_cub_pca_anchor",
       "eval_command": [
         "/home/geyingjie/miniforge3/envs/py312/bin/python",
@@ -506,6 +1466,54 @@
         "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_42_train.yaml"
       ],
       "train_config": "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_42_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_pca_anchor/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_43_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_pca_anchor/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_43_train.yaml"
+    },
+    {
+      "case_id": "fine_cub_pca_anchor",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/core_ablation_matrix/fine_cub_pca_anchor/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_44_eval.yaml",
+      "run_dir": "save/experiments/core_ablation_matrix/fine_cub_pca_anchor/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/core_ablation_matrix/fine_cub_pca_anchor/seed_44_train.yaml"
     }
   ],
   "suite_name": "core_ablation_matrix",

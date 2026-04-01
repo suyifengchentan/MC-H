@@ -30,6 +30,7 @@
 - [`collect_results.py`](/home/geyingjie/hypersphere/experiments/collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
 - [`run_validation.sh`](/home/geyingjie/hypersphere/experiments/run_validation.sh): 运行验证实验套件
 - [`run_ablation.sh`](/home/geyingjie/hypersphere/experiments/run_ablation.sh): 运行消融实验套件
+- [`run_all_representative.sh`](/home/geyingjie/hypersphere/experiments/run_all_representative.sh): 顺序执行当前保留的 CIFAR10 / Image50 / CUB 代表性实验并自动汇总
 - [`generate_core_ablation_table.py`](/home/geyingjie/hypersphere/experiments/generate_core_ablation_table.py): 从 grouped summary 生成核心消融 LaTeX 表
 - [`generate_k_estimation_table.py`](/home/geyingjie/hypersphere/experiments/generate_k_estimation_table.py): 从 grouped summary 生成 K 估计 LaTeX 表
 - [`figures/generate_fig3.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
@@ -51,6 +52,12 @@ python experiments/run_suite.py --suite experiments/suites/freek_validation.yaml
 python experiments/run_suite.py --suite experiments/suites/freek_ablation.yaml
 python experiments/run_suite.py --suite experiments/suites/k_estimation_benchmark.yaml
 python experiments/run_suite.py --suite experiments/suites/oracle_k_fairness.yaml
+```
+
+一键顺序执行当前保留的代表性实验：
+
+```bash
+bash experiments/run_all_representative.sh --device cuda:0 --seed 42
 ```
 
 2. 执行指定 case（建议先小规模验证）：

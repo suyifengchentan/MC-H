@@ -1,0 +1,1089 @@
+{
+  "execute": false,
+  "generated_at_utc": "2026-04-01T14:29:42.747455+00:00",
+  "run_count": 45,
+  "runs": [
+    {
+      "case_id": "cub_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_full/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_full/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_full/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_full/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_full/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_dpp/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_dpp/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_dpp/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_subspace/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_subspace/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_subspace/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_subspace/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_no_subspace",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_subspace/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_subspace/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_subspace/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_subspace/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_no_cluster",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_cluster/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_cluster/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_no_cluster",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_cluster/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_cluster/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_no_cluster",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_cluster/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_cluster/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_cluster/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_cluster/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_no_instance",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_instance/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_instance/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_no_instance",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_instance/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_instance/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_no_instance",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_no_instance/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_no_instance/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_no_instance/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_no_instance/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_0",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_0/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_0/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_0",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_0/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_0/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_0",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_0/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_0/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_0/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_0/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_60",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_60/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_60/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_60",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_60/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_60/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_warmup_60",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_warmup_60/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_warmup_60/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_warmup_60/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_warmup_60/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_1",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_1",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_1",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_1/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_1/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_8",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_8",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_dpp_freq_8",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_dpp_freq_8/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_dpp_freq_8/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_low",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_low/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_low/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_low",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_low/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_low/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_low",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_low/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_low/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_low/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_low/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_high",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_high/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_high/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_high",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_high/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_high/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cub_alpha_high",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cub_alpha_high/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cub_alpha_high/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cub_alpha_high/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cub_alpha_high/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cifar10_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_full/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_full/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_full/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_full/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cifar10_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cifar10_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_full/seed_44_train.yaml"
+    },
+    {
+      "case_id": "cifar10_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_no_dpp/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_no_dpp/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_42_train.yaml"
+    },
+    {
+      "case_id": "cifar10_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "cifar10_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/cifar10_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/cifar10_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/cifar10_no_dpp/seed_44_train.yaml"
+    },
+    {
+      "case_id": "image50_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_full/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_full/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_full/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_full/seed_42_train.yaml"
+    },
+    {
+      "case_id": "image50_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_full/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_full/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_full/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_full/seed_43_train.yaml"
+    },
+    {
+      "case_id": "image50_full",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_full/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_full/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_full/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_full/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_full/seed_44_train.yaml"
+    },
+    {
+      "case_id": "image50_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_42_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_no_dpp/seed_42/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_42_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_no_dpp/seed_42",
+      "seed": 42,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_42_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_42_train.yaml"
+    },
+    {
+      "case_id": "image50_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_43_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_no_dpp/seed_43/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_43_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_no_dpp/seed_43",
+      "seed": 43,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_43_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_43_train.yaml"
+    },
+    {
+      "case_id": "image50_no_dpp",
+      "eval_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "eval.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_44_eval.yaml",
+        "--checkpoint",
+        "save/experiments/methodology_ablation/image50_no_dpp/seed_44/best.pt",
+        "--split",
+        "both"
+      ],
+      "eval_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_44_eval.yaml",
+      "run_dir": "save/experiments/methodology_ablation/image50_no_dpp/seed_44",
+      "seed": 44,
+      "status": "planned",
+      "train_command": [
+        "/home/geyingjie/miniforge3/envs/py312/bin/python",
+        "train.py",
+        "--config",
+        "experiments/generated/methodology_ablation/image50_no_dpp/seed_44_train.yaml"
+      ],
+      "train_config": "experiments/generated/methodology_ablation/image50_no_dpp/seed_44_train.yaml"
+    }
+  ],
+  "suite_name": "methodology_ablation",
+  "suite_path": "/home/geyingjie/hypersphere/experiments/suites/ablation_methodology.yaml"
+}
