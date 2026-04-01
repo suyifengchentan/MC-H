@@ -113,6 +113,16 @@ class HypersphereDPPModel(nn.Module):
     def encode_teacher(self, images: torch.Tensor) -> torch.Tensor:
         return self.backbone(images)
 
+    def forward(
+        self, view1: torch.Tensor, view2: torch.Tensor
+    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
+        teacher1 = self.encode_teacher(view1)
+        teacher2 = self.encode_teacher(view2)
+        teacher_cat = torch.cat([teacher1, teacher2], dim=0)
+        student_cat = self.encode_student(teacher_features=teacher_cat)
+        logits_cat = self.prototype_logits(student_cat)
+        return teacher_cat, student_cat, logits_cat
+
     def encode_student(
         self,
         images: Optional[torch.Tensor] = None,
