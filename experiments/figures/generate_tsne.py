@@ -160,10 +160,6 @@ def _log_progress(message: str) -> None:
     print(message, flush=True)
 
 
-def _vertical_label(text: str) -> str:
-    return "\n".join(text)
-
-
 def _resolve_training_config_path(config_path: Path) -> Path:
     resolved = config_path.resolve()
     parts = resolved.parts
@@ -759,23 +755,6 @@ def main() -> None:
         # 设置列标题（顶部）：数据集名称
         dataset_title = result.dataset_name.replace("_", " ")
         ax_before.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
-
-        # 设置行标题（最左侧 Y 轴标签）：聚类前后
-        if col_index == 0:
-            ax_before.set_ylabel(
-                _vertical_label("Before"),
-                fontsize=14,
-                fontweight="bold",
-                labelpad=20,
-                rotation=0,
-            )
-            ax_after.set_ylabel(
-                _vertical_label("After"),
-                fontsize=14,
-                fontweight="bold",
-                labelpad=20,
-                rotation=0,
-            )
 
     # 精细化调整内部子图间距，确保论文中紧凑排版
     fig.subplots_adjust(
