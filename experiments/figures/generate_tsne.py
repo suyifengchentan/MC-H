@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import argparse
 import sys
+import time
+from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -131,12 +133,35 @@ def parse_args() -> argparse.Namespace:
         "--tsne-backend", choices=["auto", "cpu", "gpu"], default="auto"
     )
     parser.add_argument("--tsne-jobs", type=int, default=-1)
+    parser.add_argument(
+        "--pca-threads",
+        type=int,
+        default=1,
+        help=(
+            "Limit BLAS/OpenMP threads used during PCA. "
+            "Use 1 to avoid OpenBLAS/OpenMP stalls on some systems; "
+            "set <= 0 to keep library defaults."
+        ),
+    )
+    parser.add_argument(
+        "--tsne-verbose",
+        action="store_true",
+        help="Enable verbose progress logs from the selected t-SNE backend.",
+    )
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
     parser.add_argument("--dpi", type=int, default=300)
     parser.add_argument("--raw-image-size", type=int, default=40)
     parser.add_argument("--output", default=None)
     return parser.parse_args()
+
+
+def _log_progress(message: str) -> None:
+    print(message, flush=True)
+
+
+def _vertical_label(text: str) -> str:
+    return "\n".join(text)
 
 
 def _resolve_training_config_path(config_path: Path) -> Path:
@@ -445,6 +470,7 @@ def _run_tsne_cpu(
     learning_rate: str | float,
     seed: int,
     tsne_jobs: int,
+    verbose: bool,
 ) -> np.ndarray:
     effective_perplexity = min(
         float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0)
@@ -462,6 +488,7 @@ def _run_tsne_cpu(
         method="barnes_hut",
         angle=0.5,
         n_jobs=tsne_jobs,
+        verbose=1 if verbose else 0,
     )
     return tsne.fit_transform(reduced)
 
@@ -471,6 +498,7 @@ def _run_tsne_gpu(
     perplexity: float,
     learning_rate: str | float,
     seed: int,
+    verbose: bool,
 ) -> np.ndarray:
     from cuml.manifold import TSNE as CuMLTSNE
 
@@ -478,6 +506,7 @@ def _run_tsne_gpu(
         float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0)
     )
     tsne_learning_rate = 200.0 if learning_rate == "auto" else float(learning_rate)
+    n_neighbors = max(90, int(np.ceil(effective_perplexity * 3.0)))
     tsne = CuMLTSNE(
         n_components=2,
         perplexity=effective_perplexity,
@@ -486,6 +515,8 @@ def _run_tsne_gpu(
         random_state=seed,
         max_iter=1500,
         method="fft",
+        n_neighbors=n_neighbors,
+        verbose=verbose,
         output_type="numpy",
     )
     embedding = tsne.fit_transform(reduced.astype(np.float32, copy=False))
@@ -499,19 +530,64 @@ def _run_tsne(
     seed: int,
     backend: str,
     tsne_jobs: int,
+    pca_threads: int,
+    verbose: bool,
+    stage_label: str,
 ) -> np.ndarray:
+    _log_progress(
+        f"[{stage_label}] PCA start: samples={features.shape[0]}, dim={features.shape[1]}"
+    )
+    pca_start = time.perf_counter()
     pca_dim = min(50, features.shape[0], features.shape[1])
     pca_solver = (
         "randomized" if pca_dim < min(features.shape[0], features.shape[1]) else "auto"
     )
-    reduced = PCA(
-        n_components=pca_dim, random_state=seed, svd_solver=pca_solver
-    ).fit_transform(features)
+    threadpool_context = nullcontext()
+    if pca_threads > 0:
+        try:
+            from threadpoolctl import threadpool_limits
+
+            threadpool_context = threadpool_limits(limits=pca_threads)
+        except ImportError:
+            _log_progress(
+                f"[{stage_label}] threadpoolctl is unavailable; using default PCA threading"
+            )
+
+    with threadpool_context:
+        reduced = PCA(
+            n_components=pca_dim, random_state=seed, svd_solver=pca_solver
+        ).fit_transform(features)
     reduced = reduced.astype(np.float32, copy=False)
+    _log_progress(
+        f"[{stage_label}] PCA done in {time.perf_counter() - pca_start:.2f}s -> "
+        f"reduced_dim={reduced.shape[1]}, pca_threads="
+        f"{pca_threads if pca_threads > 0 else 'default'}"
+    )
+
+    effective_perplexity = min(
+        float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0)
+    )
+    tsne_learning_rate = (
+        200.0
+        if backend == "gpu" and learning_rate == "auto"
+        else learning_rate
+    )
+    _log_progress(
+        f"[{stage_label}] t-SNE start: backend={backend}, samples={reduced.shape[0]}, "
+        f"perplexity={effective_perplexity:.2f}, learning_rate={tsne_learning_rate}"
+    )
+    tsne_start = time.perf_counter()
 
     if backend == "gpu":
-        return _run_tsne_gpu(reduced, perplexity, learning_rate, seed)
-    return _run_tsne_cpu(reduced, perplexity, learning_rate, seed, tsne_jobs)
+        embedding = _run_tsne_gpu(reduced, perplexity, learning_rate, seed, verbose)
+    else:
+        embedding = _run_tsne_cpu(
+            reduced, perplexity, learning_rate, seed, tsne_jobs, verbose
+        )
+    _log_progress(
+        f"[{stage_label}] t-SNE done in {time.perf_counter() - tsne_start:.2f}s"
+    )
+    return embedding
 
 
 def _build_label_colormap(class_num: int) -> ListedColormap:
@@ -587,8 +663,9 @@ def _generate_tsne_result(
     raw_image_features = _extract_raw_image_features(raw_subset, args.raw_image_size)
     student_features, labels = _extract_features(model, loader, device)
 
-    print(
-        f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}"
+    _log_progress(
+        f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}, "
+        f"samples={labels.shape[0]}"
     )
     raw_tsne = _run_tsne(
         raw_image_features,
@@ -597,6 +674,9 @@ def _generate_tsne_result(
         args.seed,
         backend=tsne_backend,
         tsne_jobs=args.tsne_jobs,
+        pca_threads=args.pca_threads,
+        verbose=args.tsne_verbose,
+        stage_label=f"{config.dataset}/raw",
     )
     student_tsne = _run_tsne(
         student_features,
@@ -605,6 +685,9 @@ def _generate_tsne_result(
         args.seed,
         backend=tsne_backend,
         tsne_jobs=args.tsne_jobs,
+        pca_threads=args.pca_threads,
+        verbose=args.tsne_verbose,
+        stage_label=f"{config.dataset}/student",
     )
 
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
@@ -680,18 +763,18 @@ def main() -> None:
         # 设置行标题（最左侧 Y 轴标签）：聚类前后
         if col_index == 0:
             ax_before.set_ylabel(
-                "Before\nClustering",
+                _vertical_label("Before"),
                 fontsize=14,
                 fontweight="bold",
-                labelpad=15,
-                rotation=90,
+                labelpad=20,
+                rotation=0,
             )
             ax_after.set_ylabel(
-                "After\nClustering",
+                _vertical_label("After"),
                 fontsize=14,
                 fontweight="bold",
-                labelpad=15,
-                rotation=90,
+                labelpad=20,
+                rotation=0,
             )
 
     # 精细化调整内部子图间距，确保论文中紧凑排版
