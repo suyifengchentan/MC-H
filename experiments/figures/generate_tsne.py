@@ -13,6 +13,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
+from matplotlib.lines import Line2D
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader, Subset
@@ -765,6 +766,25 @@ def main() -> None:
         hspace=0.08,  # 行间距紧凑
         wspace=0.05,  # 列间距紧凑
     )
+
+    if n_cols > 1:
+        separator_y0 = min(axes[1, col_index].get_position().y0 for col_index in range(n_cols))
+        separator_y1 = max(axes[0, col_index].get_position().y1 for col_index in range(n_cols))
+        for col_index in range(n_cols - 1):
+            left_box = axes[0, col_index].get_position()
+            right_box = axes[0, col_index + 1].get_position()
+            separator_x = (left_box.x1 + right_box.x0) / 2.0
+            fig.add_artist(
+                Line2D(
+                    [separator_x, separator_x],
+                    [separator_y0, separator_y1],
+                    transform=fig.transFigure,
+                    color="#8f8f8f",
+                    linewidth=1.0,
+                    linestyle=(0, (4, 4)),
+                    alpha=0.9,
+                )
+            )
 
     fig.savefig(output_path, dpi=args.dpi)
     print(f"Saved figure to {output_path}")
