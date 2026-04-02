@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 import argparse
+import sys
 from dataclasses import dataclass
 from pathlib import Path
-import sys
 
 import matplotlib
 import matplotlib.pyplot as plt
@@ -22,13 +22,18 @@ if str(PROJECT_ROOT) not in sys.path:
 
 from hypersphere_dpp.checkpoint import load_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import SingleViewDataset, build_experiment_dataloaders, safe_default_collate
+from hypersphere_dpp.data import (
+    SingleViewDataset,
+    build_experiment_dataloaders,
+    safe_default_collate,
+)
 from hypersphere_dpp.labels import load_label_name_map
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.utils import resolve_device, set_seed
 
-
-DEFAULT_CONFIG = "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
+DEFAULT_CONFIG = (
+    "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
+)
 DATASET_CONFIG_MAP = {
     "cifar10": "config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml",
     "cifar100": "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml",
@@ -107,7 +112,9 @@ def apply_neurips_style() -> None:
 
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Generate before/after t-SNE plots for one or more datasets.")
+    parser = argparse.ArgumentParser(
+        description="Generate before/after t-SNE plots for one or more datasets."
+    )
     parser.add_argument("--config", default=DEFAULT_CONFIG)
     parser.add_argument("--configs", nargs="+", default=None)
     parser.add_argument("--datasets", nargs="+", default=None)
@@ -120,7 +127,9 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--workers", type=int, default=4)
     parser.add_argument("--perplexity", type=float, default=35.0)
     parser.add_argument("--learning-rate", default="auto")
-    parser.add_argument("--tsne-backend", choices=["auto", "cpu", "gpu"], default="auto")
+    parser.add_argument(
+        "--tsne-backend", choices=["auto", "cpu", "gpu"], default="auto"
+    )
     parser.add_argument("--tsne-jobs", type=int, default=-1)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
@@ -208,7 +217,9 @@ def _resolve_config_path_list(args: argparse.Namespace) -> list[Path]:
             config_rel = DATASET_CONFIG_MAP.get(dataset_key)
             if config_rel is None:
                 supported = ", ".join(sorted(DATASET_CONFIG_MAP))
-                raise ValueError(f"Unsupported dataset {dataset_name!r}. Supported aliases: {supported}.")
+                raise ValueError(
+                    f"Unsupported dataset {dataset_name!r}. Supported aliases: {supported}."
+                )
             config_paths.append(Path(config_rel))
         return config_paths
 
@@ -218,7 +229,12 @@ def _resolve_config_path_list(args: argparse.Namespace) -> list[Path]:
     return [Path(args.config)]
 
 
-def _balanced_indices(labels: list[int] | np.ndarray, selected_class_ids: list[int], samples_per_class: int, seed: int) -> list[int]:
+def _balanced_indices(
+    labels: list[int] | np.ndarray,
+    selected_class_ids: list[int],
+    samples_per_class: int,
+    seed: int,
+) -> list[int]:
     label_array = np.asarray(labels, dtype=np.int64)
     rng = np.random.default_rng(seed)
     selected: list[int] = []
@@ -238,10 +254,14 @@ def _balanced_indices(labels: list[int] | np.ndarray, selected_class_ids: list[i
     return selected
 
 
-def _select_top_classes(labels: list[int] | np.ndarray, class_names: list[str] | None, top_k_classes: int) -> tuple[list[int], list[str]]:
+def _select_top_classes(
+    labels: list[int] | np.ndarray, class_names: list[str] | None, top_k_classes: int
+) -> tuple[list[int], list[str]]:
     label_array = np.asarray(labels, dtype=np.int64)
     unique_ids, counts = np.unique(label_array, return_counts=True)
-    ranked_pairs = sorted(zip(unique_ids.tolist(), counts.tolist()), key=lambda item: (-item[1], item[0]))
+    ranked_pairs = sorted(
+        zip(unique_ids.tolist(), counts.tolist()), key=lambda item: (-item[1], item[0])
+    )
 
     selected_ids = [class_id for class_id, _ in ranked_pairs[:top_k_classes]]
     if class_names is None:
@@ -251,24 +271,37 @@ def _select_top_classes(labels: list[int] | np.ndarray, class_names: list[str] |
     return selected_ids, selected_names
 
 
-def _extract_labels_and_class_names(dataset, dataset_name: str) -> tuple[list[int], list[str] | None]:
+def _extract_labels_and_class_names(
+    dataset, dataset_name: str
+) -> tuple[list[int], list[str] | None]:
     if isinstance(dataset, Subset):
-        parent_labels, parent_class_names = _extract_labels_and_class_names(dataset.dataset, dataset_name=dataset_name)
+        parent_labels, parent_class_names = _extract_labels_and_class_names(
+            dataset.dataset, dataset_name=dataset_name
+        )
         subset_labels = [int(parent_labels[index]) for index in dataset.indices]
         return subset_labels, parent_class_names
 
     targets = getattr(dataset, "targets", None)
     if targets is not None:
         class_names = getattr(dataset, "classes", None)
-        return [int(label) for label in targets], list(class_names) if class_names is not None else None
+        return [int(label) for label in targets], list(
+            class_names
+        ) if class_names is not None else None
 
     labels = getattr(dataset, "labels", None)
     if labels is not None:
         class_names = getattr(dataset, "classes", None)
-        return [int(label) for label in labels], list(class_names) if class_names is not None else None
+        return [int(label) for label in labels], list(
+            class_names
+        ) if class_names is not None else None
 
     data = getattr(dataset, "data", None)
-    if isinstance(data, list) and data and isinstance(data[0], tuple) and len(data[0]) >= 2:
+    if (
+        isinstance(data, list)
+        and data
+        and isinstance(data[0], tuple)
+        and len(data[0]) >= 2
+    ):
         parsed_labels = [int(sample[1]) for sample in data]
         class_names = getattr(dataset, "classes", None)
         if class_names is not None:
@@ -302,30 +335,49 @@ def _extract_labels_and_class_names(dataset, dataset_name: str) -> tuple[list[in
                 class_names = [label_name_map.get(name, name) for name in class_names]
         return shard_labels, class_names
 
-    raise ValueError("The selected dataset does not expose class labels for balanced sampling.")
+    raise ValueError(
+        "The selected dataset does not expose class labels for balanced sampling."
+    )
 
 
 def _build_visualization_loader(
-    config_path: Path, split: str, samples_per_class: int, top_k_classes: int,
-    batch_size: int, workers: int, seed: int, device: torch.device,
+    config_path: Path,
+    split: str,
+    samples_per_class: int,
+    top_k_classes: int,
+    batch_size: int,
+    workers: int,
+    seed: int,
+    device: torch.device,
 ) -> tuple[DataLoader, Subset, list[int], list[str]]:
     config = load_experiment_config(config_path)
     config.eval_batch_size = batch_size
     config.workers = workers
 
     bundles = build_experiment_dataloaders(config)
-    source_dataset = bundles.val_loader.dataset if split == "val" else bundles.test_loader.dataset
+    source_dataset = (
+        bundles.val_loader.dataset if split == "val" else bundles.test_loader.dataset
+    )
     if not isinstance(source_dataset, SingleViewDataset):
         raise TypeError("Expected a SingleViewDataset for visualization.")
 
     base_dataset = source_dataset.dataset
-    labels, class_names = _extract_labels_and_class_names(base_dataset, dataset_name=config.dataset)
+    labels, class_names = _extract_labels_and_class_names(
+        base_dataset, dataset_name=config.dataset
+    )
 
-    selected_class_ids, selected_class_names = _select_top_classes(labels=labels, class_names=class_names, top_k_classes=top_k_classes)
-    selected_indices = _balanced_indices(labels=labels, selected_class_ids=selected_class_ids, samples_per_class=samples_per_class, seed=seed)
+    selected_class_ids, selected_class_names = _select_top_classes(
+        labels=labels, class_names=class_names, top_k_classes=top_k_classes
+    )
+    selected_indices = _balanced_indices(
+        labels=labels,
+        selected_class_ids=selected_class_ids,
+        samples_per_class=samples_per_class,
+        seed=seed,
+    )
     subset = Subset(base_dataset, selected_indices)
     visualization_dataset = SingleViewDataset(subset, source_dataset.transform)
-    
+
     loader = DataLoader(
         visualization_dataset,
         batch_size=batch_size,
@@ -338,7 +390,9 @@ def _build_visualization_loader(
     return loader, subset, selected_class_ids, selected_class_names
 
 
-def _extract_features(model: HypersphereDPPModel, dataloader: DataLoader, device: torch.device) -> tuple[np.ndarray, np.ndarray]:
+def _extract_features(
+    model: HypersphereDPPModel, dataloader: DataLoader, device: torch.device
+) -> tuple[np.ndarray, np.ndarray]:
     student_features: list[np.ndarray] = []
     labels: list[np.ndarray] = []
     model.eval()
@@ -355,10 +409,12 @@ def _extract_features(model: HypersphereDPPModel, dataloader: DataLoader, device
 
 
 def _extract_raw_image_features(raw_subset: Subset, raw_image_size: int) -> np.ndarray:
-    raw_transform = transforms.Compose([
-        transforms.Resize((raw_image_size, raw_image_size)),
-        transforms.ToTensor(),
-    ])
+    raw_transform = transforms.Compose(
+        [
+            transforms.Resize((raw_image_size, raw_image_size)),
+            transforms.ToTensor(),
+        ]
+    )
     features: list[np.ndarray] = []
     for index in range(len(raw_subset)):
         image, _, _ = raw_subset[index]
@@ -390,8 +446,12 @@ def _run_tsne_cpu(
     seed: int,
     tsne_jobs: int,
 ) -> np.ndarray:
-    effective_perplexity = min(float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0))
-    tsne_learning_rate = learning_rate if learning_rate == "auto" else float(learning_rate)
+    effective_perplexity = min(
+        float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0)
+    )
+    tsne_learning_rate = (
+        learning_rate if learning_rate == "auto" else float(learning_rate)
+    )
     tsne = TSNE(
         n_components=2,
         perplexity=effective_perplexity,
@@ -414,7 +474,9 @@ def _run_tsne_gpu(
 ) -> np.ndarray:
     from cuml.manifold import TSNE as CuMLTSNE
 
-    effective_perplexity = min(float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0))
+    effective_perplexity = min(
+        float(perplexity), max(2.0, (reduced.shape[0] - 1) / 3.0)
+    )
     tsne_learning_rate = 200.0 if learning_rate == "auto" else float(learning_rate)
     tsne = CuMLTSNE(
         n_components=2,
@@ -439,8 +501,12 @@ def _run_tsne(
     tsne_jobs: int,
 ) -> np.ndarray:
     pca_dim = min(50, features.shape[0], features.shape[1])
-    pca_solver = "randomized" if pca_dim < min(features.shape[0], features.shape[1]) else "auto"
-    reduced = PCA(n_components=pca_dim, random_state=seed, svd_solver=pca_solver).fit_transform(features)
+    pca_solver = (
+        "randomized" if pca_dim < min(features.shape[0], features.shape[1]) else "auto"
+    )
+    reduced = PCA(
+        n_components=pca_dim, random_state=seed, svd_solver=pca_solver
+    ).fit_transform(features)
     reduced = reduced.astype(np.float32, copy=False)
 
     if backend == "gpu":
@@ -450,8 +516,16 @@ def _run_tsne(
 
 def _build_label_colormap(class_num: int) -> ListedColormap:
     neurips_colors = [
-        "#332288", "#88CCEE", "#44AA99", "#117733", "#999933",
-        "#DDCC77", "#CC6677", "#882255", "#AA4499", "#DDDDDD",
+        "#332288",
+        "#88CCEE",
+        "#44AA99",
+        "#117733",
+        "#999933",
+        "#DDCC77",
+        "#CC6677",
+        "#882255",
+        "#AA4499",
+        "#DDDDDD",
     ]
     return ListedColormap(neurips_colors[:class_num])
 
@@ -478,7 +552,9 @@ def _scatter_panel(ax, embedding: np.ndarray, labels: np.ndarray, cmap) -> None:
         spine.set_visible(False)
 
 
-def _generate_tsne_result(config_path: Path, args: argparse.Namespace, checkpoint_arg: str | None = None) -> TSNEResult:
+def _generate_tsne_result(
+    config_path: Path, args: argparse.Namespace, checkpoint_arg: str | None = None
+) -> TSNEResult:
     config = load_experiment_config(config_path)
     checkpoint_path = _resolve_checkpoint(config_path, checkpoint_arg)
     tsne_backend = _resolve_tsne_backend(args.tsne_backend)
@@ -486,21 +562,34 @@ def _generate_tsne_result(config_path: Path, args: argparse.Namespace, checkpoin
     device = resolve_device(args.device or config.device)
     split = args.split or config.official_eval_split or "test"
     loader, raw_subset, selected_class_ids, _ = _build_visualization_loader(
-        config_path, split, args.samples_per_class, args.top_k_classes,
-        args.batch_size, args.workers, args.seed, device
+        config_path,
+        split,
+        args.samples_per_class,
+        args.top_k_classes,
+        args.batch_size,
+        args.workers,
+        args.seed,
+        device,
     )
 
     model = HypersphereDPPModel(
-        backbone_name=config.backbone_name, pretrained=config.pretrained, pretrained_checkpoint=config.pretrained_checkpoint,
-        feature_dim=config.feature_dim, adapter_hidden_dim=config.adapter_hidden_dim, adapter_dropout=config.adapter_dropout,
-        num_prototypes=config.class_num, device=device,
+        backbone_name=config.backbone_name,
+        pretrained=config.pretrained,
+        pretrained_checkpoint=config.pretrained_checkpoint,
+        feature_dim=config.feature_dim,
+        adapter_hidden_dim=config.adapter_hidden_dim,
+        adapter_dropout=config.adapter_dropout,
+        num_prototypes=config.class_num,
+        device=device,
     ).to(device)
     load_checkpoint(checkpoint_path, model=model, map_location=device)
 
     raw_image_features = _extract_raw_image_features(raw_subset, args.raw_image_size)
     student_features, labels = _extract_features(model, loader, device)
 
-    print(f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}")
+    print(
+        f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}"
+    )
     raw_tsne = _run_tsne(
         raw_image_features,
         args.perplexity,
@@ -519,11 +608,18 @@ def _generate_tsne_result(config_path: Path, args: argparse.Namespace, checkpoin
     )
 
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
-    display_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
-    
+    display_labels = np.asarray(
+        [label_map[int(label)] for label in labels], dtype=np.int64
+    )
+
     return TSNEResult(
-        dataset_name=config.dataset, checkpoint_path=checkpoint_path, split=split,
-        sample_count=int(labels.shape[0]), raw_tsne=raw_tsne, student_tsne=student_tsne, display_labels=display_labels,
+        dataset_name=config.dataset,
+        checkpoint_path=checkpoint_path,
+        split=split,
+        sample_count=int(labels.shape[0]),
+        raw_tsne=raw_tsne,
+        student_tsne=student_tsne,
+        display_labels=display_labels,
     )
 
 
@@ -541,11 +637,13 @@ def main() -> None:
         _generate_tsne_result(config_path, args, checkpoint_arg=checkpoint_arg)
         for config_path in config_paths
     ]
-    
+
     if len(results) == 1:
         default_output = f"experiments/generated/figures/{results[0].dataset_name.lower()}_tsne_before_after.png"
     else:
-        default_output = "experiments/generated/figures/multi_dataset_tsne_before_after.png"
+        default_output = (
+            "experiments/generated/figures/multi_dataset_tsne_before_after.png"
+        )
 
     output_path = Path(args.output or default_output)
     output_path = output_path.with_suffix(".png")
@@ -555,7 +653,7 @@ def main() -> None:
     n_cols = len(results)
     # 根据列数动态调整画布宽度，保证每个面板约占用 3.5 英寸
     fig_width = max(5.0, 3.5 * n_cols)
-    fig_height = 7.0 
+    fig_height = 7.0
 
     fig, axes = plt.subplots(
         2,
@@ -568,7 +666,7 @@ def main() -> None:
 
     for col_index, result in enumerate(results):
         cmap = _build_label_colormap(int(result.display_labels.max()) + 1)
-        
+
         ax_before = axes[0, col_index]
         ax_after = axes[1, col_index]
 
@@ -581,17 +679,29 @@ def main() -> None:
 
         # 设置行标题（最左侧 Y 轴标签）：聚类前后
         if col_index == 0:
-            ax_before.set_ylabel("Before\nClustering", fontsize=14, fontweight="bold", labelpad=15, rotation=90)
-            ax_after.set_ylabel("After\nClustering", fontsize=14, fontweight="bold", labelpad=15, rotation=90)
+            ax_before.set_ylabel(
+                "Before\nClustering",
+                fontsize=14,
+                fontweight="bold",
+                labelpad=15,
+                rotation=90,
+            )
+            ax_after.set_ylabel(
+                "After\nClustering",
+                fontsize=14,
+                fontweight="bold",
+                labelpad=15,
+                rotation=90,
+            )
 
     # 精细化调整内部子图间距，确保论文中紧凑排版
     fig.subplots_adjust(
-        left=0.08 if n_cols > 1 else 0.18, 
+        left=0.08 if n_cols > 1 else 0.18,
         right=0.98,
         top=0.90,
         bottom=0.05,
-        hspace=0.08, # 行间距紧凑
-        wspace=0.05, # 列间距紧凑
+        hspace=0.08,  # 行间距紧凑
+        wspace=0.05,  # 列间距紧凑
     )
 
     fig.savefig(output_path, dpi=args.dpi)
@@ -601,6 +711,7 @@ def main() -> None:
             f"[{result.dataset_name}] checkpoint={result.checkpoint_path} "
             f"split={result.split} samples={result.sample_count}"
         )
+
 
 if __name__ == "__main__":
     main()
