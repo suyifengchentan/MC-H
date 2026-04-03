@@ -56,6 +56,12 @@ _SEMANTIC_DATASET_TEMPLATE_PRESETS = {
 }
 
 
+def _canonicalize_imagenet_class_name(name: str) -> str:
+    normalized = str(name).strip().replace("_", " ")
+    primary_label = normalized.split(",", 1)[0].strip()
+    return primary_label or normalized
+
+
 def _resolve_prompt_style(dataset_name: str, prompt_style: str) -> tuple[list[str], str]:
     normalized = str(prompt_style).strip().lower().replace("-", "_")
     if normalized == "auto":
@@ -138,7 +144,10 @@ def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
         idx_to_class_name = raw.get("idx_to_class_name")
         if isinstance(idx_to_class_name, dict) and idx_to_class_name:
             sorted_pairs = sorted((int(index), name) for index, name in idx_to_class_name.items())
-            return [str(name).strip() for _, name in sorted_pairs]
+            return [
+                _canonicalize_imagenet_class_name(name)
+                for _, name in sorted_pairs
+            ]
 
     classes_path = Path(dataset_dir) / "classes.py"
     spec = importlib.util.spec_from_file_location(
@@ -153,7 +162,7 @@ def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
     imagenet_classes = getattr(module, "IMAGENET2012_CLASSES", None)
     if not isinstance(imagenet_classes, dict) or not imagenet_classes:
         raise ValueError(f"IMAGENET2012_CLASSES is missing or invalid in {classes_path}")
-    return [str(name).strip() for name in imagenet_classes.values()]
+    return [_canonicalize_imagenet_class_name(name) for name in imagenet_classes.values()]
 
 
 def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:

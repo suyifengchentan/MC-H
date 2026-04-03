@@ -165,8 +165,15 @@ def safe_default_collate(batch):
     elem = batch[0]
 
     if torch.is_tensor(elem):
-        tensors = [_clone_cpu_tensors_for_collate(sample) for sample in batch]
-        return torch.stack(tensors, dim=0)
+        try:
+            # Fast path: avoid an extra deep copy for every sample when tensors
+            # are already backed by stackable storage.
+            return torch.stack(batch, dim=0)
+        except RuntimeError as error:
+            if "resizable" not in str(error).lower():
+                raise
+            tensors = [_clone_cpu_tensors_for_collate(sample) for sample in batch]
+            return torch.stack(tensors, dim=0)
 
     if isinstance(elem, Mapping):
         return {
@@ -402,22 +409,29 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         "Image100",
         "Image200",
     }
-    train_workers = (
-        min(config.workers, 4) if is_sharded_imagenet_dataset else config.workers
-    )
-    eval_workers = (
-        min(config.workers, 4) if is_sharded_imagenet_dataset else config.workers
-    )
+    train_workers = config.workers
+    eval_workers = config.workers
     pin_memory = is_sharded_imagenet_dataset
-    persistent_workers = True if is_sharded_imagenet_dataset else None
-    train_prefetch_factor = (
-        2 if is_sharded_imagenet_dataset and train_workers > 0 else None
-    )
-    eval_prefetch_factor = (
-        1
-        if is_sharded_imagenet_dataset and eval_workers > 0
-        else (4 if eval_workers > 0 else None)
-    )
+    if config.persistent_workers is not None:
+        persistent_workers = config.persistent_workers
+    else:
+        persistent_workers = True if is_sharded_imagenet_dataset else None
+
+    if config.train_prefetch_factor is not None:
+        train_prefetch_factor = config.train_prefetch_factor if train_workers > 0 else None
+    else:
+        train_prefetch_factor = (
+            2 if is_sharded_imagenet_dataset and train_workers > 0 else None
+        )
+
+    if config.eval_prefetch_factor is not None:
+        eval_prefetch_factor = config.eval_prefetch_factor if eval_workers > 0 else None
+    else:
+        eval_prefetch_factor = (
+            1
+            if is_sharded_imagenet_dataset and eval_workers > 0
+            else (4 if eval_workers > 0 else None)
+        )
 
     train_loader = _build_loader(
         train_dataset,

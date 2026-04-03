@@ -11,6 +11,8 @@ import numpy as np
 from PIL import Image
 
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
+from hypersphere_dpp.config import ExperimentConfig
+from hypersphere_dpp.data import build_experiment_dataloaders
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
@@ -114,6 +116,67 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             _, label, sample_index = dataset[0]
             self.assertEqual(label, 0)
             self.assertEqual(sample_index, 0)
+
+    def test_dataset_exposes_labels_for_stratified_splits(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            data_root = root / "data"
+            data_root.mkdir(parents=True)
+
+            with (root / "label_info.json").open("w", encoding="utf-8") as handle:
+                json.dump(
+                    {
+                        "idx_to_wnid": {"0": "n00000001", "1": "n00000002"},
+                    },
+                    handle,
+                )
+
+            train_rows = []
+            for label in (0, 1):
+                for sample_idx in range(10):
+                    train_rows.append(
+                        {
+                            "image_bytes": _jpeg_bytes((label * 127, sample_idx, 0)),
+                            "label": label,
+                            "path": f"train-{label}-{sample_idx}.jpg",
+                            "wnid": f"n0000000{label + 1}",
+                        }
+                    )
+            _write_h5(data_root / "train-00000-of-00001.h5", train_rows)
+            _write_h5(
+                data_root / "validation-00000-of-00001.h5",
+                [
+                    {
+                        "image_bytes": _jpeg_bytes((0, 0, 255)),
+                        "label": 0,
+                        "path": "val-0.jpg",
+                        "wnid": "n00000001",
+                    }
+                ],
+            )
+
+            dataset = ImageNetH5Dataset(root=str(root), split="train")
+            self.assertEqual(dataset.labels.count(0), 10)
+            self.assertEqual(dataset.labels.count(1), 10)
+            self.assertEqual(dataset.targets, dataset.labels)
+
+            config = ExperimentConfig(
+                dataset="ImageNet1K",
+                dataset_dir=str(root),
+                class_num=2,
+                image_size=8,
+                feature_dim=512,
+                backbone_name="ViT-B-16",
+                pretrained="laion2b_s34b_b88k",
+                pretrained_checkpoint="/root/clip-pretrained/open_clip_pytorch_model.bin",
+                batch_size=4,
+                eval_batch_size=4,
+                workers=0,
+                validation_ratio=0.2,
+                official_eval_split="val",
+            )
+            bundle = build_experiment_dataloaders(config)
+            self.assertTrue(bundle.val_is_stratified)
 
 
 if __name__ == "__main__":

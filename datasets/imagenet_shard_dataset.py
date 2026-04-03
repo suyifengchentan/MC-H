@@ -60,6 +60,8 @@ class ImageNetH5Dataset(Dataset):
         self.shards = self._build_shards(self._SPLIT_TO_PREFIX[split])
         self._shard_start_indices = [shard.start_index for shard in self.shards]
         self._size = sum(shard.num_rows for shard in self.shards)
+        self.labels = self._load_all_labels()
+        self.targets = self.labels
 
         self._h5_files: dict[Path, h5py.File] = {}
 
@@ -118,6 +120,13 @@ class ImageNetH5Dataset(Dataset):
             )
             start_index += num_rows
         return shards
+
+    def _load_all_labels(self) -> list[int]:
+        labels: list[int] = []
+        for shard in self.shards:
+            with h5py.File(shard.path, "r") as handle:
+                labels.extend(np.asarray(handle["label"], dtype=np.int64).tolist())
+        return labels
 
     def _get_h5_file(self, path: Path) -> h5py.File:
         handle = self._h5_files.get(path)

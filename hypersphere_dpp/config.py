@@ -48,6 +48,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 }
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
+SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 
 
 @dataclass
@@ -113,6 +114,10 @@ class ExperimentConfig:
     # Runtime / output
     eval_interval: int = 1
     workers: int = 8
+    train_prefetch_factor: int | None = None
+    eval_prefetch_factor: int | None = None
+    persistent_workers: bool | None = None
+    distributed_batch_size_mode: str = "per_rank"
     reload: bool = False
     seed: int = 42
     best_checkpoint_patience: int = 50
@@ -181,6 +186,26 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")
+
+    if config.workers < 0:
+        raise ValueError("workers must be non-negative.")
+
+    if config.train_prefetch_factor is not None and config.train_prefetch_factor <= 0:
+        raise ValueError("train_prefetch_factor must be positive when provided.")
+
+    if config.eval_prefetch_factor is not None and config.eval_prefetch_factor <= 0:
+        raise ValueError("eval_prefetch_factor must be positive when provided.")
+
+    if config.persistent_workers and config.workers == 0:
+        raise ValueError(
+            "persistent_workers cannot be true when workers=0."
+        )
+
+    if config.distributed_batch_size_mode not in SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES:
+        raise ValueError(
+            "distributed_batch_size_mode must be one of "
+            f"{sorted(SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES)}, got {config.distributed_batch_size_mode!r}."
+        )
 
     if config.subspace_every_n_steps <= 0:
         raise ValueError("subspace_every_n_steps must be a positive integer.")

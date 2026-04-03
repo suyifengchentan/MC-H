@@ -112,8 +112,26 @@ def setup_rank_logger(rank: int, output_dir) -> logging.Logger:
 
 
 def build_distributed_train_loader(
-    train_loader: DataLoader, rank: int, world_size: int
-) -> tuple[DataLoader, DistributedSampler]:
+    train_loader: DataLoader,
+    rank: int,
+    world_size: int,
+    batch_size_mode: str,
+) -> tuple[DataLoader, DistributedSampler, dict[str, int]]:
+    requested_batch_size = int(train_loader.batch_size)
+    if batch_size_mode == "global":
+        per_rank_batch_size = requested_batch_size // world_size
+        if per_rank_batch_size <= 0:
+            raise ValueError(
+                "batch_size is smaller than world_size under distributed_batch_size_mode='global'. "
+                "Increase batch_size or switch distributed_batch_size_mode to 'per_rank'."
+            )
+    elif batch_size_mode == "per_rank":
+        per_rank_batch_size = requested_batch_size
+    else:
+        raise ValueError(
+            f"Unsupported distributed batch size mode: {batch_size_mode!r}"
+        )
+
     sampler = DistributedSampler(
         train_loader.dataset,
         num_replicas=world_size,
@@ -123,7 +141,7 @@ def build_distributed_train_loader(
     )
     loader_kwargs = {
         "dataset": train_loader.dataset,
-        "batch_size": train_loader.batch_size,
+        "batch_size": per_rank_batch_size,
         "sampler": sampler,
         "shuffle": False,
         "drop_last": train_loader.drop_last,
@@ -134,7 +152,12 @@ def build_distributed_train_loader(
     }
     if train_loader.num_workers > 0 and train_loader.prefetch_factor is not None:
         loader_kwargs["prefetch_factor"] = train_loader.prefetch_factor
-    return DataLoader(**loader_kwargs), sampler
+    effective_global_batch_size = per_rank_batch_size * world_size
+    return DataLoader(**loader_kwargs), sampler, {
+        "requested_batch_size": requested_batch_size,
+        "per_rank_batch_size": per_rank_batch_size,
+        "effective_global_batch_size": effective_global_batch_size,
+    }
 
 
 def reduce_metrics_across_ranks(
@@ -392,9 +415,17 @@ def main():
         datasets = build_experiment_dataloaders(config)
         train_loader = datasets.train_loader
         train_sampler = None
+        train_batch_info = {
+            "requested_batch_size": int(train_loader.batch_size),
+            "per_rank_batch_size": int(train_loader.batch_size),
+            "effective_global_batch_size": int(train_loader.batch_size) * world_size,
+        }
         if world_size > 1:
-            train_loader, train_sampler = build_distributed_train_loader(
-                datasets.train_loader, rank, world_size
+            train_loader, train_sampler, train_batch_info = build_distributed_train_loader(
+                datasets.train_loader,
+                rank,
+                world_size,
+                config.distributed_batch_size_mode,
             )
         train_prefetch_factor = getattr(train_loader, "prefetch_factor", None)
         if is_main_process(rank):
@@ -408,6 +439,25 @@ def main():
                 world_size,
                 train_sampler is not None,
             )
+            logger.info(
+                "train batch: mode=%s requested=%d per_rank=%d effective_global=%d",
+                config.distributed_batch_size_mode,
+                train_batch_info["requested_batch_size"],
+                train_batch_info["per_rank_batch_size"],
+                train_batch_info["effective_global_batch_size"],
+            )
+            if (
+                world_size > 1
+                and config.distributed_batch_size_mode == "global"
+                and train_batch_info["effective_global_batch_size"]
+                != train_batch_info["requested_batch_size"]
+            ):
+                logger.warning(
+                    "requested global batch_size=%d is not divisible by world_size=%d; using effective_global_batch_size=%d.",
+                    train_batch_info["requested_batch_size"],
+                    world_size,
+                    train_batch_info["effective_global_batch_size"],
+                )
 
         gpu_train_transform = build_gpu_train_transform(
             config.image_size, config.transform_profile
