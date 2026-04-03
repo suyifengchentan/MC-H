@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import bisect
 import json
+import time
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -65,6 +66,24 @@ class ImageNetTeacherFeatureCache:
         state["_h5_files"] = {}
         return state
 
+    def _open_readonly_h5(self, path: Path) -> h5py.File:
+        last_error: BlockingIOError | None = None
+        for attempt in range(20):
+            try:
+                return h5py.File(path, "r", locking=False, swmr=True)
+            except TypeError:
+                # Older h5py builds may not expose locking/swmr kwargs.
+                return h5py.File(path, "r")
+            except BlockingIOError as error:
+                last_error = error
+                if attempt == 19:
+                    break
+                time.sleep(0.5)
+
+        raise BlockingIOError(
+            f"Unable to open teacher cache shard after 20 attempts due to file locking: {path}"
+        ) from last_error
+
     def _load_metadata(self) -> dict:
         metadata_path = self.root / "metadata.json"
         if not metadata_path.is_file():
@@ -89,7 +108,7 @@ class ImageNetTeacherFeatureCache:
         shards: list[_CacheShard] = []
         start_index = 0
         for shard_path in shard_paths:
-            with h5py.File(shard_path, "r") as handle:
+            with self._open_readonly_h5(shard_path) as handle:
                 if "teacher_features" not in handle:
                     raise KeyError(
                         f"Teacher cache shard is missing required dataset 'teacher_features': {shard_path}"
@@ -115,7 +134,7 @@ class ImageNetTeacherFeatureCache:
     def _get_h5_file(self, path: Path) -> h5py.File:
         handle = self._h5_files.get(path)
         if handle is None:
-            handle = h5py.File(path, "r")
+            handle = self._open_readonly_h5(path)
             self._h5_files[path] = handle
         return handle
 

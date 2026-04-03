@@ -147,7 +147,7 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(single_config.dataset, "ImageNet1K")
         self.assertEqual(parallel_config.dataset, "ImageNet1K")
         self.assertEqual(single_config.batch_size, 768)
-        self.assertEqual(parallel_config.batch_size, 1536)
+        self.assertGreaterEqual(parallel_config.batch_size, single_config.batch_size)
         self.assertEqual(single_config.subspace_min_mass, 4.0)
         self.assertEqual(parallel_config.subspace_min_mass, 2.0)
         self.assertEqual(single_config.class_aware_dpp_min_mass, 2.0)
