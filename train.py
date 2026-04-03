@@ -9,7 +9,11 @@ from torch import optim
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders
+from hypersphere_dpp.data import (
+    TEACHER_FEATURE_CANDIDATES_KEY,
+    build_experiment_dataloaders,
+    sample_two_teacher_feature_views,
+)
 from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
@@ -62,6 +66,10 @@ def resolve_amp_settings(
     raise ValueError(f"Unsupported precision mode: {precision}")
 
 
+def use_cached_teacher_feature_candidates(batch: dict) -> bool:
+    return TEACHER_FEATURE_CANDIDATES_KEY in batch
+
+
 def train_one_epoch(
     model: HypersphereDPPModel,
     dataloader,
@@ -93,8 +101,17 @@ def train_one_epoch(
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
 
     for step, batch in enumerate(dataloader):
-        images = batch["image"].to(device, non_blocking=True)
-        view1, view2 = gpu_train_transform(images)
+        teacher_feature_candidates = None
+        if use_cached_teacher_feature_candidates(batch):
+            teacher_feature_candidates = batch[TEACHER_FEATURE_CANDIDATES_KEY].to(
+                device,
+                non_blocking=True,
+            )
+        else:
+            if gpu_train_transform is None:
+                raise ValueError("gpu_train_transform must be provided for image-based training batches.")
+            images = batch["image"].to(device, non_blocking=True)
+            view1, view2 = gpu_train_transform(images)
 
         optimizer.zero_grad(set_to_none=True)
         autocast_kwargs = {"device_type": amp_device_type, "enabled": use_amp}
@@ -102,8 +119,13 @@ def train_one_epoch(
             autocast_kwargs["dtype"] = amp_dtype
         amp_context = amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
         with amp_context:
-            teacher1 = model.encode_teacher(view1)
-            teacher2 = model.encode_teacher(view2)
+            if teacher_feature_candidates is not None:
+                teacher1, teacher2 = sample_two_teacher_feature_views(
+                    teacher_feature_candidates
+                )
+            else:
+                teacher1 = model.encode_teacher(view1)
+                teacher2 = model.encode_teacher(view2)
             teacher_cat = torch.cat([teacher1, teacher2], dim=0)
             student_cat = model.encode_student(teacher_features=teacher_cat)
             logits_cat = model.prototype_logits(student_cat)
@@ -313,9 +335,18 @@ def main():
         datasets.train_loader.persistent_workers,
         train_prefetch_factor,
     )
-    gpu_train_transform = build_gpu_train_transform(
-        config.image_size, config.transform_profile
-    ).to(device)
+    if config.uses_imagenet1k_cached_teacher_views:
+        logger.info(
+            "imagenet1k cached teacher views: enabled=True dir=%s num_views=%d dtype=%s sampled_views=2",
+            config.resolved_imagenet1k_cached_teacher_views_dir,
+            config.imagenet1k_cached_teacher_num_views,
+            config.imagenet1k_cached_teacher_dtype,
+        )
+        gpu_train_transform = None
+    else:
+        gpu_train_transform = build_gpu_train_transform(
+            config.image_size, config.transform_profile
+        ).to(device)
     model = HypersphereDPPModel(
         backbone_name=config.backbone_name,
         pretrained=config.pretrained,

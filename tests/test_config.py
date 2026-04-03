@@ -114,6 +114,9 @@ class ConfigLoaderTest(unittest.TestCase):
             backbone_name: "ViT-B-16"
             transform_profile: "imagenet1k_two_view"
             official_eval_split: "val"
+            imagenet1k_cached_teacher_views_enabled: true
+            imagenet1k_cached_teacher_num_views: 6
+            imagenet1k_cached_teacher_dtype: "float16"
             """
         )
         with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
@@ -126,6 +129,9 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.class_num, 1000)
         self.assertEqual(config.transform_profile, "imagenet1k_two_view")
         self.assertEqual(config.official_eval_split, "val")
+        self.assertTrue(config.uses_imagenet1k_cached_teacher_views)
+        self.assertEqual(config.imagenet1k_cached_teacher_num_views, 6)
+        self.assertEqual(config.imagenet1k_cached_teacher_dtype, "float16")
 
     def test_imagenet1k_single_and_parallel_train_configs_are_split(self):
         repo_root = Path(__file__).resolve().parents[1]
@@ -146,7 +152,31 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(parallel_config.subspace_min_mass, 2.0)
         self.assertEqual(single_config.class_aware_dpp_min_mass, 2.0)
         self.assertEqual(parallel_config.class_aware_dpp_min_mass, 1.0)
+        self.assertTrue(single_config.uses_imagenet1k_cached_teacher_views)
+        self.assertTrue(parallel_config.uses_imagenet1k_cached_teacher_views)
+        self.assertEqual(single_config.imagenet1k_cached_teacher_num_views, 6)
+        self.assertEqual(parallel_config.imagenet1k_cached_teacher_num_views, 6)
         self.assertNotEqual(single_config.model_path, parallel_config.model_path)
+
+    def test_imagenet1k_cached_teacher_views_are_rejected_for_other_datasets(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image100"
+            dataset_dir: "/tmp/image100"
+            class_num: 100
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            imagenet1k_cached_teacher_views_enabled: true
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "only supported when dataset='ImageNet1K'"
+        ):
+            load_experiment_config(config_path)
 
     def test_tiny_imagenet200_is_supported(self):
         config_text = textwrap.dedent(

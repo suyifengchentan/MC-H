@@ -12,7 +12,7 @@ from PIL import Image
 
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
 from hypersphere_dpp.config import ExperimentConfig
-from hypersphere_dpp.data import build_experiment_dataloaders
+from hypersphere_dpp.data import TEACHER_FEATURE_CANDIDATES_KEY, build_experiment_dataloaders
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
@@ -33,6 +33,12 @@ def _write_h5(path: Path, rows: list[dict]) -> None:
         handle.create_dataset("label", data=np.asarray([row["label"] for row in rows], dtype=np.int32), chunks=(1,))
         handle.create_dataset("path", data=np.asarray([row["path"] for row in rows], dtype=object), dtype=utf8_dtype)
         handle.create_dataset("wnid", data=np.asarray([row["wnid"] for row in rows], dtype=object), dtype=utf8_dtype)
+
+
+def _write_teacher_cache_h5(path: Path, teacher_features: np.ndarray) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    with h5py.File(path, "w") as handle:
+        handle.create_dataset("teacher_features", data=teacher_features)
 
 
 class ImageNetH5DatasetTest(unittest.TestCase):
@@ -177,6 +183,82 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             )
             bundle = build_experiment_dataloaders(config)
             self.assertTrue(bundle.val_is_stratified)
+
+    def test_dataloaders_can_use_imagenet_teacher_feature_cache(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir)
+            data_root = root / "data"
+            data_root.mkdir(parents=True)
+
+            with (root / "label_info.json").open("w", encoding="utf-8") as handle:
+                json.dump({"idx_to_wnid": {"0": "n00000001", "1": "n00000002"}}, handle)
+
+            train_rows = []
+            for label in (0, 1):
+                for sample_idx in range(10):
+                    train_rows.append(
+                        {
+                            "image_bytes": _jpeg_bytes((label * 100, sample_idx, 0)),
+                            "label": label,
+                            "path": f"train-{label}-{sample_idx}.jpg",
+                            "wnid": f"n0000000{label + 1}",
+                        }
+                    )
+            _write_h5(data_root / "train-00000-of-00001.h5", train_rows)
+            _write_h5(
+                data_root / "validation-00000-of-00001.h5",
+                [
+                    {
+                        "image_bytes": _jpeg_bytes((0, 0, 255)),
+                        "label": 0,
+                        "path": "val-0.jpg",
+                        "wnid": "n00000001",
+                    }
+                ],
+            )
+
+            cache_root = root / "teacher_cache_vitb16_imagenet1k_two_view_views6"
+            cache_root.mkdir(parents=True, exist_ok=True)
+            with (cache_root / "metadata.json").open("w", encoding="utf-8") as handle:
+                json.dump(
+                    {
+                        "num_views": 6,
+                        "feature_dim": 512,
+                        "dtype": "float16",
+                    },
+                    handle,
+                )
+            teacher_features = np.random.randn(20, 6, 512).astype(np.float16)
+            _write_teacher_cache_h5(
+                cache_root / "data" / "train-00000-of-00001.h5",
+                teacher_features,
+            )
+
+            config = ExperimentConfig(
+                dataset="ImageNet1K",
+                dataset_dir=str(root),
+                class_num=2,
+                image_size=8,
+                feature_dim=512,
+                backbone_name="ViT-B-16",
+                pretrained="laion2b_s34b_b88k",
+                pretrained_checkpoint="/root/clip-pretrained/open_clip_pytorch_model.bin",
+                batch_size=4,
+                eval_batch_size=4,
+                workers=0,
+                validation_ratio=0.2,
+                official_eval_split="val",
+                imagenet1k_cached_teacher_views_enabled=True,
+                imagenet1k_cached_teacher_num_views=6,
+                imagenet1k_cached_teacher_views_dir=str(cache_root),
+            )
+
+            bundle = build_experiment_dataloaders(config)
+            batch = next(iter(bundle.train_loader))
+
+            self.assertIn(TEACHER_FEATURE_CANDIDATES_KEY, batch)
+            self.assertNotIn("image", batch)
+            self.assertEqual(batch[TEACHER_FEATURE_CANDIDATES_KEY].shape[1:], (6, 512))
 
 
 if __name__ == "__main__":

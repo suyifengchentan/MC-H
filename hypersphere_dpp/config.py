@@ -49,6 +49,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
+SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
 
 
 @dataclass
@@ -60,6 +61,10 @@ class ExperimentConfig:
     validation_ratio: float = 0.1
     validation_seed: int = 42
     official_eval_split: str | None = None
+    imagenet1k_cached_teacher_views_enabled: bool = False
+    imagenet1k_cached_teacher_views_dir: str | None = None
+    imagenet1k_cached_teacher_num_views: int = 6
+    imagenet1k_cached_teacher_dtype: str = "float16"
 
     # Model
     image_size: int = 224
@@ -131,6 +136,24 @@ class ExperimentConfig:
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
 
+    @property
+    def uses_imagenet1k_cached_teacher_views(self) -> bool:
+        return self.dataset == "ImageNet1K" and self.imagenet1k_cached_teacher_views_enabled
+
+    @property
+    def resolved_imagenet1k_cached_teacher_views_dir(self) -> Path | None:
+        if not self.uses_imagenet1k_cached_teacher_views:
+            return None
+        if self.imagenet1k_cached_teacher_views_dir:
+            return Path(self.imagenet1k_cached_teacher_views_dir)
+
+        backbone_tag = self.backbone_name.lower().replace("-", "").replace("/", "")
+        cache_dir_name = (
+            f"teacher_cache_{backbone_tag}_{self.transform_profile}_"
+            f"views{self.imagenet1k_cached_teacher_num_views}"
+        )
+        return Path(self.dataset_dir) / cache_dir_name
+
 
 def _field_names() -> set[str]:
     return {item.name for item in fields(ExperimentConfig)}
@@ -183,6 +206,24 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
+
+    if config.imagenet1k_cached_teacher_views_enabled and config.dataset != "ImageNet1K":
+        raise ValueError(
+            "imagenet1k_cached_teacher_views_enabled is only supported when dataset='ImageNet1K'."
+        )
+
+    if config.imagenet1k_cached_teacher_num_views < 2:
+        raise ValueError("imagenet1k_cached_teacher_num_views must be at least 2.")
+
+    if (
+        config.imagenet1k_cached_teacher_dtype
+        not in SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES
+    ):
+        raise ValueError(
+            "imagenet1k_cached_teacher_dtype must be one of "
+            f"{sorted(SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES)}, "
+            f"got {config.imagenet1k_cached_teacher_dtype!r}."
+        )
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")

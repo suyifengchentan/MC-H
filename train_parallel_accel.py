@@ -188,9 +188,19 @@ def main():
                 batch_info["effective_global_batch_size"],
             )
 
-        gpu_train_transform = build_gpu_train_transform(
-            config.image_size, config.transform_profile
-        ).to(device)
+        if config.uses_imagenet1k_cached_teacher_views:
+            if is_main_process(rank):
+                logger.info(
+                    "imagenet1k cached teacher views: enabled=True dir=%s num_views=%d dtype=%s sampled_views=2",
+                    config.resolved_imagenet1k_cached_teacher_views_dir,
+                    config.imagenet1k_cached_teacher_num_views,
+                    config.imagenet1k_cached_teacher_dtype,
+                )
+            gpu_train_transform = None
+        else:
+            gpu_train_transform = build_gpu_train_transform(
+                config.image_size, config.transform_profile
+            ).to(device)
         model = HypersphereDPPModel(
             backbone_name=config.backbone_name,
             pretrained=config.pretrained,

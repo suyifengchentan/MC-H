@@ -21,7 +21,10 @@ from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
 from .labels import load_label_wnids
+from .teacher_cache import ImageNetTeacherFeatureCache
 from .transforms import build_eval_transform, build_train_decode_transform
+
+TEACHER_FEATURE_CANDIDATES_KEY = "teacher_feature_candidates"
 
 
 class TrainTensorDataset(Dataset):
@@ -55,6 +58,34 @@ class SingleViewDataset(Dataset):
             "image": self.transform(image),
             "label": label,
             "index": sample_index,
+        }
+
+
+class ImageNetTeacherFeatureTrainDataset(Dataset):
+    def __init__(self, dataset: Subset, teacher_cache: ImageNetTeacherFeatureCache):
+        if not isinstance(dataset, Subset):
+            raise TypeError("ImageNetTeacherFeatureTrainDataset expects a torch.utils.data.Subset.")
+        if not hasattr(dataset.dataset, "targets"):
+            raise ValueError("The wrapped base dataset must expose targets for labels.")
+        if len(teacher_cache) != len(dataset.dataset):
+            raise ValueError(
+                "Teacher feature cache size must match the full ImageNet training dataset size."
+            )
+
+        self.dataset = dataset
+        self.base_dataset = dataset.dataset
+        self.teacher_cache = teacher_cache
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int):
+        base_index = int(self.dataset.indices[index])
+        label = int(self.base_dataset.targets[base_index])
+        return {
+            TEACHER_FEATURE_CANDIDATES_KEY: self.teacher_cache[base_index],
+            "label": label,
+            "index": base_index,
         }
 
 
@@ -196,6 +227,32 @@ def safe_default_collate(batch):
         return torch.tensor(batch)
 
     return batch
+
+
+def sample_two_teacher_feature_views(
+    teacher_feature_candidates: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if teacher_feature_candidates.ndim != 3:
+        raise ValueError(
+            "teacher_feature_candidates must have shape [batch, num_views, feature_dim]."
+        )
+    num_candidates = teacher_feature_candidates.size(1)
+    if num_candidates < 2:
+        raise ValueError("teacher_feature_candidates must provide at least 2 candidate views.")
+
+    random_scores = torch.rand(
+        teacher_feature_candidates.size(0),
+        num_candidates,
+        device=teacher_feature_candidates.device,
+    )
+    sampled_indices = random_scores.topk(k=2, dim=1).indices
+    gather_index = sampled_indices.unsqueeze(-1).expand(
+        -1,
+        -1,
+        teacher_feature_candidates.size(-1),
+    )
+    sampled = torch.gather(teacher_feature_candidates, dim=1, index=gather_index)
+    return sampled[:, 0], sampled[:, 1]
 
 
 def _build_loader(
@@ -389,10 +446,24 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     train_subset = Subset(train_base, train_indices)
     val_subset = Subset(train_base, val_indices)
 
-    train_dataset = TrainTensorDataset(
-        train_subset,
-        build_train_decode_transform(config.image_size, config.transform_profile),
-    )
+    if config.uses_imagenet1k_cached_teacher_views:
+        teacher_cache_dir = config.resolved_imagenet1k_cached_teacher_views_dir
+        if teacher_cache_dir is None:
+            raise ValueError("ImageNet1K cached teacher views are enabled but no cache dir was resolved.")
+        teacher_cache = ImageNetTeacherFeatureCache(
+            teacher_cache_dir,
+            expected_num_views=config.imagenet1k_cached_teacher_num_views,
+            expected_feature_dim=config.feature_dim,
+        )
+        train_dataset = ImageNetTeacherFeatureTrainDataset(
+            train_subset,
+            teacher_cache,
+        )
+    else:
+        train_dataset = TrainTensorDataset(
+            train_subset,
+            build_train_decode_transform(config.image_size, config.transform_profile),
+        )
     val_dataset = SingleViewDataset(
         val_subset, build_eval_transform(config.image_size, config.transform_profile)
     )

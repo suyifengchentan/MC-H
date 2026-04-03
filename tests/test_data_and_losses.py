@@ -6,7 +6,7 @@ from collections import Counter
 import torch
 import torch.nn.functional as F
 
-from hypersphere_dpp.data import split_train_indices
+from hypersphere_dpp.data import sample_two_teacher_feature_views, split_train_indices
 from hypersphere_dpp.losses import _dpp_logdet_from_phi, dpp_diversity_loss
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 
@@ -142,6 +142,26 @@ class DataAndLossesTest(unittest.TestCase):
 
         self.assertTrue(torch.isfinite(loss))
         self.assertEqual(stats.active_clusters, 2)
+
+    def test_sample_two_teacher_feature_views_returns_distinct_candidates(self):
+        candidates = torch.tensor(
+            [
+                [
+                    [1.0, 0.0],
+                    [2.0, 0.0],
+                    [3.0, 0.0],
+                    [4.0, 0.0],
+                    [5.0, 0.0],
+                    [6.0, 0.0],
+                ]
+            ]
+        )
+
+        view_a, view_b = sample_two_teacher_feature_views(candidates)
+
+        self.assertEqual(view_a.shape, (1, 2))
+        self.assertEqual(view_b.shape, (1, 2))
+        self.assertFalse(torch.equal(view_a, view_b))
 
 
 if __name__ == "__main__":
