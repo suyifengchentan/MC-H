@@ -133,6 +133,11 @@ def dpp_diversity_loss(
 def adaptive_diversity_weight(
     rho: torch.Tensor,
     alpha_div_base: float,
+    alpha_div_mode: str,
+    alpha_div_floor: float,
+    alpha_div_rho_center: float,
+    alpha_div_rho_scale: float,
+    alpha_div_max: float,
     epoch_progress: float,
     warmup_epochs: int,
 ) -> torch.Tensor:
@@ -140,5 +145,24 @@ def adaptive_diversity_weight(
         curriculum = 1.0
     else:
         curriculum = min(max(epoch_progress / warmup_epochs, 0.0), 1.0)
-    rho_value = rho.detach().clamp(min=0.0)
-    return rho_value.new_tensor(curriculum) * torch.clamp(alpha_div_base * rho_value, max=1.0)
+    curriculum_tensor = rho.detach().new_tensor(curriculum)
+
+    if alpha_div_mode == "clamp_positive":
+        rho_value = rho.detach().clamp(min=0.0)
+        return curriculum_tensor * torch.clamp(
+            alpha_div_base * rho_value,
+            max=alpha_div_max,
+        )
+
+    if alpha_div_mode == "sigmoid_floor":
+        rho_value = rho.detach()
+        adaptive_gate = torch.sigmoid(
+            (rho_value - alpha_div_rho_center) / alpha_div_rho_scale
+        )
+        floor = rho_value.new_tensor(alpha_div_floor)
+        weight = alpha_div_base * (
+            floor + (1.0 - floor) * adaptive_gate
+        )
+        return curriculum_tensor * torch.clamp(weight, max=alpha_div_max)
+
+    raise ValueError(f"Unsupported alpha_div_mode: {alpha_div_mode}")

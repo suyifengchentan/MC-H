@@ -55,6 +55,11 @@ subspace_topk_clusters: 64
 
 # DPP
 alpha_div_base: 0.4
+alpha_div_mode: "sigmoid_floor"
+alpha_div_floor: 0.1
+alpha_div_rho_center: 0.005
+alpha_div_rho_scale: 0.01
+alpha_div_max: 0.32
 dpp_warmup_epochs: 18
 dpp_every_n_steps: 4
 dpp_jitter: 0.00001

@@ -50,6 +50,7 @@ SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
+SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
 
 
 @dataclass
@@ -110,6 +111,11 @@ class ExperimentConfig:
 
     # DPP
     alpha_div_base: float = 0.6
+    alpha_div_mode: str = "clamp_positive"
+    alpha_div_floor: float = 0.0
+    alpha_div_rho_center: float = 0.0
+    alpha_div_rho_scale: float = 0.01
+    alpha_div_max: float = 1.0
     dpp_warmup_epochs: int = 20
     dpp_every_n_steps: int = 4
     dpp_jitter: float = 1e-5
@@ -261,6 +267,24 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.dpp_every_n_steps <= 0:
         raise ValueError("dpp_every_n_steps must be a positive integer.")
+
+    if config.alpha_div_mode not in SUPPORTED_ALPHA_DIV_MODES:
+        raise ValueError(
+            "alpha_div_mode must be one of "
+            f"{sorted(SUPPORTED_ALPHA_DIV_MODES)}, got {config.alpha_div_mode!r}."
+        )
+
+    if config.alpha_div_base < 0:
+        raise ValueError("alpha_div_base must be non-negative.")
+
+    if not 0.0 <= config.alpha_div_floor <= 1.0:
+        raise ValueError("alpha_div_floor must be in [0, 1].")
+
+    if config.alpha_div_rho_scale <= 0:
+        raise ValueError("alpha_div_rho_scale must be positive.")
+
+    if config.alpha_div_max <= 0:
+        raise ValueError("alpha_div_max must be positive.")
 
     if config.subspace_min_mass <= 0:
         raise ValueError("subspace_min_mass must be positive.")

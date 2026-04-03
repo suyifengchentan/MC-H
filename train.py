@@ -182,6 +182,11 @@ def train_one_epoch(
                 alpha_div = adaptive_diversity_weight(
                     rho=rho,
                     alpha_div_base=config.alpha_div_base,
+                    alpha_div_mode=config.alpha_div_mode,
+                    alpha_div_floor=config.alpha_div_floor,
+                    alpha_div_rho_center=config.alpha_div_rho_center,
+                    alpha_div_rho_scale=config.alpha_div_rho_scale,
+                    alpha_div_max=config.alpha_div_max,
                     epoch_progress=epoch_progress,
                     warmup_epochs=config.dpp_warmup_epochs,
                 )
