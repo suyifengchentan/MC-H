@@ -1,7 +1,6 @@
 # datasets/oxford_pet_dataset.py
 
 import os
-import pandas as pd
 from torch.utils.data import Dataset
 from PIL import Image
 
