@@ -368,6 +368,11 @@ def main():
             aggregation=config.semantic_prototype_aggregation,
             device=device,
         )
+        # Initialize random prototypes with the semantic text features!
+        with torch.no_grad():
+            model.prototypes.prototypes.data.copy_(semantic_text_features)
+            model.normalize_prototypes()
+
         logger.info(
             "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
             True,
