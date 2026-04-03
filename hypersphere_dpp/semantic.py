@@ -39,17 +39,104 @@ _SEMANTIC_TEMPLATE_PRESETS = {
         "a bright photo of a {label}",
         "a cropped photo of a {label}",
     ],
+    # CLIP paper 80-template ensemble for ImageNet-scale fine-grained recognition.
+    # Covers diverse contexts (rendered, embroidery, cartoon, origami, etc.) which
+    # anchors fine-grained classes more precisely in the CLIP text embedding space.
+    "imagenet1k_80": [
+        "a bad photo of a {label}",
+        "a photo of many {label}",
+        "a sculpture of a {label}",
+        "a photo of the hard to see {label}",
+        "a low resolution photo of the {label}",
+        "a rendering of a {label}",
+        "graffiti of a {label}",
+        "a bad photo of the {label}",
+        "a cropped photo of the {label}",
+        "a tattoo of a {label}",
+        "the embroidered {label}",
+        "a photo of a hard to see {label}",
+        "a bright photo of a {label}",
+        "a photo of a clean {label}",
+        "a photo of a dirty {label}",
+        "a dark photo of the {label}",
+        "a drawing of a {label}",
+        "a photo of my {label}",
+        "the plastic {label}",
+        "a photo of the cool {label}",
+        "a close-up photo of a {label}",
+        "a black and white photo of the {label}",
+        "a painting of the {label}",
+        "a painting of a {label}",
+        "a pixelated photo of the {label}",
+        "a sculpture of the {label}",
+        "a bright photo of the {label}",
+        "a cropped photo of a {label}",
+        "a plastic {label}",
+        "a photo of the dirty {label}",
+        "a jpeg corrupted photo of a {label}",
+        "a blurry photo of the {label}",
+        "a photo of the {label}",
+        "a good photo of the {label}",
+        "a rendering of the {label}",
+        "a {label} in a video game",
+        "a photo of one {label}",
+        "a doodle of a {label}",
+        "a close-up photo of the {label}",
+        "a photo of a {label}",
+        "the origami {label}",
+        "the {label} in a video game",
+        "a sketch of a {label}",
+        "a doodle of the {label}",
+        "a origami {label}",
+        "a low resolution photo of a {label}",
+        "the toy {label}",
+        "a rendition of the {label}",
+        "a photo of the clean {label}",
+        "a photo of a large {label}",
+        "a rendition of a {label}",
+        "a photo of a nice {label}",
+        "a photo of a weird {label}",
+        "a blurry photo of a {label}",
+        "a cartoon {label}",
+        "art of a {label}",
+        "a sketch of the {label}",
+        "a embroidered {label}",
+        "a pixelated photo of a {label}",
+        "itap of the {label}",
+        "a jpeg corrupted photo of the {label}",
+        "a good photo of a {label}",
+        "a plushie {label}",
+        "a photo of the nice {label}",
+        "a photo of the small {label}",
+        "a photo of the weird {label}",
+        "the cartoon {label}",
+        "art of the {label}",
+        "a drawing of the {label}",
+        "a photo of the large {label}",
+        "a black and white photo of a {label}",
+        "the plushie {label}",
+        "a dark photo of a {label}",
+        "itap of a {label}",
+        "graffiti of the {label}",
+        "a toy {label}",
+        "itap of my {label}",
+        "a photo of a cool {label}",
+        "a photo of a small {label}",
+        "a tattoo of the {label}",
+    ],
 }
 
 _SEMANTIC_DATASET_TEMPLATE_PRESETS = {
     "CUB_200_2011": "clip_ensemble",
     "FGVC_Aircraft": "clip_ensemble",
     "Image10": "clip_ensemble",
-    "ImageNet1K": "clip_ensemble",
+    # Use the full 80-template ensemble for ImageNet1K: the 1000 fine-grained
+    # classes demand richer textual context to produce well-separated prototypes.
+    "ImageNet1K": "imagenet1k_80",
     "Image50": "clip_ensemble",
     "Image100": "clip_ensemble",
-    "Image200": "clip_ensemble",
-    "TinyImageNet200": "clip_ensemble",
+    "Image200": "imagenet1k_80",
+    "TinyImageNet200": "imagenet1k_80",
     "Oxford_Flowers": "clip_ensemble",
     "Oxford_Pet": "clip_ensemble",
     "Stanford_Dogs": "clip_ensemble",
@@ -60,6 +147,16 @@ def _canonicalize_imagenet_class_name(name: str) -> str:
     normalized = str(name).strip().replace("_", " ")
     primary_label = normalized.split(",", 1)[0].strip()
     return primary_label or normalized
+
+
+def _parse_imagenet_synonyms(name: str) -> list[str]:
+    """Return all comma-separated WordNet synonyms for one ImageNet class.
+
+    Example: ``"goldfish, Carassius auratus"`` → ``["goldfish", "Carassius auratus"]``
+    """
+    normalized = str(name).strip().replace("_", " ")
+    synonyms = [part.strip() for part in normalized.split(",")]
+    return [s for s in synonyms if s]
 
 
 def _resolve_prompt_style(dataset_name: str, prompt_style: str) -> tuple[list[str], str]:
@@ -165,6 +262,38 @@ def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
     return [_canonicalize_imagenet_class_name(name) for name in imagenet_classes.values()]
 
 
+def _load_imagenet1k_class_synonyms(dataset_dir: str) -> list[list[str]]:
+    """Return all WordNet synonyms for each ImageNet1K class, ordered by class index.
+
+    Each element is a list of synonym strings for that class.  For classes that
+    have a single name the list contains exactly one element.
+    """
+    label_info_path = Path(dataset_dir) / "label_info.json"
+    if label_info_path.is_file():
+        with label_info_path.open("r", encoding="utf-8") as handle:
+            raw = json.load(handle)
+
+        idx_to_class_name = raw.get("idx_to_class_name")
+        if isinstance(idx_to_class_name, dict) and idx_to_class_name:
+            sorted_pairs = sorted((int(index), name) for index, name in idx_to_class_name.items())
+            return [_parse_imagenet_synonyms(name) for _, name in sorted_pairs]
+
+    classes_path = Path(dataset_dir) / "classes.py"
+    spec = importlib.util.spec_from_file_location(
+        "imagenet1k_classes_module",
+        classes_path,
+    )
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to import ImageNet-1K classes from: {classes_path}")
+
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    imagenet_classes = getattr(module, "IMAGENET2012_CLASSES", None)
+    if not isinstance(imagenet_classes, dict) or not imagenet_classes:
+        raise ValueError(f"IMAGENET2012_CLASSES is missing or invalid in {classes_path}")
+    return [_parse_imagenet_synonyms(name) for name in imagenet_classes.values()]
+
+
 def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     label_entries = load_label_entries(dataset_name)
     if label_entries:
@@ -213,33 +342,72 @@ def build_semantic_text_features(
     aggregation: str,
     device: torch.device,
 ) -> tuple[torch.Tensor, dict[str, int | str]]:
-    class_texts = load_class_texts(dataset_name, dataset_dir)
     prompt_templates, resolved_prompt_style = _resolve_prompt_style(dataset_name, prompt_style)
     tokenizer = open_clip.get_tokenizer(backbone_name)
-
-    prompt_groups = [
-        [template.format(label=class_text).strip() for template in prompt_templates]
-        for class_text in class_texts
-    ]
-    flat_prompts = [prompt for prompt_group in prompt_groups for prompt in prompt_group]
-    tokenized = tokenizer(flat_prompts).to(device)
-    encoded = backbone_model.encode_text(tokenized)
-    encoded = F.normalize(encoded.float(), dim=-1)
-    encoded = encoded.view(len(class_texts), len(prompt_templates), -1)
-
     normalized_aggregation = aggregation.strip().lower().replace("-", "_")
-    if normalized_aggregation == "mean":
-        pooled = encoded.mean(dim=1)
-    elif normalized_aggregation == "max":
-        pooled = encoded.max(dim=1).values
-    elif normalized_aggregation == "first":
-        pooled = encoded[:, 0, :]
-    else:
-        raise ValueError(f"Unsupported semantic aggregation: {aggregation!r}")
 
-    return F.normalize(pooled, dim=-1), {
-        "num_classes": len(class_texts),
-        "num_templates": len(prompt_templates),
+    # ImageNet1K uses all available WordNet synonyms for rich semantic pooling.
+    if dataset_name == "ImageNet1K":
+        class_synonyms = _load_imagenet1k_class_synonyms(dataset_dir)
+        num_classes = len(class_synonyms)
+
+        pooled_class_features = []
+        for synonyms in class_synonyms:
+            # Generate prompts using all synonyms and all templates
+            flat_prompts = [
+                template.format(label=syn).strip()
+                for syn in synonyms
+                for template in prompt_templates
+            ]
+            tokenized = tokenizer(flat_prompts).to(device)
+            # Batch encode
+            encoded = backbone_model.encode_text(tokenized)
+            encoded = F.normalize(encoded.float(), dim=-1)
+
+            # Pool across all templates & synonyms for this single class
+            if normalized_aggregation == "mean":
+                pooled = encoded.mean(dim=0)
+            elif normalized_aggregation == "max":
+                pooled = encoded.max(dim=0).values
+            elif normalized_aggregation == "first":
+                pooled = encoded[0, :]
+            else:
+                raise ValueError(f"Unsupported semantic aggregation: {aggregation!r}")
+
+            pooled_class_features.append(pooled)
+
+        final_pooled = torch.stack(pooled_class_features, dim=0)
+        num_templates_used = len(prompt_templates) * (sum(len(s) for s in class_synonyms) / max(1, num_classes))
+
+    else:
+        # Standard code path for other datasets using single class names
+        class_texts = load_class_texts(dataset_name, dataset_dir)
+        num_classes = len(class_texts)
+
+        prompt_groups = [
+            [template.format(label=class_text).strip() for template in prompt_templates]
+            for class_text in class_texts
+        ]
+        flat_prompts = [prompt for prompt_group in prompt_groups for prompt in prompt_group]
+        tokenized = tokenizer(flat_prompts).to(device)
+        encoded = backbone_model.encode_text(tokenized)
+        encoded = F.normalize(encoded.float(), dim=-1)
+        encoded = encoded.view(len(class_texts), len(prompt_templates), -1)
+
+        if normalized_aggregation == "mean":
+            final_pooled = encoded.mean(dim=1)
+        elif normalized_aggregation == "max":
+            final_pooled = encoded.max(dim=1).values
+        elif normalized_aggregation == "first":
+            final_pooled = encoded[:, 0, :]
+        else:
+            raise ValueError(f"Unsupported semantic aggregation: {aggregation!r}")
+
+        num_templates_used = len(prompt_templates)
+
+    return F.normalize(final_pooled, dim=-1), {
+        "num_classes": num_classes,
+        "num_templates": num_templates_used,
         "prompt_style": resolved_prompt_style,
         "aggregation": normalized_aggregation,
     }

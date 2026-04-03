@@ -40,9 +40,13 @@ cluster_temperature: 0.25
 lambda_instance: 1.0
 lambda_cluster: 0.7
 semantic_prototype_enabled: true
+# "auto" maps ImageNet1K → imagenet1k_80 (CLIP 80-template ensemble + all WordNet synonyms).
+# Richer text features produce sharper teacher distributions and better semantic alignment.
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
-lambda_semantic: 0.15
+# Reduced vs old runs (≥0.2): fine-grained ImageNet classes produce diffuse CLIP text
+# distributions; a high weight overpowers clustering and degrades accuracy epoch-over-epoch.
+lambda_semantic: 0.1
 semantic_temperature: 0.2
 
 sinkhorn_iters: 5
