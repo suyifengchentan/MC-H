@@ -2,13 +2,13 @@ from __future__ import annotations
 
 import bisect
 import json
-import time
 from dataclasses import dataclass
 from pathlib import Path
 
-import h5py
 import numpy as np
 import torch
+
+from .hdf5_utils import open_readonly_h5
 
 
 @dataclass(frozen=True)
@@ -67,22 +67,7 @@ class ImageNetTeacherFeatureCache:
         return state
 
     def _open_readonly_h5(self, path: Path) -> h5py.File:
-        last_error: BlockingIOError | None = None
-        for attempt in range(20):
-            try:
-                return h5py.File(path, "r", locking=False, swmr=True)
-            except TypeError:
-                # Older h5py builds may not expose locking/swmr kwargs.
-                return h5py.File(path, "r")
-            except BlockingIOError as error:
-                last_error = error
-                if attempt == 19:
-                    break
-                time.sleep(0.5)
-
-        raise BlockingIOError(
-            f"Unable to open teacher cache shard after 20 attempts due to file locking: {path}"
-        ) from last_error
+        return open_readonly_h5(path, swmr=True)
 
     def _load_metadata(self) -> dict:
         metadata_path = self.root / "metadata.json"
