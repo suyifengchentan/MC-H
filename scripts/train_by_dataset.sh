@@ -13,14 +13,14 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--parallel] [--foreground] [-- extra train args...]
-  bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--parallel] [--foreground] [-- extra train args...]
+  bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train args...]
+  bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train args...]
 
 Behavior:
+  - Single-card launcher: uses train.py
   - Single dataset: defaults to background launch with nohup unless --foreground is set
   - Multiple datasets: runs sequentially, waiting for each dataset to finish before starting the next
-  - --parallel switches the launcher from train.py to torchrun + train_parallel.py
-  - In --parallel mode, --device can be a comma-separated GPU list such as 0,1,2,3
+  - For multi-GPU torchrun launches, use scripts/train_accelerated_by_dataset.sh instead
 
 Supported dataset names:
   CIFAR10      | cifar10
@@ -43,8 +43,6 @@ Examples:
   bash scripts/train_by_dataset.sh TinyImageNet200 --device cuda:0
   bash scripts/train_by_dataset.sh ImageNet1K --device cuda:0
   bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
-  bash scripts/train_by_dataset.sh TinyImageNet200 --parallel
-  bash scripts/train_by_dataset.sh TinyImageNet200 --parallel --device 0,1,2,3
   bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
   bash scripts/train_by_dataset.sh image10 --device cuda:0
   bash scripts/train_by_dataset.sh cub --foreground --device cuda:1
@@ -52,7 +50,6 @@ EOF
 }
 
 DEVICE=""
-PARALLEL=0
 FOREGROUND=0
 EXTRA_ARGS=()
 DATASET_INPUTS=()
@@ -79,8 +76,8 @@ while [[ $# -gt 0 ]]; do
       shift
       ;;
     --parallel)
-      PARALLEL=1
-      shift
+      echo "train_by_dataset.sh no longer supports --parallel; use scripts/train_accelerated_by_dataset.sh for multi-GPU launches." >&2
+      exit 1
       ;;
     --datasets)
       shift
@@ -140,7 +137,7 @@ resolve_dataset() {
       printf '%s\n%s\n' "Image10" "config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
       ;;
     imagenet1k|imagenet-1k|image1k)
-      printf '%s\n%s\n' "ImageNet1K" "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml"
+      printf '%s\n%s\n' "ImageNet1K" "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_single_config.yaml"
       ;;
     image50)
       printf '%s\n%s\n' "Image50" "config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"
@@ -189,64 +186,6 @@ print("1" if config.get("reload", False) else "0")
 PY
 }
 
-resolve_parallel_launch() {
-  local device_input="${1:-}"
-  "$PYTHON_BIN" - "$device_input" <<'PY'
-import os
-import sys
-
-import torch
-
-
-def split_csv(value: str) -> list[str]:
-    return [item.strip() for item in value.split(",") if item.strip()]
-
-
-def normalize_visible_devices(spec: str) -> list[str] | None:
-    normalized = spec.strip()
-    if not normalized:
-        return None
-
-    lower = normalized.lower()
-    if lower in {"cuda", "cuda:all", "all", "auto"}:
-        return None
-
-    if lower.startswith("cuda:"):
-        suffix = normalized[5:]
-        if "," in suffix:
-            parts = split_csv(suffix)
-            return parts if all(part.isdigit() for part in parts) else None
-        return [suffix] if suffix.isdigit() else None
-
-    if "," in normalized:
-        parts = split_csv(normalized)
-        return parts if all(part.isdigit() for part in parts) else None
-
-    return [normalized] if normalized.isdigit() else None
-
-
-requested_spec = sys.argv[1]
-requested_devices = normalize_visible_devices(requested_spec)
-cuda_visible_devices = ""
-
-if requested_devices is not None:
-    cuda_visible_devices = ",".join(requested_devices)
-    nproc_per_node = len(requested_devices)
-else:
-    current_visible = os.environ.get("CUDA_VISIBLE_DEVICES", "").strip()
-    if current_visible:
-        nproc_per_node = len(split_csv(current_visible))
-    else:
-        nproc_per_node = torch.cuda.device_count()
-
-if nproc_per_node < 1:
-    raise SystemExit("Parallel training requires at least one visible CUDA device.")
-
-print(cuda_visible_devices)
-print(nproc_per_node)
-PY
-}
-
 build_output_dir() {
   local base_output_dir="$1"
   local reload_enabled="$2"
@@ -289,7 +228,7 @@ PY
 launch_dataset() {
   local dataset_input="$1"
   local dataset_name config_rel config_path
-  local -a dataset_info config_info cmd parallel_info
+  local -a dataset_info config_info cmd
 
   mapfile -t dataset_info < <(resolve_dataset "$dataset_input")
   dataset_name="${dataset_info[0]}"
@@ -326,31 +265,9 @@ launch_dataset() {
   mkdir -p "$output_dir"
   write_resolved_config "$config_path" "$run_config_path" "$output_dir"
 
-  if [[ "$PARALLEL" -eq 1 ]]; then
-    local parallel_visible_devices parallel_nproc
-    mapfile -t parallel_info < <(resolve_parallel_launch "$DEVICE")
-    parallel_visible_devices="${parallel_info[0]}"
-    parallel_nproc="${parallel_info[1]}"
-    cmd=()
-    if [[ -n "$parallel_visible_devices" ]]; then
-      cmd+=("env" "CUDA_VISIBLE_DEVICES=$parallel_visible_devices")
-    fi
-    cmd+=(
-      "$PYTHON_BIN"
-      "-m"
-      "torch.distributed.run"
-      "--standalone"
-      "--nproc_per_node"
-      "$parallel_nproc"
-      "train_parallel.py"
-      "--config"
-      "$run_config_path"
-    )
-  else
-    cmd=("$PYTHON_BIN" "train.py" "--config" "$run_config_path")
-    if [[ -n "$DEVICE" ]]; then
-      cmd+=("--device" "$DEVICE")
-    fi
+  cmd=("$PYTHON_BIN" "train.py" "--config" "$run_config_path")
+  if [[ -n "$DEVICE" ]]; then
+    cmd+=("--device" "$DEVICE")
   fi
   if [[ ${#EXTRA_ARGS[@]} -gt 0 ]]; then
     cmd+=("${EXTRA_ARGS[@]}")
@@ -365,15 +282,7 @@ launch_dataset() {
   echo "base_output_dir: $model_path_rel"
   echo "reload: $reload_enabled"
   echo "run_output_dir: $output_dir"
-  echo "parallel: $PARALLEL"
-  if [[ "$PARALLEL" -eq 1 ]]; then
-    if [[ -n "${parallel_visible_devices:-}" ]]; then
-      echo "cuda_visible_devices: $parallel_visible_devices"
-    else
-      echo "cuda_visible_devices: <inherit>"
-    fi
-    echo "nproc_per_node: $parallel_nproc"
-  fi
+  echo "launcher: single_gpu"
   printf 'command:'
   printf ' %q' "${cmd[@]}"
   printf '\n'

@@ -17,7 +17,7 @@ Usage:
   bash scripts/train_accelerated_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train args...]
 
 Behavior:
-  - Uses torchrun + train_parallel_accel.py
+  - Multi-GPU launcher: uses torchrun + train_parallel_accel.py
   - Single dataset defaults to background launch with nohup unless --foreground is set
   - Multiple datasets run sequentially, waiting for each dataset to finish
   - --device can be a comma-separated GPU list such as 0,1 or a CUDA spec like cuda:0
@@ -43,6 +43,7 @@ Examples:
   bash scripts/train_accelerated_by_dataset.sh ImageNet1K
   bash scripts/train_accelerated_by_dataset.sh ImageNet1K --device 0,1
   bash scripts/train_accelerated_by_dataset.sh ImageNet1K --device 0,1 -- --disable-cudnn-benchmark
+  bash scripts/train_accelerated_by_dataset.sh TinyImageNet200 --device 0,1,2,3
   bash scripts/train_accelerated_by_dataset.sh --datasets image50 image100 --device 0,1
 EOF
 }
@@ -131,7 +132,7 @@ resolve_dataset() {
       printf '%s\n%s\n' "Image10" "config/train/coarse_grained/image10_vitb16_hypersphere_dpp_config.yaml"
       ;;
     imagenet1k|imagenet-1k|image1k)
-      printf '%s\n%s\n' "ImageNet1K" "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_config.yaml"
+      printf '%s\n%s\n' "ImageNet1K" "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_parallel_config.yaml"
       ;;
     image50)
       printf '%s\n%s\n' "Image50" "config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"

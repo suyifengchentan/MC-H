@@ -2,7 +2,7 @@
 
 # Data
 dataset: "ImageNet1K"
-dataset_dir: "/111/ImageNet1K"
+dataset_dir: "/home/geyingjie/hypersphere-data/ImageNet1K"
 class_num: 1000
 validation_ratio: 0.1
 validation_seed: 42
@@ -15,15 +15,15 @@ image_size: 224
 feature_dim: 512
 backbone_name: "ViT-B-16"
 pretrained: "laion2b_s34b_b88k"
-pretrained_checkpoint: "/root/clip-pretrained/open_clip_pytorch_model.bin"
+pretrained_checkpoint: "/home/geyingjie/clip-pretrained/open_clip_pytorch_model.bin"
 adapter_hidden_dim: 768
 adapter_dropout: 0.1
 transform_profile: "imagenet1k_two_view"
 
 # Optimization
 precision: "bf16"
-batch_size: 1536
-eval_batch_size: 1024
+batch_size: 768
+eval_batch_size: 768
 epochs: 180
 learning_rate: 0.00016
 weight_decay: 0.00001

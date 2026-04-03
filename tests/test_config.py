@@ -4,6 +4,7 @@ import tempfile
 import textwrap
 import unittest
 import warnings
+from pathlib import Path
 
 from hypersphere_dpp.config import load_experiment_config
 
@@ -125,6 +126,27 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.class_num, 1000)
         self.assertEqual(config.transform_profile, "imagenet1k_two_view")
         self.assertEqual(config.official_eval_split, "val")
+
+    def test_imagenet1k_single_and_parallel_train_configs_are_split(self):
+        repo_root = Path(__file__).resolve().parents[1]
+        single_config = load_experiment_config(
+            repo_root
+            / "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_single_config.yaml"
+        )
+        parallel_config = load_experiment_config(
+            repo_root
+            / "config/train/coarse_grained/imagenet1k_vitb16_hypersphere_dpp_parallel_config.yaml"
+        )
+
+        self.assertEqual(single_config.dataset, "ImageNet1K")
+        self.assertEqual(parallel_config.dataset, "ImageNet1K")
+        self.assertEqual(single_config.batch_size, 768)
+        self.assertEqual(parallel_config.batch_size, 1536)
+        self.assertEqual(single_config.subspace_min_mass, 4.0)
+        self.assertEqual(parallel_config.subspace_min_mass, 2.0)
+        self.assertEqual(single_config.class_aware_dpp_min_mass, 2.0)
+        self.assertEqual(parallel_config.class_aware_dpp_min_mass, 1.0)
+        self.assertNotEqual(single_config.model_path, parallel_config.model_path)
 
     def test_tiny_imagenet200_is_supported(self):
         config_text = textwrap.dedent(
