@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import importlib.util
 import json
 import tempfile
 import unittest
@@ -13,6 +14,8 @@ from PIL import Image
 from datasets.imagenet_shard_dataset import ImageNetH5Dataset
 from hypersphere_dpp.config import ExperimentConfig
 from hypersphere_dpp.data import TEACHER_FEATURE_CANDIDATES_KEY, build_experiment_dataloaders
+
+PROJECT_ROOT = Path(__file__).resolve().parents[1]
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
@@ -39,6 +42,16 @@ def _write_teacher_cache_h5(path: Path, teacher_features: np.ndarray) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with h5py.File(path, "w") as handle:
         handle.create_dataset("teacher_features", data=teacher_features)
+
+
+def _load_precompute_module():
+    module_path = PROJECT_ROOT / "scripts" / "precompute_imagenet1k_teacher_cache.py"
+    spec = importlib.util.spec_from_file_location("precompute_imagenet1k_teacher_cache_test", module_path)
+    if spec is None or spec.loader is None:
+        raise ImportError(f"Unable to load precompute module from {module_path}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
 
 
 class ImageNetH5DatasetTest(unittest.TestCase):
@@ -259,6 +272,35 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             self.assertIn(TEACHER_FEATURE_CANDIDATES_KEY, batch)
             self.assertNotIn("image", batch)
             self.assertEqual(batch[TEACHER_FEATURE_CANDIDATES_KEY].shape[1:], (6, 512))
+
+    def test_precompute_shard_progress_reads_rows_written(self):
+        module = _load_precompute_module()
+
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            shard_path = Path(tmp_dir) / "train-00000-of-00001.h5"
+            shard_path.parent.mkdir(parents=True, exist_ok=True)
+            with h5py.File(shard_path, "w") as handle:
+                handle.create_dataset(
+                    "teacher_features",
+                    shape=(10, 6, 512),
+                    dtype="float16",
+                )
+                handle.attrs["rows_written"] = 4
+
+            handle, teacher_features_ds, rows_written = module.prepare_cache_shard(
+                shard_path,
+                expected_num_rows=10,
+                expected_num_views=6,
+                expected_feature_dim=512,
+                dtype_name="float16",
+                batch_size=2,
+                overwrite=False,
+            )
+            teacher_features_shape = tuple(int(dim) for dim in teacher_features_ds.shape)
+            handle.close()
+
+            self.assertEqual(teacher_features_shape, (10, 6, 512))
+            self.assertEqual(rows_written, 4)
 
 
 if __name__ == "__main__":

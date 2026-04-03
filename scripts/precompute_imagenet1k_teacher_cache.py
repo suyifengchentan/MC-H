@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import sys
+import time
 from contextlib import nullcontext
 from pathlib import Path
 
@@ -135,6 +136,35 @@ def assigned_shard_indices(num_shards: int, rank: int, world_size: int) -> range
     return range(rank, num_shards, world_size)
 
 
+def open_h5_file_with_retry(
+    path: Path,
+    mode: str,
+    *,
+    attempts: int = 20,
+    sleep_seconds: float = 0.5,
+    locking: bool | None = False,
+) -> h5py.File:
+    last_error: BlockingIOError | None = None
+    for attempt in range(attempts):
+        try:
+            if locking is None:
+                return h5py.File(path, mode)
+            return h5py.File(path, mode, locking=locking)
+        except TypeError:
+            # Older h5py builds may not expose the locking kwarg. Fall back to
+            # the default open behavior in that case.
+            return h5py.File(path, mode)
+        except BlockingIOError as error:
+            last_error = error
+            if attempt + 1 >= attempts:
+                break
+            time.sleep(sleep_seconds)
+
+    raise BlockingIOError(
+        f"Unable to open HDF5 file after {attempts} attempts due to file locking: {path}"
+    ) from last_error
+
+
 def validate_existing_cache_shard(
     output_path: Path,
     *,
@@ -142,7 +172,7 @@ def validate_existing_cache_shard(
     expected_num_views: int,
     expected_feature_dim: int,
 ) -> int:
-    with h5py.File(output_path, "r") as handle:
+    with open_h5_file_with_retry(output_path, "r") as handle:
         cached_shape = tuple(int(dim) for dim in handle["teacher_features"].shape)
     expected_shape = (
         expected_num_rows,
@@ -155,6 +185,84 @@ def validate_existing_cache_shard(
             "Remove it or rerun with --overwrite."
         )
     return cached_shape[0]
+
+
+def resolve_rows_written(
+    handle: h5py.File,
+    *,
+    expected_num_rows: int,
+) -> int:
+    rows_written_raw = handle.attrs.get("rows_written")
+    if rows_written_raw is None:
+        # Legacy cache shards created before resume support do not carry
+        # incremental progress metadata. Treat them as complete so they can
+        # still be reused, but partial legacy shards should be deleted.
+        return expected_num_rows
+
+    rows_written = int(rows_written_raw)
+    if rows_written < 0 or rows_written > expected_num_rows:
+        raise ValueError(
+            f"Invalid rows_written={rows_written} for cache shard; expected a value in [0, {expected_num_rows}]."
+        )
+    return rows_written
+
+
+def prepare_cache_shard(
+    output_path: Path,
+    *,
+    expected_num_rows: int,
+    expected_num_views: int,
+    expected_feature_dim: int,
+    dtype_name: str,
+    batch_size: int,
+    overwrite: bool,
+) -> tuple[h5py.File, h5py.Dataset, int]:
+    if output_path.exists() and not overwrite:
+        handle = open_h5_file_with_retry(output_path, "r+")
+        if "teacher_features" not in handle:
+            handle.close()
+            raise KeyError(
+                f"Existing cache shard is missing required dataset 'teacher_features': {output_path}"
+            )
+
+        teacher_features_ds = handle["teacher_features"]
+        cached_shape = tuple(int(dim) for dim in teacher_features_ds.shape)
+        expected_shape = (
+            expected_num_rows,
+            expected_num_views,
+            expected_feature_dim,
+        )
+        if cached_shape != expected_shape:
+            handle.close()
+            raise ValueError(
+                f"Existing cache shard {output_path} has shape {cached_shape}, expected {expected_shape}. "
+                "Remove it or rerun with --overwrite."
+            )
+
+        rows_written = resolve_rows_written(
+            handle,
+            expected_num_rows=expected_num_rows,
+        )
+        return handle, teacher_features_ds, rows_written
+
+    handle = open_h5_file_with_retry(output_path, "w")
+    teacher_features_ds = handle.create_dataset(
+        "teacher_features",
+        shape=(
+            expected_num_rows,
+            expected_num_views,
+            expected_feature_dim,
+        ),
+        dtype=dtype_name,
+        chunks=(
+            min(max(1, batch_size), expected_num_rows),
+            expected_num_views,
+            expected_feature_dim,
+        ),
+    )
+    handle.attrs["rows_written"] = 0
+    handle.flush()
+    return handle, teacher_features_ds, 0
 
 
 def build_metadata(
@@ -276,19 +384,43 @@ def main() -> int:
         for shard_index in assigned_shard_indices(len(dataset.shards), rank, world_size):
             shard = dataset.shards[shard_index]
             output_path = output_data_root / shard.path.name
-            if output_path.exists() and not args.overwrite:
-                cached_rows = validate_existing_cache_shard(
-                    output_path,
-                    expected_num_rows=shard.num_rows,
-                    expected_num_views=config.imagenet1k_cached_teacher_num_views,
-                    expected_feature_dim=config.feature_dim,
+            handle, teacher_features_ds, write_offset = prepare_cache_shard(
+                output_path,
+                expected_num_rows=shard.num_rows,
+                expected_num_views=config.imagenet1k_cached_teacher_num_views,
+                expected_feature_dim=config.feature_dim,
+                dtype_name=save_dtype_name,
+                batch_size=args.batch_size,
+                overwrite=args.overwrite,
+            )
+            if write_offset >= shard.num_rows:
+                handle.close()
+                log(
+                    f"[skip] {output_path.name} already complete ({write_offset} rows)",
+                    rank=rank,
+                    force=True,
                 )
-                log(f"[skip] {output_path.name} already exists ({cached_rows} rows)", rank=rank, force=True)
                 continue
+
+            if write_offset > 0:
+                log(
+                    f"[resume] {output_path.name} from row {write_offset}/{shard.num_rows}",
+                    rank=rank,
+                    force=True,
+                )
+            else:
+                log(
+                    f"[start] {output_path.name} from row 0/{shard.num_rows}",
+                    rank=rank,
+                    force=True,
+                )
 
             subset = Subset(
                 dataset,
-                range(shard.start_index, shard.start_index + shard.num_rows),
+                range(
+                    shard.start_index + write_offset,
+                    shard.start_index + shard.num_rows,
+                ),
             )
             loader = DataLoader(
                 subset,
@@ -301,23 +433,7 @@ def main() -> int:
                 collate_fn=safe_default_collate,
             )
 
-            with h5py.File(output_path, "w") as handle:
-                teacher_features_ds = handle.create_dataset(
-                    "teacher_features",
-                    shape=(
-                        shard.num_rows,
-                        config.imagenet1k_cached_teacher_num_views,
-                        config.feature_dim,
-                    ),
-                    dtype=save_dtype_name,
-                    chunks=(
-                        min(max(1, args.batch_size), shard.num_rows),
-                        config.imagenet1k_cached_teacher_num_views,
-                        config.feature_dim,
-                    ),
-                )
-
-                write_offset = 0
+            with handle:
                 for images, _labels, _indices in loader:
                     images = images.to(device, non_blocking=True)
                     feature_views: list[torch.Tensor] = []
@@ -354,11 +470,15 @@ def main() -> int:
                         write_offset : write_offset + batch_size
                     ] = stacked.cpu().numpy()
                     write_offset += batch_size
+                    handle.attrs["rows_written"] = write_offset
+                    handle.flush()
 
                 if write_offset != shard.num_rows:
                     raise RuntimeError(
                         f"Teacher cache row count mismatch for {output_path}: expected {shard.num_rows}, wrote {write_offset}."
                     )
+                handle.attrs["rows_written"] = write_offset
+                handle.flush()
 
             log(f"[done] {output_path.name} ({shard.num_rows} rows)", rank=rank, force=True)
 
