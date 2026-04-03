@@ -42,7 +42,7 @@ lambda_cluster: 0.7
 semantic_prototype_enabled: true
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
-lambda_semantic: 0.1
+lambda_semantic: 0.15
 semantic_temperature: 0.2
 
 sinkhorn_iters: 5
@@ -60,10 +60,10 @@ subspace_topk_clusters: 128
 # DPP
 alpha_div_base: 0.5
 alpha_div_mode: "sigmoid_floor"
-alpha_div_floor: 0.2
-alpha_div_rho_center: 0.01
+alpha_div_floor: 0.12
+alpha_div_rho_center: 0.015
 alpha_div_rho_scale: 0.01
-alpha_div_max: 0.4
+alpha_div_max: 0.25
 dpp_warmup_epochs: 10
 dpp_every_n_steps: 1
 dpp_jitter: 0.00001
