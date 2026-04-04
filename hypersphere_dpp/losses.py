@@ -138,6 +138,9 @@ def adaptive_diversity_weight(
     alpha_div_rho_center: float,
     alpha_div_rho_scale: float,
     alpha_div_max: float,
+    alpha_div_decay_start_epoch: float,
+    alpha_div_decay_end_epoch: float,
+    alpha_div_decay_target: float,
     epoch_progress: float,
     warmup_epochs: int,
 ) -> torch.Tensor:
@@ -145,7 +148,24 @@ def adaptive_diversity_weight(
         curriculum = 1.0
     else:
         curriculum = min(max(epoch_progress / warmup_epochs, 0.0), 1.0)
-    curriculum_tensor = rho.detach().new_tensor(curriculum)
+    if (
+        alpha_div_decay_start_epoch >= 0
+        and alpha_div_decay_end_epoch > alpha_div_decay_start_epoch
+    ):
+        if epoch_progress <= alpha_div_decay_start_epoch:
+            decay_multiplier = 1.0
+        elif epoch_progress >= alpha_div_decay_end_epoch:
+            decay_multiplier = alpha_div_decay_target
+        else:
+            ratio = (
+                (epoch_progress - alpha_div_decay_start_epoch)
+                / (alpha_div_decay_end_epoch - alpha_div_decay_start_epoch)
+            )
+            decay_multiplier = 1.0 + ratio * (alpha_div_decay_target - 1.0)
+    else:
+        decay_multiplier = 1.0
+
+    curriculum_tensor = rho.detach().new_tensor(curriculum * decay_multiplier)
 
     if alpha_div_mode == "clamp_positive":
         rho_value = rho.detach().clamp(min=0.0)

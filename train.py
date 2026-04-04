@@ -30,6 +30,7 @@ from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.semantic import (
     build_semantic_text_features,
     semantic_cluster_alignment_loss,
+    semantic_retrieval_alignment_loss,
 )
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 from hypersphere_dpp.transforms import build_gpu_train_transform
@@ -94,6 +95,7 @@ def train_one_epoch(
         "subspace_loss": 0.0,
         "dpp_loss": 0.0,
         "semantic_loss": 0.0,
+        "semantic_retrieval_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
     }
@@ -150,9 +152,24 @@ def train_one_epoch(
                     text_features=semantic_text_features,
                     teacher_logit_scale=model.teacher_logit_scale(),
                     temperature=config.semantic_temperature,
+                    target_topk=config.semantic_target_topk,
                 )
             else:
                 semantic_loss = student_cat.new_zeros(())
+
+            if (
+                semantic_text_features is not None
+                and config.lambda_semantic_retrieval > 0
+            ):
+                semantic_retrieval_loss = semantic_retrieval_alignment_loss(
+                    student_features=student_cat,
+                    teacher_features=teacher_cat,
+                    text_features=semantic_text_features,
+                    teacher_logit_scale=model.teacher_logit_scale(),
+                    retrieval_topk=config.semantic_retrieval_topk,
+                )
+            else:
+                semantic_retrieval_loss = student_cat.new_zeros(())
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
@@ -187,6 +204,9 @@ def train_one_epoch(
                     alpha_div_rho_center=config.alpha_div_rho_center,
                     alpha_div_rho_scale=config.alpha_div_rho_scale,
                     alpha_div_max=config.alpha_div_max,
+                    alpha_div_decay_start_epoch=config.alpha_div_decay_start_epoch,
+                    alpha_div_decay_end_epoch=config.alpha_div_decay_end_epoch,
+                    alpha_div_decay_target=config.alpha_div_decay_target,
                     epoch_progress=epoch_progress,
                     warmup_epochs=config.dpp_warmup_epochs,
                 )
@@ -199,6 +219,7 @@ def train_one_epoch(
                 config.lambda_instance * inst_loss
                 + config.lambda_cluster * cluster_loss
                 + config.lambda_semantic * semantic_loss
+                + config.lambda_semantic_retrieval * semantic_retrieval_loss
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -213,6 +234,7 @@ def train_one_epoch(
         totals["inst_loss"] += float(inst_loss.item())
         totals["cluster_loss"] += float(cluster_loss.item())
         totals["semantic_loss"] += float(semantic_loss.item())
+        totals["semantic_retrieval_loss"] += float(semantic_retrieval_loss.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -223,7 +245,7 @@ def train_one_epoch(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -232,6 +254,7 @@ def train_one_epoch(
                 totals["inst_loss"] / running_denom,
                 totals["cluster_loss"] / running_denom,
                 totals["semantic_loss"] / running_denom,
+                totals["semantic_retrieval_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -371,6 +394,9 @@ def main():
             dataset_dir=config.dataset_dir,
             prompt_style=config.semantic_prompt_style,
             aggregation=config.semantic_prototype_aggregation,
+            imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
+            semantic_primary_weight=config.semantic_primary_weight,
+            semantic_template_topk=config.semantic_template_topk,
             device=device,
         )
         # Initialize random prototypes with the semantic text features!
@@ -379,11 +405,12 @@ def main():
             model.normalize_prototypes()
 
         logger.info(
-            "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
+            "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s synonym_mode=%s classes=%d templates_per_class=%d",
             True,
             config.lambda_semantic,
             semantic_info["prompt_style"],
             semantic_info["aggregation"],
+            semantic_info["imagenet_synonym_mode"],
             semantic_info["num_classes"],
             semantic_info["num_templates"],
         )

@@ -48,6 +48,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 }
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
+SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES = {"mean_all", "primary_weighted"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
@@ -98,7 +99,13 @@ class ExperimentConfig:
     semantic_prompt_style: str = "auto"
     semantic_prototype_aggregation: str = "mean"
     lambda_semantic: float = 0.0
+    lambda_semantic_retrieval: float = 0.0
     semantic_temperature: float = 0.1
+    semantic_imagenet_synonym_mode: str = "mean_all"
+    semantic_primary_weight: float = 0.8
+    semantic_template_topk: int = 0
+    semantic_target_topk: int = 0
+    semantic_retrieval_topk: int = 0
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -116,6 +123,9 @@ class ExperimentConfig:
     alpha_div_rho_center: float = 0.0
     alpha_div_rho_scale: float = 0.01
     alpha_div_max: float = 1.0
+    alpha_div_decay_start_epoch: float = -1.0
+    alpha_div_decay_end_epoch: float = -1.0
+    alpha_div_decay_target: float = 1.0
     dpp_warmup_epochs: int = 20
     dpp_every_n_steps: int = 4
     dpp_jitter: float = 1e-5
@@ -286,6 +296,17 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.alpha_div_max <= 0:
         raise ValueError("alpha_div_max must be positive.")
 
+    if (
+        config.alpha_div_decay_end_epoch > 0
+        and config.alpha_div_decay_start_epoch >= config.alpha_div_decay_end_epoch
+    ):
+        raise ValueError(
+            "alpha_div_decay_start_epoch must be smaller than alpha_div_decay_end_epoch."
+        )
+
+    if not 0.0 <= config.alpha_div_decay_target <= 1.0:
+        raise ValueError("alpha_div_decay_target must be in [0, 1].")
+
     if config.subspace_min_mass <= 0:
         raise ValueError("subspace_min_mass must be positive.")
 
@@ -310,8 +331,33 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.lambda_semantic < 0:
         raise ValueError("lambda_semantic must be non-negative.")
 
+    if config.lambda_semantic_retrieval < 0:
+        raise ValueError("lambda_semantic_retrieval must be non-negative.")
+
     if config.semantic_temperature <= 0:
         raise ValueError("semantic_temperature must be positive.")
+
+    if (
+        config.semantic_imagenet_synonym_mode
+        not in SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES
+    ):
+        raise ValueError(
+            "semantic_imagenet_synonym_mode must be one of "
+            f"{sorted(SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES)}, "
+            f"got {config.semantic_imagenet_synonym_mode!r}."
+        )
+
+    if not 0.0 <= config.semantic_primary_weight <= 1.0:
+        raise ValueError("semantic_primary_weight must be in [0, 1].")
+
+    if config.semantic_template_topk < 0:
+        raise ValueError("semantic_template_topk must be non-negative.")
+
+    if config.semantic_target_topk < 0:
+        raise ValueError("semantic_target_topk must be non-negative.")
+
+    if config.semantic_retrieval_topk < 0:
+        raise ValueError("semantic_retrieval_topk must be non-negative.")
 
     if (
         config.official_eval_split is not None

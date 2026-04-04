@@ -38,16 +38,22 @@ min_learning_rate: 0.00005
 instance_temperature: 0.2
 cluster_temperature: 0.25
 lambda_instance: 1.0
-lambda_cluster: 0.7
+lambda_cluster: 0.5
 semantic_prototype_enabled: true
 # "auto" maps ImageNet1K → imagenet1k_80 (CLIP 80-template ensemble + all WordNet synonyms).
 # Richer text features produce sharper teacher distributions and better semantic alignment.
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
+semantic_imagenet_synonym_mode: "primary_weighted"
+semantic_primary_weight: 0.8
+semantic_template_topk: 16
 # Reduced vs old runs (≥0.2): fine-grained ImageNet classes produce diffuse CLIP text
 # distributions; a high weight overpowers clustering and degrades accuracy epoch-over-epoch.
-lambda_semantic: 0.15
+lambda_semantic: 0.22
+lambda_semantic_retrieval: 0.08
 semantic_temperature: 0.2
+semantic_target_topk: 5
+semantic_retrieval_topk: 8
 
 sinkhorn_iters: 5
 sinkhorn_epsilon: 0.07
@@ -62,12 +68,15 @@ subspace_pca_q_offset: 2
 subspace_topk_clusters: 128
 
 # DPP
-alpha_div_base: 0.5
+alpha_div_base: 0.35
 alpha_div_mode: "sigmoid_floor"
 alpha_div_floor: 0.12
 alpha_div_rho_center: 0.015
 alpha_div_rho_scale: 0.01
-alpha_div_max: 0.25
+alpha_div_max: 0.10
+alpha_div_decay_start_epoch: 8
+alpha_div_decay_end_epoch: 16
+alpha_div_decay_target: 0.0
 dpp_warmup_epochs: 10
 dpp_every_n_steps: 1
 dpp_jitter: 0.00001
