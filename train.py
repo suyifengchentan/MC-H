@@ -97,6 +97,7 @@ def train_one_epoch(
         "dpp_loss": 0.0,
         "semantic_loss": 0.0,
         "semantic_retrieval_loss": 0.0,
+        "prototype_anchor_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
     }
@@ -148,6 +149,7 @@ def train_one_epoch(
             )
             semantic_loss = student_cat.new_zeros(())
             semantic_retrieval_loss = student_cat.new_zeros(())
+            prototype_anchor = student_cat.new_zeros(())
             if semantic_state is not None:
                 if (
                     config.dataset == "ImageNet1K"
@@ -183,6 +185,11 @@ def train_one_epoch(
                             teacher_logit_scale=model.teacher_logit_scale(),
                             retrieval_topk=config.semantic_retrieval_topk,
                         )
+                if config.lambda_prototype_anchor > 0:
+                    prototype_anchor = prototype_anchor_loss(
+                        model=model,
+                        target_prototypes=semantic_state.prototype_features.detach(),
+                    )
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
@@ -233,6 +240,7 @@ def train_one_epoch(
                 + config.lambda_cluster * cluster_loss
                 + config.lambda_semantic * semantic_loss
                 + config.lambda_semantic_retrieval * semantic_retrieval_loss
+                + config.lambda_prototype_anchor * prototype_anchor
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -248,6 +256,7 @@ def train_one_epoch(
         totals["cluster_loss"] += float(cluster_loss.item())
         totals["semantic_loss"] += float(semantic_loss.item())
         totals["semantic_retrieval_loss"] += float(semantic_retrieval_loss.item())
+        totals["prototype_anchor_loss"] += float(prototype_anchor.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -258,7 +267,7 @@ def train_one_epoch(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f proto_reg=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -268,6 +277,7 @@ def train_one_epoch(
                 totals["cluster_loss"] / running_denom,
                 totals["semantic_loss"] / running_denom,
                 totals["semantic_retrieval_loss"] / running_denom,
+                totals["prototype_anchor_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -292,6 +302,32 @@ def build_lr_scheduler(optimizer, config):
 
 def current_learning_rate(optimizer) -> float:
     return float(optimizer.param_groups[0]["lr"])
+
+
+def build_optimizer(model, config):
+    prototype_lr = config.learning_rate * config.prototype_lr_multiplier
+    return optim.AdamW(
+        [
+            {
+                "params": model.adapter_parameters(),
+                "lr": config.learning_rate,
+                "name": "adapter",
+            },
+            {
+                "params": model.prototype_parameters(),
+                "lr": prototype_lr,
+                "name": "prototype",
+            },
+        ],
+        weight_decay=config.weight_decay,
+    )
+
+
+def prototype_anchor_loss(model, target_prototypes: torch.Tensor) -> torch.Tensor:
+    current = torch.nn.functional.normalize(model.prototypes.prototypes.float(), dim=-1)
+    target = torch.nn.functional.normalize(target_prototypes.float(), dim=-1)
+    cosine = (current * target).sum(dim=-1)
+    return 1.0 - cosine.mean()
 
 
 def set_prototype_trainability(model, freeze_epochs: int, epoch: int, logger=None) -> bool:
@@ -450,11 +486,7 @@ def main():
         config.class_aware_dpp,
         config.class_aware_dpp_min_mass,
     )
-    optimizer = optim.AdamW(
-        model.trainable_parameters(),
-        lr=config.learning_rate,
-        weight_decay=config.weight_decay,
-    )
+    optimizer = build_optimizer(model, config)
     scheduler = build_lr_scheduler(optimizer, config)
     scaler = amp.GradScaler(
         device="cuda" if device.type == "cuda" else "cpu",
@@ -485,8 +517,11 @@ def main():
             best_metric,
         )
     logger.info(
-        "optimizer: lr=%.8f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
+        "optimizer: adapter_lr=%.8f prototype_lr=%.8f prototype_lr_multiplier=%.4f lambda_prototype_anchor=%.4f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
         current_learning_rate(optimizer),
+        float(optimizer.param_groups[1]["lr"]),
+        config.prototype_lr_multiplier,
+        config.lambda_prototype_anchor,
         config.weight_decay,
         config.lr_scheduler,
         config.min_learning_rate,

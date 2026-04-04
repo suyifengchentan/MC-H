@@ -151,8 +151,14 @@ class HypersphereDPPModel(nn.Module):
     def set_prototypes_trainable(self, trainable: bool) -> None:
         self.prototypes.set_trainable(trainable)
 
+    def adapter_parameters(self):
+        return list(self.adapter.parameters())
+
+    def prototype_parameters(self):
+        return list(self.prototypes.parameters())
+
     def trainable_parameters(self):
-        return list(self.adapter.parameters()) + list(self.prototypes.parameters())
+        return self.adapter_parameters() + self.prototype_parameters()
 
     def trainable_state_dict(self) -> dict[str, dict[str, torch.Tensor]]:
         return {

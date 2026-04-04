@@ -42,10 +42,12 @@ from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularizatio
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
 from train import (
+    build_optimizer,
     build_lr_scheduler,
     current_learning_rate,
     evaluate_splits,
     maybe_resume_training,
+    prototype_anchor_loss,
     resolve_amp_settings,
     select_checkpoint_score,
     set_prototype_trainability,
@@ -283,6 +285,7 @@ def train_one_epoch_distributed(
         "dpp_loss": 0.0,
         "semantic_loss": 0.0,
         "semantic_retrieval_loss": 0.0,
+        "prototype_anchor_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
     }
@@ -357,6 +360,7 @@ def train_one_epoch_distributed(
             )
             semantic_loss = student_cat.new_zeros(())
             semantic_retrieval_loss = student_cat.new_zeros(())
+            prototype_anchor = student_cat.new_zeros(())
             if semantic_state is not None:
                 if (
                     config.dataset == "ImageNet1K"
@@ -392,6 +396,11 @@ def train_one_epoch_distributed(
                             teacher_logit_scale=module.teacher_logit_scale(),
                             retrieval_topk=config.semantic_retrieval_topk,
                         )
+                if config.lambda_prototype_anchor > 0:
+                    prototype_anchor = prototype_anchor_loss(
+                        model=module,
+                        target_prototypes=semantic_state.prototype_features.detach(),
+                    )
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
@@ -442,6 +451,7 @@ def train_one_epoch_distributed(
                 + config.lambda_cluster * cluster_loss
                 + config.lambda_semantic * semantic_loss
                 + config.lambda_semantic_retrieval * semantic_retrieval_loss
+                + config.lambda_prototype_anchor * prototype_anchor
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -458,6 +468,7 @@ def train_one_epoch_distributed(
         totals["cluster_loss"] += float(cluster_loss.item())
         totals["semantic_loss"] += float(semantic_loss.item())
         totals["semantic_retrieval_loss"] += float(semantic_retrieval_loss.item())
+        totals["prototype_anchor_loss"] += float(prototype_anchor.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -470,7 +481,7 @@ def train_one_epoch_distributed(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f proto_reg=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -480,6 +491,7 @@ def train_one_epoch_distributed(
                 totals["cluster_loss"] / running_denom,
                 totals["semantic_loss"] / running_denom,
                 totals["semantic_retrieval_loss"] / running_denom,
+                totals["prototype_anchor_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -653,11 +665,7 @@ def main():
                 config.class_aware_dpp_min_mass,
             )
 
-        optimizer = optim.AdamW(
-            base_model.trainable_parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-        )
+        optimizer = build_optimizer(base_model, config)
         scheduler = build_lr_scheduler(optimizer, config)
         scaler = amp.GradScaler(
             device="cuda" if device.type == "cuda" else "cpu",
@@ -688,13 +696,16 @@ def main():
                 best_metric,
             )
         if is_main_process(rank):
-            logger.info(
-                "optimizer: lr=%.8f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
-                current_learning_rate(optimizer),
-                config.weight_decay,
-                config.lr_scheduler,
-                config.min_learning_rate,
-            )
+                logger.info(
+                    "optimizer: adapter_lr=%.8f prototype_lr=%.8f prototype_lr_multiplier=%.4f lambda_prototype_anchor=%.4f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
+                    current_learning_rate(optimizer),
+                    float(optimizer.param_groups[1]["lr"]),
+                    config.prototype_lr_multiplier,
+                    config.lambda_prototype_anchor,
+                    config.weight_decay,
+                    config.lr_scheduler,
+                    config.min_learning_rate,
+                )
 
         model = base_model
         if world_size > 1:

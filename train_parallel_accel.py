@@ -21,6 +21,7 @@ from hypersphere_dpp.subspace import ClusterFeatureQueue
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, set_seed
 from train import (
+    build_optimizer,
     build_lr_scheduler,
     current_learning_rate,
     evaluate_splits,
@@ -262,11 +263,7 @@ def main():
                 config.class_aware_dpp_min_mass,
             )
 
-        optimizer = optim.AdamW(
-            model.trainable_parameters(),
-            lr=config.learning_rate,
-            weight_decay=config.weight_decay,
-        )
+        optimizer = build_optimizer(model, config)
         scheduler = build_lr_scheduler(optimizer, config)
         scaler = amp.GradScaler(
             device="cuda" if device.type == "cuda" else "cpu",
@@ -298,8 +295,11 @@ def main():
             )
         if is_main_process(rank):
             logger.info(
-                "optimizer: lr=%.8f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
+                "optimizer: adapter_lr=%.8f prototype_lr=%.8f prototype_lr_multiplier=%.4f lambda_prototype_anchor=%.4f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
                 current_learning_rate(optimizer),
+                float(optimizer.param_groups[1]["lr"]),
+                config.prototype_lr_multiplier,
+                config.lambda_prototype_anchor,
                 config.weight_decay,
                 config.lr_scheduler,
                 config.min_learning_rate,

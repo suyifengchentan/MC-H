@@ -110,6 +110,8 @@ class ExperimentConfig:
     semantic_retrieval_topk: int = 0
     semantic_tac_class_blend: float = 0.5
     prototype_freeze_epochs: int = 0
+    prototype_lr_multiplier: float = 1.0
+    lambda_prototype_anchor: float = 0.0
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -374,6 +376,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.prototype_freeze_epochs < 0:
         raise ValueError("prototype_freeze_epochs must be non-negative.")
+
+    if config.prototype_lr_multiplier <= 0:
+        raise ValueError("prototype_lr_multiplier must be positive.")
+
+    if config.lambda_prototype_anchor < 0:
+        raise ValueError("lambda_prototype_anchor must be non-negative.")
 
     if (
         config.official_eval_split is not None

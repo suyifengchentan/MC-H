@@ -51,6 +51,8 @@ semantic_target_topk: 5
 semantic_retrieval_topk: 0
 semantic_tac_class_blend: 1.0
 prototype_freeze_epochs: 5
+prototype_lr_multiplier: 0.1
+lambda_prototype_anchor: 0.1
 
 sinkhorn_iters: 5
 sinkhorn_epsilon: 0.07
