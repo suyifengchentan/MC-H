@@ -38,7 +38,7 @@ min_learning_rate: 0.00005
 instance_temperature: 0.2
 cluster_temperature: 0.25
 lambda_instance: 1.0
-lambda_cluster: 0.5
+lambda_cluster: 0.4
 semantic_prototype_enabled: true
 semantic_mode: "tac_imagenet1k"
 # "auto" maps ImageNet1K → imagenet1k_80 (CLIP 80-template ensemble + all WordNet synonyms).
@@ -49,13 +49,13 @@ semantic_imagenet_synonym_mode: "primary_weighted"
 semantic_primary_weight: 0.8
 semantic_template_topk: 16
 # TAC-style dynamic semantic counterpart:
-# keep direct class distillation lighter and let retrieval counterpart carry more weight.
-lambda_semantic: 0.18
-lambda_semantic_retrieval: 0.12
+# weaken batch clustering and let retrieval counterpart carry more of the semantic load.
+lambda_semantic: 0.15
+lambda_semantic_retrieval: 0.20
 semantic_temperature: 0.2
 semantic_target_topk: 10
 semantic_retrieval_topk: 12
-semantic_tac_class_blend: 0.35
+semantic_tac_class_blend: 0.20
 
 sinkhorn_iters: 5
 sinkhorn_epsilon: 0.07
@@ -75,9 +75,9 @@ alpha_div_mode: "sigmoid_floor"
 alpha_div_floor: 0.12
 alpha_div_rho_center: 0.015
 alpha_div_rho_scale: 0.01
-alpha_div_max: 0.10
-alpha_div_decay_start_epoch: 8
-alpha_div_decay_end_epoch: 16
+alpha_div_max: 0.05
+alpha_div_decay_start_epoch: 4
+alpha_div_decay_end_epoch: 8
 alpha_div_decay_target: 0.0
 dpp_warmup_epochs: 10
 dpp_every_n_steps: 1
