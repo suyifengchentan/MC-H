@@ -33,8 +33,10 @@ from hypersphere_dpp.metrics import (
 )
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.semantic import (
-    build_semantic_text_features,
+    build_semantic_prototype_state,
     semantic_cluster_alignment_loss,
+    semantic_retrieval_alignment_loss,
+    semantic_tac_alignment_losses,
 )
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 from hypersphere_dpp.transforms import build_gpu_train_transform
@@ -256,7 +258,7 @@ def train_one_epoch_distributed(
     optimizer,
     scaler,
     queue: ClusterFeatureQueue,
-    semantic_text_features: torch.Tensor | None,
+    semantic_state,
     config,
     device: torch.device,
     epoch: int,
@@ -279,6 +281,7 @@ def train_one_epoch_distributed(
         "subspace_loss": 0.0,
         "dpp_loss": 0.0,
         "semantic_loss": 0.0,
+        "semantic_retrieval_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
     }
@@ -351,16 +354,43 @@ def train_one_epoch_distributed(
                 sinkhorn_epsilon=config.sinkhorn_epsilon,
                 sinkhorn_iters=config.sinkhorn_iters,
             )
-            if semantic_text_features is not None and config.lambda_semantic > 0:
-                semantic_loss = semantic_cluster_alignment_loss(
-                    logits=logits_cat,
-                    teacher_features=teacher_cat,
-                    text_features=semantic_text_features,
-                    teacher_logit_scale=module.teacher_logit_scale(),
-                    temperature=config.semantic_temperature,
-                )
-            else:
-                semantic_loss = student_cat.new_zeros(())
+            semantic_loss = student_cat.new_zeros(())
+            semantic_retrieval_loss = student_cat.new_zeros(())
+            if semantic_state is not None:
+                if (
+                    config.dataset == "ImageNet1K"
+                    and config.semantic_mode == "tac_imagenet1k"
+                    and (config.lambda_semantic > 0 or config.lambda_semantic_retrieval > 0)
+                ):
+                    semantic_loss, semantic_retrieval_loss = semantic_tac_alignment_losses(
+                        logits=logits_cat,
+                        student_features=student_cat,
+                        teacher_features=teacher_cat,
+                        semantic_state=semantic_state,
+                        teacher_logit_scale=module.teacher_logit_scale(),
+                        temperature=config.semantic_temperature,
+                        target_topk=config.semantic_target_topk,
+                        retrieval_topk=config.semantic_retrieval_topk,
+                        class_blend=config.semantic_tac_class_blend,
+                    )
+                else:
+                    if config.lambda_semantic > 0:
+                        semantic_loss = semantic_cluster_alignment_loss(
+                            logits=logits_cat,
+                            teacher_features=teacher_cat,
+                            text_features=semantic_state.class_text_features,
+                            teacher_logit_scale=module.teacher_logit_scale(),
+                            temperature=config.semantic_temperature,
+                            target_topk=config.semantic_target_topk,
+                        )
+                    if config.lambda_semantic_retrieval > 0:
+                        semantic_retrieval_loss = semantic_retrieval_alignment_loss(
+                            student_features=student_cat,
+                            teacher_features=teacher_cat,
+                            text_features=semantic_state.retrieval_text_features,
+                            teacher_logit_scale=module.teacher_logit_scale(),
+                            retrieval_topk=config.semantic_retrieval_topk,
+                        )
 
             assignment_cat = torch.cat([assign1, assign2], dim=0)
 
@@ -390,6 +420,14 @@ def train_one_epoch_distributed(
                 alpha_div = adaptive_diversity_weight(
                     rho=rho,
                     alpha_div_base=config.alpha_div_base,
+                    alpha_div_mode=config.alpha_div_mode,
+                    alpha_div_floor=config.alpha_div_floor,
+                    alpha_div_rho_center=config.alpha_div_rho_center,
+                    alpha_div_rho_scale=config.alpha_div_rho_scale,
+                    alpha_div_max=config.alpha_div_max,
+                    alpha_div_decay_start_epoch=config.alpha_div_decay_start_epoch,
+                    alpha_div_decay_end_epoch=config.alpha_div_decay_end_epoch,
+                    alpha_div_decay_target=config.alpha_div_decay_target,
                     epoch_progress=epoch_progress,
                     warmup_epochs=config.dpp_warmup_epochs,
                 )
@@ -402,6 +440,7 @@ def train_one_epoch_distributed(
                 config.lambda_instance * inst_loss
                 + config.lambda_cluster * cluster_loss
                 + config.lambda_semantic * semantic_loss
+                + config.lambda_semantic_retrieval * semantic_retrieval_loss
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -417,6 +456,7 @@ def train_one_epoch_distributed(
         totals["inst_loss"] += float(inst_loss.item())
         totals["cluster_loss"] += float(cluster_loss.item())
         totals["semantic_loss"] += float(semantic_loss.item())
+        totals["semantic_retrieval_loss"] += float(semantic_retrieval_loss.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -429,7 +469,7 @@ def train_one_epoch_distributed(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -438,6 +478,7 @@ def train_one_epoch_distributed(
                 totals["inst_loss"] / running_denom,
                 totals["cluster_loss"] / running_denom,
                 totals["semantic_loss"] / running_denom,
+                totals["semantic_retrieval_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -569,31 +610,40 @@ def main():
             num_prototypes=config.class_num,
             device=device,
         ).to(device)
-        semantic_text_features = None
+        semantic_state = None
         if config.semantic_prototype_enabled:
-            semantic_text_features, semantic_info = build_semantic_text_features(
+            semantic_state = build_semantic_prototype_state(
                 backbone_model=base_model.backbone.model,
                 backbone_name=config.backbone_name,
                 dataset_name=config.dataset,
                 dataset_dir=config.dataset_dir,
                 prompt_style=config.semantic_prompt_style,
                 aggregation=config.semantic_prototype_aggregation,
+                imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
+                semantic_primary_weight=config.semantic_primary_weight,
+                semantic_template_topk=config.semantic_template_topk,
+                semantic_mode=config.semantic_mode,
                 device=device,
             )
+            semantic_info = semantic_state.info
             # Initialize random prototypes with the semantic text features!
             with torch.no_grad():
-                base_model.prototypes.prototypes.data.copy_(semantic_text_features)
+                base_model.prototypes.prototypes.data.copy_(semantic_state.prototype_features)
                 base_model.normalize_prototypes()
 
             if is_main_process(rank):
                 logger.info(
-                    "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
+                    "semantic prototypes: enabled=%s mode=%s lambda_semantic=%.4f lambda_semantic_retrieval=%.4f prompt_style=%s aggregation=%s synonym_mode=%s classes=%d templates_per_class=%d retrieval_bank=%d",
                     True,
+                    semantic_info["semantic_mode"],
                     config.lambda_semantic,
+                    config.lambda_semantic_retrieval,
                     semantic_info["prompt_style"],
                     semantic_info["aggregation"],
+                    semantic_info["imagenet_synonym_mode"],
                     semantic_info["num_classes"],
                     semantic_info["num_templates"],
+                    semantic_info["retrieval_bank_size"],
                 )
         if is_main_process(rank):
             logger.info(
@@ -661,7 +711,7 @@ def main():
                 optimizer=optimizer,
                 scaler=scaler,
                 queue=queue,
-                semantic_text_features=semantic_text_features,
+                semantic_state=semantic_state,
                 config=config,
                 device=device,
                 epoch=epoch,

@@ -49,6 +49,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES = {"mean_all", "primary_weighted"}
+SUPPORTED_SEMANTIC_MODES = {"legacy", "tac_imagenet1k"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
@@ -96,6 +97,7 @@ class ExperimentConfig:
     sinkhorn_iters: int = 3
     sinkhorn_epsilon: float = 0.05
     semantic_prototype_enabled: bool = False
+    semantic_mode: str = "legacy"
     semantic_prompt_style: str = "auto"
     semantic_prototype_aggregation: str = "mean"
     lambda_semantic: float = 0.0
@@ -106,6 +108,7 @@ class ExperimentConfig:
     semantic_template_topk: int = 0
     semantic_target_topk: int = 0
     semantic_retrieval_topk: int = 0
+    semantic_tac_class_blend: float = 0.5
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -319,6 +322,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             f"{sorted(SUPPORTED_SEMANTIC_PROMPT_STYLES)}, got {config.semantic_prompt_style!r}."
         )
 
+    if config.semantic_mode not in SUPPORTED_SEMANTIC_MODES:
+        raise ValueError(
+            "semantic_mode must be one of "
+            f"{sorted(SUPPORTED_SEMANTIC_MODES)}, got {config.semantic_mode!r}."
+        )
+
     if (
         config.semantic_prototype_aggregation
         not in SUPPORTED_SEMANTIC_AGGREGATIONS
@@ -358,6 +367,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.semantic_retrieval_topk < 0:
         raise ValueError("semantic_retrieval_topk must be non-negative.")
+
+    if not 0.0 <= config.semantic_tac_class_blend <= 1.0:
+        raise ValueError("semantic_tac_class_blend must be in [0, 1].")
 
     if (
         config.official_eval_split is not None

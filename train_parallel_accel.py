@@ -16,7 +16,7 @@ from hypersphere_dpp.runtime_accel import (
     configure_cuda_runtime,
     format_runtime_accel_state,
 )
-from hypersphere_dpp.semantic import build_semantic_text_features
+from hypersphere_dpp.semantic import build_semantic_prototype_state
 from hypersphere_dpp.subspace import ClusterFeatureQueue
 from hypersphere_dpp.transforms import build_gpu_train_transform
 from hypersphere_dpp.utils import ensure_dir, set_seed
@@ -221,26 +221,38 @@ def main():
             else model
         )
 
-        semantic_text_features = None
+        semantic_state = None
         if config.semantic_prototype_enabled:
-            semantic_text_features, semantic_info = build_semantic_text_features(
+            semantic_state = build_semantic_prototype_state(
                 backbone_model=model.backbone.model,
                 backbone_name=config.backbone_name,
                 dataset_name=config.dataset,
                 dataset_dir=config.dataset_dir,
                 prompt_style=config.semantic_prompt_style,
                 aggregation=config.semantic_prototype_aggregation,
+                imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
+                semantic_primary_weight=config.semantic_primary_weight,
+                semantic_template_topk=config.semantic_template_topk,
+                semantic_mode=config.semantic_mode,
                 device=device,
             )
+            semantic_info = semantic_state.info
+            with torch.no_grad():
+                model.prototypes.prototypes.data.copy_(semantic_state.prototype_features)
+                model.normalize_prototypes()
             if is_main_process(rank):
                 logger.info(
-                    "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
+                    "semantic prototypes: enabled=%s mode=%s lambda_semantic=%.4f lambda_semantic_retrieval=%.4f prompt_style=%s aggregation=%s synonym_mode=%s classes=%d templates_per_class=%d retrieval_bank=%d",
                     True,
+                    semantic_info["semantic_mode"],
                     config.lambda_semantic,
+                    config.lambda_semantic_retrieval,
                     semantic_info["prompt_style"],
                     semantic_info["aggregation"],
+                    semantic_info["imagenet_synonym_mode"],
                     semantic_info["num_classes"],
                     semantic_info["num_templates"],
+                    semantic_info["retrieval_bank_size"],
                 )
         if is_main_process(rank):
             logger.info(
@@ -303,7 +315,7 @@ def main():
                 optimizer=optimizer,
                 scaler=scaler,
                 queue=queue,
-                semantic_text_features=semantic_text_features,
+                semantic_state=semantic_state,
                 config=config,
                 device=device,
                 epoch=epoch,

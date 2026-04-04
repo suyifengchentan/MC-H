@@ -40,16 +40,18 @@ cluster_temperature: 0.25
 lambda_instance: 1.0
 lambda_cluster: 0.5
 semantic_prototype_enabled: true
+semantic_mode: "tac_imagenet1k"
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
 semantic_imagenet_synonym_mode: "primary_weighted"
 semantic_primary_weight: 0.8
 semantic_template_topk: 16
-lambda_semantic: 0.22
-lambda_semantic_retrieval: 0.08
+lambda_semantic: 0.18
+lambda_semantic_retrieval: 0.12
 semantic_temperature: 0.2
-semantic_target_topk: 5
-semantic_retrieval_topk: 8
+semantic_target_topk: 10
+semantic_retrieval_topk: 12
+semantic_tac_class_blend: 0.35
 
 sinkhorn_iters: 5
 sinkhorn_epsilon: 0.07

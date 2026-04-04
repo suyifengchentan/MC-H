@@ -3,6 +3,7 @@ from __future__ import annotations
 import json
 import os
 import importlib.util
+from dataclasses import dataclass
 from pathlib import Path
 
 import open_clip
@@ -16,6 +17,15 @@ from datasets.stl10_dataset import STL10Dataset
 from datasets.tiny_imagenet_dataset import load_tiny_imagenet_class_texts
 
 from .labels import load_label_entries
+
+
+@dataclass
+class SemanticPrototypeState:
+    prototype_features: torch.Tensor
+    class_text_features: torch.Tensor
+    retrieval_text_features: torch.Tensor
+    retrieval_class_indices: torch.Tensor
+    info: dict[str, int | str | float]
 
 _CIFAR10_CLASS_NAMES = [
     "airplane",
@@ -307,6 +317,34 @@ def _pool_prompt_embeddings(
     raise ValueError(f"Unsupported semantic aggregation: {normalized_aggregation!r}")
 
 
+def _encode_label_text_feature(
+    backbone_model,
+    tokenizer,
+    prompt_templates: list[str],
+    label: str,
+    normalized_aggregation: str,
+    template_topk: int,
+    device: torch.device,
+    reference_feature: torch.Tensor | None = None,
+) -> torch.Tensor:
+    prompts = [template.format(label=label).strip() for template in prompt_templates]
+    tokenized = tokenizer(prompts).to(device)
+    encoded = backbone_model.encode_text(tokenized)
+    encoded = F.normalize(encoded.float(), dim=-1)
+
+    if template_topk > 0 and encoded.size(0) > template_topk:
+        if reference_feature is None:
+            template_reference = F.normalize(encoded.mean(dim=0, keepdim=True), dim=-1)
+        else:
+            template_reference = F.normalize(reference_feature.unsqueeze(0), dim=-1)
+        template_scores = (encoded @ template_reference.t()).squeeze(1)
+        keep_indices = template_scores.topk(k=template_topk).indices
+        encoded = encoded[keep_indices]
+
+    pooled = _pool_prompt_embeddings(encoded, normalized_aggregation)
+    return F.normalize(pooled, dim=-1)
+
+
 def _pool_imagenet1k_text_features(
     backbone_model,
     tokenizer,
@@ -378,6 +416,124 @@ def _pool_imagenet1k_text_features(
         return F.normalize(pooled, dim=-1)
 
     raise ValueError(f"Unsupported semantic_imagenet_synonym_mode: {synonym_mode!r}")
+
+
+@torch.no_grad()
+def build_semantic_prototype_state(
+    backbone_model,
+    backbone_name: str,
+    dataset_name: str,
+    dataset_dir: str,
+    prompt_style: str,
+    aggregation: str,
+    imagenet_synonym_mode: str,
+    semantic_primary_weight: float,
+    semantic_template_topk: int,
+    semantic_mode: str,
+    device: torch.device,
+) -> SemanticPrototypeState:
+    class_text_features, info = build_semantic_text_features(
+        backbone_model=backbone_model,
+        backbone_name=backbone_name,
+        dataset_name=dataset_name,
+        dataset_dir=dataset_dir,
+        prompt_style=prompt_style,
+        aggregation=aggregation,
+        imagenet_synonym_mode=imagenet_synonym_mode,
+        semantic_primary_weight=semantic_primary_weight,
+        semantic_template_topk=semantic_template_topk,
+        device=device,
+    )
+
+    if not (dataset_name == "ImageNet1K" and semantic_mode == "tac_imagenet1k"):
+        retrieval_class_indices = torch.arange(
+            class_text_features.size(0), device=device, dtype=torch.long
+        )
+        return SemanticPrototypeState(
+            prototype_features=class_text_features,
+            class_text_features=class_text_features,
+            retrieval_text_features=class_text_features,
+            retrieval_class_indices=retrieval_class_indices,
+            info={**info, "semantic_mode": semantic_mode, "retrieval_bank_size": class_text_features.size(0)},
+        )
+
+    prompt_templates, resolved_prompt_style = _resolve_prompt_style(dataset_name, prompt_style)
+    tokenizer = open_clip.get_tokenizer(backbone_name)
+    normalized_aggregation = aggregation.strip().lower().replace("-", "_")
+    class_synonyms = _load_imagenet1k_class_synonyms(dataset_dir)
+
+    class_features = []
+    retrieval_features = []
+    retrieval_class_indices = []
+    for class_index, synonyms in enumerate(class_synonyms):
+        primary_label = synonyms[0]
+        primary_feature = _encode_label_text_feature(
+            backbone_model=backbone_model,
+            tokenizer=tokenizer,
+            prompt_templates=prompt_templates,
+            label=primary_label,
+            normalized_aggregation=normalized_aggregation,
+            template_topk=semantic_template_topk,
+            device=device,
+        )
+
+        alias_features = [primary_feature]
+        for synonym in synonyms[1:]:
+            alias_features.append(
+                _encode_label_text_feature(
+                    backbone_model=backbone_model,
+                    tokenizer=tokenizer,
+                    prompt_templates=prompt_templates,
+                    label=synonym,
+                    normalized_aggregation=normalized_aggregation,
+                    template_topk=semantic_template_topk,
+                    device=device,
+                    reference_feature=primary_feature,
+                )
+            )
+
+        if len(alias_features) == 1 or imagenet_synonym_mode == "primary_weighted":
+            if len(alias_features) == 1:
+                class_feature = primary_feature
+            else:
+                synonym_feature = torch.stack(alias_features[1:], dim=0).mean(dim=0)
+                class_feature = F.normalize(
+                    semantic_primary_weight * primary_feature
+                    + (1.0 - semantic_primary_weight) * synonym_feature,
+                    dim=-1,
+                )
+        else:
+            class_feature = F.normalize(torch.stack(alias_features, dim=0).mean(dim=0), dim=-1)
+
+        class_features.append(class_feature)
+        retrieval_features.extend(alias_features)
+        retrieval_class_indices.extend([class_index] * len(alias_features))
+
+    class_text_features = F.normalize(torch.stack(class_features, dim=0), dim=-1)
+    retrieval_text_features = F.normalize(torch.stack(retrieval_features, dim=0), dim=-1)
+    retrieval_class_indices_tensor = torch.tensor(
+        retrieval_class_indices, device=device, dtype=torch.long
+    )
+    num_templates_used = (
+        min(len(prompt_templates), semantic_template_topk)
+        if semantic_template_topk > 0
+        else len(prompt_templates)
+    )
+    return SemanticPrototypeState(
+        prototype_features=class_text_features,
+        class_text_features=class_text_features,
+        retrieval_text_features=retrieval_text_features,
+        retrieval_class_indices=retrieval_class_indices_tensor,
+        info={
+            "num_classes": len(class_synonyms),
+            "num_templates": num_templates_used,
+            "prompt_style": resolved_prompt_style,
+            "aggregation": normalized_aggregation,
+            "imagenet_synonym_mode": imagenet_synonym_mode,
+            "semantic_mode": semantic_mode,
+            "retrieval_bank_size": retrieval_text_features.size(0),
+        },
+    )
 
 
 def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
@@ -554,3 +710,74 @@ def semantic_retrieval_alignment_loss(
         retrieved_text_features = F.normalize(retrieved_text_features, dim=-1)
         cosine_similarity = (student_features_f * retrieved_text_features).sum(dim=-1)
         return 1.0 - cosine_similarity.mean()
+
+
+def semantic_tac_alignment_losses(
+    logits: torch.Tensor,
+    student_features: torch.Tensor,
+    teacher_features: torch.Tensor,
+    semantic_state: SemanticPrototypeState,
+    teacher_logit_scale: torch.Tensor,
+    temperature: float,
+    target_topk: int = 0,
+    retrieval_topk: int = 0,
+    class_blend: float = 0.5,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if logits.size(0) == 0:
+        zero = logits.new_zeros(())
+        return zero, zero
+
+    with torch.autocast(device_type=logits.device.type, enabled=False):
+        teacher_features_f = F.normalize(teacher_features.float(), dim=-1)
+        student_features_f = F.normalize(student_features.float(), dim=-1)
+        class_text_features_f = F.normalize(semantic_state.class_text_features.float(), dim=-1)
+        retrieval_text_features_f = F.normalize(
+            semantic_state.retrieval_text_features.float(), dim=-1
+        )
+
+        retrieval_logits = teacher_logit_scale.float() * (
+            teacher_features_f @ retrieval_text_features_f.t()
+        )
+        if 0 < retrieval_topk < retrieval_logits.size(1):
+            topk_values, topk_indices = retrieval_logits.topk(k=retrieval_topk, dim=-1)
+            sparse_logits = torch.full_like(retrieval_logits, float("-inf"))
+            sparse_logits.scatter_(1, topk_indices, topk_values)
+            retrieval_weights = F.softmax(sparse_logits, dim=-1).detach()
+        else:
+            retrieval_weights = F.softmax(retrieval_logits, dim=-1).detach()
+
+        retrieved_text_features = retrieval_weights @ retrieval_text_features_f
+        retrieved_text_features = F.normalize(retrieved_text_features, dim=-1)
+        retrieval_cosine = (student_features_f * retrieved_text_features).sum(dim=-1)
+        retrieval_loss = 1.0 - retrieval_cosine.mean()
+
+        retrieval_class_probs = logits.new_zeros(
+            logits.size(0), class_text_features_f.size(0), dtype=torch.float32
+        )
+        retrieval_class_indices = semantic_state.retrieval_class_indices.unsqueeze(0).expand(
+            retrieval_weights.size(0), -1
+        )
+        retrieval_class_probs.scatter_add_(1, retrieval_class_indices, retrieval_weights)
+        retrieval_class_probs = retrieval_class_probs / retrieval_class_probs.sum(
+            dim=-1, keepdim=True
+        ).clamp_min(1e-6)
+
+        teacher_class_logits = teacher_logit_scale.float() * (
+            teacher_features_f @ class_text_features_f.t()
+        )
+        if 0 < target_topk < teacher_class_logits.size(1):
+            topk_values, topk_indices = teacher_class_logits.topk(k=target_topk, dim=-1)
+            sparse_logits = torch.full_like(teacher_class_logits, float("-inf"))
+            sparse_logits.scatter_(1, topk_indices, topk_values)
+            direct_class_probs = F.softmax(sparse_logits, dim=-1).detach()
+        else:
+            direct_class_probs = F.softmax(teacher_class_logits, dim=-1).detach()
+
+        target_probs = F.normalize(
+            class_blend * direct_class_probs + (1.0 - class_blend) * retrieval_class_probs,
+            p=1,
+            dim=-1,
+        )
+        student_log_probs = F.log_softmax(logits.float() / temperature, dim=-1)
+        class_loss = -(target_probs * student_log_probs).sum(dim=1).mean()
+        return class_loss, retrieval_loss
