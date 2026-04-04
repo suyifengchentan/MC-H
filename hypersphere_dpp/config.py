@@ -17,6 +17,7 @@ SUPPORTED_DATASETS = {
     "Image50",
     "Image100",
     "Image200",
+    "ImageNet1K",
     "Oxford_Flowers",
     "Oxford_Pet",
     "STL10",
@@ -32,6 +33,7 @@ SUPPORTED_EVAL_SPLITS_BY_DATASET = {
     "Image50": {"val"},
     "Image100": {"val"},
     "Image200": {"val"},
+    "ImageNet1K": {"val"},
     "Oxford_Flowers": {"valid"},
     "Oxford_Pet": {"test"},
     "STL10": {"test"},
@@ -99,7 +101,9 @@ class ExperimentConfig:
     semantic_prompt_style: str = "auto"
     semantic_prototype_aggregation: str = "mean"
     lambda_semantic: float = 0.0
+    lambda_semantic_retrieval: float = 0.0
     semantic_temperature: float = 0.1
+    semantic_retrieval_topk: int = 8
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -285,8 +289,14 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     if config.lambda_semantic < 0:
         raise ValueError("lambda_semantic must be non-negative.")
 
+    if config.lambda_semantic_retrieval < 0:
+        raise ValueError("lambda_semantic_retrieval must be non-negative.")
+
     if config.semantic_temperature <= 0:
         raise ValueError("semantic_temperature must be positive.")
+
+    if config.semantic_retrieval_topk <= 0:
+        raise ValueError("semantic_retrieval_topk must be a positive integer.")
 
     if (
         config.official_eval_split is not None

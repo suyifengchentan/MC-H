@@ -7,6 +7,7 @@ from pathlib import Path
 import open_clip
 import torch
 import torch.nn.functional as F
+from torchvision.models._meta import _IMAGENET_CATEGORIES
 
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar100_dataset import CIFAR100Dataset
@@ -46,10 +47,28 @@ _SEMANTIC_DATASET_TEMPLATE_PRESETS = {
     "Image50": "clip_ensemble",
     "Image100": "clip_ensemble",
     "Image200": "clip_ensemble",
+    "ImageNet1K": "clip_ensemble",
     "Oxford_Flowers": "clip_ensemble",
     "Oxford_Pet": "clip_ensemble",
     "Stanford_Dogs": "clip_ensemble",
 }
+
+
+def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
+    label_info_path = Path(dataset_dir) / "label_info.json"
+    if label_info_path.is_file():
+        with label_info_path.open("r", encoding="utf-8") as handle:
+            payload = json.load(handle)
+
+        idx_to_class_name = payload.get("idx_to_class_name")
+        if isinstance(idx_to_class_name, dict) and idx_to_class_name:
+            sorted_pairs = sorted((int(index), str(name)) for index, name in idx_to_class_name.items())
+            expected_indices = list(range(len(sorted_pairs)))
+            actual_indices = [index for index, _ in sorted_pairs]
+            if actual_indices == expected_indices:
+                return [name.strip().replace("_", " ") for _, name in sorted_pairs]
+
+    return [str(name).replace("_", " ").strip() for name in _IMAGENET_CATEGORIES]
 
 
 def _resolve_prompt_style(dataset_name: str, prompt_style: str) -> tuple[list[str], str]:
@@ -129,6 +148,9 @@ def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     label_entries = load_label_entries(dataset_name)
     if label_entries:
         return [entry.name for entry in label_entries]
+
+    if dataset_name == "ImageNet1K":
+        return _load_imagenet1k_class_texts(dataset_dir)
 
     if dataset_name == "CIFAR10":
         return list(_CIFAR10_CLASS_NAMES)
@@ -249,3 +271,33 @@ def semantic_spectral_alignment_loss(
         per_cluster_loss = -(cluster_text_probs * prototype_log_probs).sum(dim=1)
         normalized_mass = cluster_mass / cluster_mass.sum().clamp_min(1e-6)
         return (normalized_mass * per_cluster_loss).sum()
+
+
+def semantic_retrieval_alignment_loss(
+    student_features: torch.Tensor,
+    teacher_features: torch.Tensor,
+    text_features: torch.Tensor,
+    teacher_logit_scale: torch.Tensor,
+    topk: int,
+) -> torch.Tensor:
+    if student_features.size(0) == 0:
+        return student_features.new_zeros(())
+
+    with torch.autocast(device_type=student_features.device.type, enabled=False):
+        student_features_f = F.normalize(student_features.float(), dim=-1)
+        teacher_features_f = F.normalize(teacher_features.float(), dim=-1)
+        text_features_f = F.normalize(text_features.float(), dim=-1)
+
+        teacher_logits = teacher_logit_scale.float() * (teacher_features_f @ text_features_f.t())
+        if 0 < topk < teacher_logits.size(1):
+            topk_values, topk_indices = teacher_logits.topk(topk, dim=-1)
+            topk_weights = F.softmax(topk_values, dim=-1)
+            gathered_text = text_features_f[topk_indices]
+            retrieved_text = (topk_weights.unsqueeze(-1) * gathered_text).sum(dim=1)
+        else:
+            retrieval_weights = F.softmax(teacher_logits, dim=-1)
+            retrieved_text = retrieval_weights @ text_features_f
+
+        retrieved_text = F.normalize(retrieved_text, dim=-1)
+        cosine = (student_features_f * retrieved_text).sum(dim=-1)
+        return (1.0 - cosine).mean()

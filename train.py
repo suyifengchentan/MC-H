@@ -27,6 +27,7 @@ from hypersphere_dpp.model import build_model_from_config
 from hypersphere_dpp.semantic import (
     build_semantic_text_features,
     semantic_cluster_alignment_loss,
+    semantic_retrieval_alignment_loss,
     semantic_spectral_alignment_loss,
 )
 from hypersphere_dpp.subspace import (
@@ -109,6 +110,7 @@ def train_one_epoch(
         "subspace_loss": 0.0,
         "dpp_loss": 0.0,
         "semantic_loss": 0.0,
+        "semantic_retrieval_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
         "estimated_k": 0.0,
@@ -200,6 +202,17 @@ def train_one_epoch(
             else:
                 semantic_loss = student_cat.new_zeros(())
 
+            if semantic_text_features is not None and config.lambda_semantic_retrieval > 0:
+                semantic_retrieval_loss = semantic_retrieval_alignment_loss(
+                    student_features=student_cat,
+                    teacher_features=teacher_cat,
+                    text_features=semantic_text_features,
+                    teacher_logit_scale=model.teacher_logit_scale(),
+                    topk=config.semantic_retrieval_topk,
+                )
+            else:
+                semantic_retrieval_loss = student_cat.new_zeros(())
+
             if step % config.subspace_every_n_steps == 0:
                 if config.clustering_mode == "spectral_free_k" and resolved_anchor_mode == "spectral_prototype":
                     subspace_loss, _ = spectral_anchor_subspace_loss(
@@ -267,6 +280,7 @@ def train_one_epoch(
                 config.lambda_instance * inst_loss
                 + config.lambda_cluster * cluster_loss
                 + config.lambda_semantic * semantic_loss
+                + config.lambda_semantic_retrieval * semantic_retrieval_loss
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
@@ -282,6 +296,7 @@ def train_one_epoch(
         totals["inst_loss"] += float(inst_loss.item())
         totals["cluster_loss"] += float(cluster_loss.item())
         totals["semantic_loss"] += float(semantic_loss.item())
+        totals["semantic_retrieval_loss"] += float(semantic_retrieval_loss.item())
         totals["subspace_loss"] += float(subspace_loss.item())
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
@@ -293,7 +308,7 @@ def train_one_epoch(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f k=%.2f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f k=%.2f"
                 ),
                 epoch,
                 step + 1,
@@ -302,6 +317,7 @@ def train_one_epoch(
                 totals["inst_loss"] / running_denom,
                 totals["cluster_loss"] / running_denom,
                 totals["semantic_loss"] / running_denom,
+                totals["semantic_retrieval_loss"] / running_denom,
                 totals["subspace_loss"] / running_denom,
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
@@ -433,9 +449,11 @@ def main():
             device=device,
         )
         logger.info(
-            "semantic prototypes: enabled=%s lambda_semantic=%.4f prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
+            "semantic prototypes: enabled=%s lambda_semantic=%.4f lambda_semantic_retrieval=%.4f retrieval_topk=%d prompt_style=%s aggregation=%s classes=%d templates_per_class=%d",
             True,
             config.lambda_semantic,
+            config.lambda_semantic_retrieval,
+            config.semantic_retrieval_topk,
             semantic_info["prompt_style"],
             semantic_info["aggregation"],
             semantic_info["num_classes"],

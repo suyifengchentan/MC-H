@@ -233,7 +233,7 @@ def _default_official_eval_split(dataset_name: str) -> str:
         "Stanford_Dogs",
     }:
         return "test"
-    if dataset_name in {"Image50", "Image100", "Image200"}:
+    if dataset_name in {"Image50", "Image100", "Image200", "ImageNet1K"}:
         return "val"
     if dataset_name == "Oxford_Flowers":
         return "valid"
@@ -306,7 +306,7 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         )
         return train_base, eval_base
 
-    if config.dataset in {"Image50", "Image100", "Image200"}:
+    if config.dataset in {"Image50", "Image100", "Image200", "ImageNet1K"}:
         return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset == "Oxford_Flowers":
@@ -378,7 +378,7 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
 
     # HDF5 shard datasets benefit from a small pinned prefetch window. Keep the
     # queue shallow enough to avoid large host-memory spikes while still feeding the GPU.
-    is_h5_dataset = config.dataset in {"Image50", "Image100", "Image200"}
+    is_h5_dataset = config.dataset in {"Image50", "Image100", "Image200", "ImageNet1K"}
     train_workers = min(config.workers, 4) if is_h5_dataset else config.workers
     eval_workers = min(config.workers, 4) if is_h5_dataset else config.workers
     pin_memory = is_h5_dataset
