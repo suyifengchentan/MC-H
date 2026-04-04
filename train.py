@@ -294,6 +294,19 @@ def current_learning_rate(optimizer) -> float:
     return float(optimizer.param_groups[0]["lr"])
 
 
+def set_prototype_trainability(model, freeze_epochs: int, epoch: int, logger=None) -> bool:
+    trainable = epoch >= freeze_epochs
+    model.set_prototypes_trainable(trainable)
+    if logger is not None:
+        logger.info(
+            "epoch=%03d prototype_trainable=%s freeze_epochs=%d",
+            epoch,
+            trainable,
+            freeze_epochs,
+        )
+    return trainable
+
+
 def evaluate_splits(
     model, val_loader, device: torch.device
 ) -> dict[str, dict[str, float]]:
@@ -481,6 +494,12 @@ def main():
 
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
+        set_prototype_trainability(
+            model=model,
+            freeze_epochs=config.prototype_freeze_epochs,
+            epoch=epoch,
+            logger=logger,
+        )
         epoch_lr = current_learning_rate(optimizer)
         train_metrics = train_one_epoch(
             model=model,

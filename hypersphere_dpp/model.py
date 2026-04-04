@@ -77,6 +77,9 @@ class PrototypeHead(nn.Module):
         normalized_prototypes = F.normalize(self.prototypes, dim=-1)
         return features @ normalized_prototypes.t()
 
+    def set_trainable(self, trainable: bool) -> None:
+        self.prototypes.requires_grad_(trainable)
+
 
 class HypersphereDPPModel(nn.Module):
     def __init__(
@@ -144,6 +147,9 @@ class HypersphereDPPModel(nn.Module):
     @torch.no_grad()
     def normalize_prototypes(self) -> None:
         self.prototypes.normalize_()
+
+    def set_prototypes_trainable(self, trainable: bool) -> None:
+        self.prototypes.set_trainable(trainable)
 
     def trainable_parameters(self):
         return list(self.adapter.parameters()) + list(self.prototypes.parameters())

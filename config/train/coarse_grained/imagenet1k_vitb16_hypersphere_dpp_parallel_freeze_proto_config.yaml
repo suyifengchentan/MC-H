@@ -1,0 +1,93 @@
+# ImageNet1K ViT-B/16 hypersphere-DPP multi-GPU config with early prototype freezing
+
+# Data
+dataset: "ImageNet1K"
+dataset_dir: "/111/ImageNet1K"
+class_num: 1000
+validation_ratio: 0.01
+validation_seed: 42
+official_eval_split: "val"
+imagenet1k_cached_teacher_views_enabled: true
+imagenet1k_cached_teacher_views_dir: "/localdisk-tmp/teacher_cache_vitb16_imagenet1k_two_view_views6"
+imagenet1k_cached_teacher_num_views: 6
+imagenet1k_cached_teacher_dtype: "float16"
+
+# Model
+image_size: 224
+feature_dim: 512
+backbone_name: "ViT-B-16"
+pretrained: "laion2b_s34b_b88k"
+pretrained_checkpoint: "/root/clip-pretrained/open_clip_pytorch_model.bin"
+adapter_hidden_dim: 768
+adapter_dropout: 0.1
+transform_profile: "imagenet1k_two_view"
+
+# Optimization
+precision: "bf16"
+batch_size: 1536
+eval_batch_size: 1024
+epochs: 180
+learning_rate: 0.0003
+weight_decay: 0.00001
+lr_scheduler: "cosine"
+min_learning_rate: 0.00005
+
+# Compact / clustering
+instance_temperature: 0.2
+cluster_temperature: 0.25
+lambda_instance: 1.0
+lambda_cluster: 0.3
+semantic_prototype_enabled: true
+semantic_mode: "legacy"
+semantic_prompt_style: "auto"
+semantic_prototype_aggregation: "mean"
+semantic_imagenet_synonym_mode: "primary_weighted"
+semantic_primary_weight: 0.8
+semantic_template_topk: 16
+lambda_semantic: 0.25
+lambda_semantic_retrieval: 0.0
+semantic_temperature: 0.2
+semantic_target_topk: 5
+semantic_retrieval_topk: 0
+semantic_tac_class_blend: 1.0
+prototype_freeze_epochs: 5
+
+sinkhorn_iters: 5
+sinkhorn_epsilon: 0.07
+
+# Subspace
+lambda_subspace: 0.15
+subspace_rank: 8
+subspace_queue_size: 64
+subspace_min_mass: 2.0
+subspace_every_n_steps: 1
+subspace_pca_q_offset: 2
+subspace_topk_clusters: 128
+
+# DPP
+alpha_div_base: 0.35
+alpha_div_mode: "sigmoid_floor"
+alpha_div_floor: 0.12
+alpha_div_rho_center: 0.015
+alpha_div_rho_scale: 0.01
+alpha_div_max: 0.05
+alpha_div_decay_start_epoch: 4
+alpha_div_decay_end_epoch: 8
+alpha_div_decay_target: 0.0
+dpp_warmup_epochs: 10
+dpp_every_n_steps: 1
+dpp_jitter: 0.00001
+class_aware_dpp: true
+class_aware_dpp_min_mass: 1.0
+
+# Runtime / output
+eval_interval: 1
+model_path: "save/hypersphere_dpp/ImageNet1K_CLIP_ViTB16_HypersphereDPP_parallel_freeze_proto"
+workers: 12
+train_prefetch_factor: 2
+eval_prefetch_factor: 4
+persistent_workers: true
+distributed_batch_size_mode: "per_rank"
+reload: false
+seed: 42
+best_checkpoint_patience: 30

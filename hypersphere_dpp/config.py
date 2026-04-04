@@ -109,6 +109,7 @@ class ExperimentConfig:
     semantic_target_topk: int = 0
     semantic_retrieval_topk: int = 0
     semantic_tac_class_blend: float = 0.5
+    prototype_freeze_epochs: int = 0
 
     # Subspace
     lambda_subspace: float = 0.15
@@ -370,6 +371,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if not 0.0 <= config.semantic_tac_class_blend <= 1.0:
         raise ValueError("semantic_tac_class_blend must be in [0, 1].")
+
+    if config.prototype_freeze_epochs < 0:
+        raise ValueError("prototype_freeze_epochs must be non-negative.")
 
     if (
         config.official_eval_split is not None

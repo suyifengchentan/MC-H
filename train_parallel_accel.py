@@ -27,6 +27,7 @@ from train import (
     maybe_resume_training,
     resolve_amp_settings,
     select_checkpoint_score,
+    set_prototype_trainability,
 )
 from train_parallel import (
     broadcast_training_control,
@@ -306,6 +307,12 @@ def main():
 
         epochs_without_improvement = 0
         for epoch in range(start_epoch, config.epochs):
+            set_prototype_trainability(
+                model=model,
+                freeze_epochs=config.prototype_freeze_epochs,
+                epoch=epoch,
+                logger=logger if is_main_process(rank) else None,
+            )
             epoch_lr = current_learning_rate(optimizer)
             train_metrics = train_one_epoch_distributed(
                 model=ddp_model,
