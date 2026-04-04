@@ -38,24 +38,23 @@ min_learning_rate: 0.00005
 instance_temperature: 0.2
 cluster_temperature: 0.25
 lambda_instance: 1.0
-lambda_cluster: 0.4
+lambda_cluster: 0.3
 semantic_prototype_enabled: true
-semantic_mode: "tac_imagenet1k"
-# "auto" maps ImageNet1K → imagenet1k_80 (CLIP 80-template ensemble + all WordNet synonyms).
-# Richer text features produce sharper teacher distributions and better semantic alignment.
+semantic_mode: "legacy"
+# "auto" maps ImageNet1K -> imagenet1k_80. We keep the richer template set,
+# but recover the direct class-text target to better match exact 1000-way acc.
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
 semantic_imagenet_synonym_mode: "primary_weighted"
 semantic_primary_weight: 0.8
 semantic_template_topk: 16
-# TAC-style dynamic semantic counterpart:
-# weaken batch clustering and let retrieval counterpart carry more of the semantic load.
-lambda_semantic: 0.15
-lambda_semantic_retrieval: 0.20
+# Let class semantics dominate again, while reducing batch clustering pressure.
+lambda_semantic: 0.25
+lambda_semantic_retrieval: 0.0
 semantic_temperature: 0.2
-semantic_target_topk: 10
-semantic_retrieval_topk: 12
-semantic_tac_class_blend: 0.20
+semantic_target_topk: 5
+semantic_retrieval_topk: 0
+semantic_tac_class_blend: 1.0
 
 sinkhorn_iters: 5
 sinkhorn_epsilon: 0.07
