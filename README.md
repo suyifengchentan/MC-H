@@ -230,6 +230,17 @@ path: 原始图像路径
 wnid: 类别 wnid
 ```
 
+若需要从原始 ImageNet parquet shard 直接导出成当前训练使用的 HDF5 shard，可运行：
+
+```bash
+/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py \
+  --imagenet-root /path/to/imagenet-1k \
+  --datasets ImageNet1K
+```
+
+脚本会读取现有的 `data/train-*.parquet` / `data/validation-*.parquet` / `data/test-*.parquet`，
+并导出为 `data/*.h5`，同时生成 `label_info.json` 与 `metadata.json`。
+
 其中 `Image10` 的 `official_eval_split` 默认使用 `test`，`ImageNet1K/Image50/Image100/Image200` 默认使用 `val`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
 
 统一目录结构为：
