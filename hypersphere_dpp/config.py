@@ -77,6 +77,10 @@ class ExperimentConfig:
     spectral_assignment_temperature: float = 0.2
     spectral_sharpen_temperature: float = 0.1
     spectral_proto_momentum: float = 0.9
+    spectral_eval_refresh_enabled: bool = True
+    spectral_eval_refresh_passes: int = 1
+    spectral_eval_refresh_temperature: float = 0.2
+    spectral_eval_refresh_min_mass: float = 1.0
     diversity_weight_mode: str = "adaptive"
     subspace_anchor_mode: str = "auto"
 
@@ -247,6 +251,15 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if not 0.0 <= config.spectral_proto_momentum < 1.0:
         raise ValueError("spectral_proto_momentum must be in [0, 1).")
+
+    if config.spectral_eval_refresh_passes <= 0:
+        raise ValueError("spectral_eval_refresh_passes must be a positive integer.")
+
+    if config.spectral_eval_refresh_temperature <= 0:
+        raise ValueError("spectral_eval_refresh_temperature must be positive.")
+
+    if config.spectral_eval_refresh_min_mass <= 0:
+        raise ValueError("spectral_eval_refresh_min_mass must be positive.")
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")

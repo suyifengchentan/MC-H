@@ -339,6 +339,83 @@ class HypersphereFreeKModel(nn.Module):
             "phi": phi,
         }
 
+    @torch.no_grad()
+    def refresh_spectral_prototypes(
+        self,
+        dataloader,
+        device: torch.device,
+        assignment_temperature: float,
+        passes: int,
+        min_cluster_mass: float,
+    ) -> dict[str, float]:
+        if self.spectral_prototypes.numel() == 0:
+            return {
+                "estimated_k": 0.0,
+                "mean_cluster_mass": 0.0,
+                "num_passes": float(passes),
+            }
+
+        if passes <= 0:
+            raise ValueError("passes must be a positive integer.")
+        if assignment_temperature <= 0:
+            raise ValueError("assignment_temperature must be positive.")
+        if min_cluster_mass <= 0:
+            raise ValueError("min_cluster_mass must be positive.")
+
+        prototypes = F.normalize(
+            self.spectral_prototypes.detach().to(device=device, dtype=torch.float32),
+            dim=-1,
+        )
+        previous_mode = self.training
+        self.eval()
+        mean_cluster_mass = 0.0
+
+        for _ in range(passes):
+            cluster_sums = torch.zeros_like(prototypes)
+            cluster_mass = torch.zeros(
+                prototypes.size(0),
+                device=device,
+                dtype=prototypes.dtype,
+            )
+
+            for batch in dataloader:
+                images = batch["image"].to(device, non_blocking=True)
+                teacher_features = self.encode_teacher(images)
+                student_features = self.encode_student(
+                    teacher_features=teacher_features
+                )
+                normalized = F.normalize(student_features.float(), dim=-1)
+                logits = (normalized @ prototypes.t()) / assignment_temperature
+                assignments = F.softmax(logits, dim=-1)
+                cluster_sums += assignments.t() @ normalized
+                cluster_mass += assignments.sum(dim=0)
+
+            active = cluster_mass >= min_cluster_mass
+            if not torch.any(active):
+                active = cluster_mass > 0
+            if not torch.any(active):
+                break
+
+            refreshed = cluster_sums[active] / cluster_mass[active].unsqueeze(1).clamp_min(1e-6)
+            prototypes = F.normalize(refreshed, dim=-1)
+            mean_cluster_mass = float(cluster_mass[active].mean().item())
+
+        self.spectral_prototypes = prototypes.detach().to(self.spectral_prototypes.device)
+        if self.spectral_eigenvalues.numel() > 0:
+            self.spectral_eigenvalues = self.spectral_eigenvalues[: prototypes.size(0)]
+        self.estimated_num_clusters = torch.tensor(
+            int(prototypes.size(0)),
+            device=self.estimated_num_clusters.device,
+            dtype=torch.long,
+        )
+        if previous_mode:
+            self.train()
+        return {
+            "estimated_k": float(prototypes.size(0)),
+            "mean_cluster_mass": mean_cluster_mass,
+            "num_passes": float(passes),
+        }
+
     def prototype_logits(self, student_features: torch.Tensor) -> torch.Tensor:
         if self.spectral_prototypes.numel() == 0:
             raise RuntimeError(

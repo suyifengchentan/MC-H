@@ -28,6 +28,21 @@ def main():
     datasets = build_experiment_dataloaders(config)
     model = build_model_from_config(config, device=device).to(device)
     load_checkpoint(args.checkpoint, model=model, map_location=device)
+    if (
+        config.clustering_mode == "spectral_free_k"
+        and config.spectral_eval_refresh_enabled
+    ):
+        refresh_stats = model.refresh_spectral_prototypes(
+            dataloader=datasets.train_eval_loader,
+            device=device,
+            assignment_temperature=config.spectral_eval_refresh_temperature,
+            passes=config.spectral_eval_refresh_passes,
+            min_cluster_mass=config.spectral_eval_refresh_min_mass,
+        )
+        print(
+            "spectral_eval_refresh="
+            f"{refresh_stats}"
+        )
     model.eval()
 
     if args.split in {"val", "both"}:

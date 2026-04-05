@@ -60,6 +60,7 @@ class SingleViewDataset(Dataset):
 @dataclass
 class DatasetBundle:
     train_loader: DataLoader
+    train_eval_loader: DataLoader
     val_loader: DataLoader
     test_loader: DataLoader
     val_is_stratified: bool = False
@@ -369,6 +370,9 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         train_subset,
         build_train_decode_transform(config.image_size, config.transform_profile),
     )
+    train_eval_dataset = SingleViewDataset(
+        train_subset, build_eval_transform(config.image_size, config.transform_profile)
+    )
     val_dataset = SingleViewDataset(
         val_subset, build_eval_transform(config.image_size, config.transform_profile)
     )
@@ -408,6 +412,16 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         persistent_workers=persistent_workers,
         prefetch_factor=eval_prefetch_factor,
     )
+    train_eval_loader = _build_loader(
+        train_eval_dataset,
+        batch_size=config.eval_batch_size,
+        workers=eval_workers,
+        shuffle=False,
+        drop_last=False,
+        pin_memory=pin_memory,
+        persistent_workers=persistent_workers,
+        prefetch_factor=eval_prefetch_factor,
+    )
     test_loader = _build_loader(
         test_dataset,
         batch_size=config.eval_batch_size,
@@ -420,6 +434,7 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     )
     return DatasetBundle(
         train_loader=train_loader,
+        train_eval_loader=train_eval_loader,
         val_loader=val_loader,
         test_loader=test_loader,
         val_is_stratified=val_is_stratified,

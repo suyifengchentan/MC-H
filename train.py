@@ -351,6 +351,32 @@ def evaluate_splits(
     return {"val": evaluate_clustering(model, val_loader, device)}
 
 
+def maybe_refresh_free_k_prototypes(
+    model,
+    reference_loader,
+    config,
+    device: torch.device,
+    logger,
+) -> None:
+    if config.clustering_mode != "spectral_free_k":
+        return
+    if not config.spectral_eval_refresh_enabled:
+        return
+    refresh_stats = model.refresh_spectral_prototypes(
+        dataloader=reference_loader,
+        device=device,
+        assignment_temperature=config.spectral_eval_refresh_temperature,
+        passes=config.spectral_eval_refresh_passes,
+        min_cluster_mass=config.spectral_eval_refresh_min_mass,
+    )
+    logger.info(
+        "spectral_eval_refresh: passes=%d estimated_k=%.2f mean_cluster_mass=%.4f",
+        config.spectral_eval_refresh_passes,
+        refresh_stats["estimated_k"],
+        refresh_stats["mean_cluster_mass"],
+    )
+
+
 def select_checkpoint_score(
     eval_metrics: dict[str, dict[str, float]],
     logger,
@@ -488,6 +514,13 @@ def main():
         config.diversity_weight_mode,
         config.subspace_anchor_mode,
     )
+    logger.info(
+        "spectral_eval_refresh: enabled=%s passes=%d temperature=%.4f min_mass=%.4f",
+        config.spectral_eval_refresh_enabled,
+        config.spectral_eval_refresh_passes,
+        config.spectral_eval_refresh_temperature,
+        config.spectral_eval_refresh_min_mass,
+    )
     optimizer = optim.AdamW(
         model.trainable_parameters(),
         lr=config.learning_rate,
@@ -584,6 +617,13 @@ def main():
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
+        maybe_refresh_free_k_prototypes(
+            model=model,
+            reference_loader=datasets.train_eval_loader,
+            config=config,
+            device=device,
+            logger=logger,
+        )
         eval_metrics = evaluate_splits(model, datasets.val_loader, device)
         for split_name, metrics in eval_metrics.items():
             selection_score = clustering_selection_score(metrics)

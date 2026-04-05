@@ -13,12 +13,15 @@ fi
 usage() {
   cat <<'EOF'
 Usage:
-  bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
-  bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [-- extra train.py args...]
+  bash scripts/train_by_dataset.sh <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [--freek] [--workers N] [--initial-spectral-clusters N] [--max-spectral-clusters N] [--lambda-semantic X] [--output-tag TAG] [-- extra train.py args...]
+  bash scripts/train_by_dataset.sh --datasets <dataset_name> [<dataset_name> ...] [--device DEVICE] [--foreground] [--freek] [--workers N] [--initial-spectral-clusters N] [--max-spectral-clusters N] [--lambda-semantic X] [--output-tag TAG] [-- extra train.py args...]
 
 Behavior:
   - Single dataset: defaults to background launch with nohup unless --foreground is set
   - Multiple datasets: runs sequentially, waiting for each dataset to finish before starting the next
+  - --freek: forces spectral free-K mode and writes outputs to a fresh directory
+    whose name includes the suffix "_freek"
+  - Optional override flags patch the resolved YAML before launch
 
 Supported dataset names:
   CIFAR10      | cifar10
@@ -39,12 +42,20 @@ Examples:
   bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
   bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
   bash scripts/train_by_dataset.sh image10 --device cuda:0
+  bash scripts/train_by_dataset.sh cifar10 --freek --device cuda:0
+  bash scripts/train_by_dataset.sh cifar10 --freek --device cuda:0 --workers 0 --initial-spectral-clusters 10 --lambda-semantic 0.02 --output-tag tuned
   bash scripts/train_by_dataset.sh cub --foreground --device cuda:1
 EOF
 }
 
 DEVICE=""
 FOREGROUND=0
+FREEK_MODE=0
+OVERRIDE_WORKERS=""
+OVERRIDE_INITIAL_SPECTRAL_CLUSTERS=""
+OVERRIDE_MAX_SPECTRAL_CLUSTERS=""
+OVERRIDE_LAMBDA_SEMANTIC=""
+OUTPUT_TAG=""
 EXTRA_ARGS=()
 DATASET_INPUTS=()
 PARSE_EXTRA_ARGS=0
@@ -68,6 +79,50 @@ while [[ $# -gt 0 ]]; do
     --foreground)
       FOREGROUND=1
       shift
+      ;;
+    --freek)
+      FREEK_MODE=1
+      shift
+      ;;
+    --workers)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --workers" >&2
+        exit 1
+      fi
+      OVERRIDE_WORKERS="$2"
+      shift 2
+      ;;
+    --initial-spectral-clusters)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --initial-spectral-clusters" >&2
+        exit 1
+      fi
+      OVERRIDE_INITIAL_SPECTRAL_CLUSTERS="$2"
+      shift 2
+      ;;
+    --max-spectral-clusters)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --max-spectral-clusters" >&2
+        exit 1
+      fi
+      OVERRIDE_MAX_SPECTRAL_CLUSTERS="$2"
+      shift 2
+      ;;
+    --lambda-semantic)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --lambda-semantic" >&2
+        exit 1
+      fi
+      OVERRIDE_LAMBDA_SEMANTIC="$2"
+      shift 2
+      ;;
+    --output-tag)
+      if [[ $# -lt 2 ]]; then
+        echo "Missing value for --output-tag" >&2
+        exit 1
+      fi
+      OUTPUT_TAG="$2"
+      shift 2
       ;;
     --datasets)
       shift
@@ -173,6 +228,11 @@ PY
 build_output_dir() {
   local base_output_dir="$1"
   local reload_enabled="$2"
+  local suffix_tag="${3:-}"
+
+  if [[ -n "$suffix_tag" ]]; then
+    reload_enabled="0"
+  fi
 
   if [[ "$reload_enabled" == "1" ]]; then
     printf '%s\n' "$base_output_dir"
@@ -181,11 +241,18 @@ build_output_dir() {
 
   local run_stamp candidate suffix
   run_stamp="$(date '+%Y%m%d_%H%M%S')"
-  candidate="${base_output_dir}_${run_stamp}"
+  candidate="$base_output_dir"
+  if [[ -n "$suffix_tag" ]]; then
+    candidate="${candidate}_${suffix_tag}"
+  fi
+  candidate="${candidate}_${run_stamp}"
   suffix=0
   while [[ -e "$candidate" ]]; do
     suffix=$((suffix + 1))
     candidate="${base_output_dir}_${run_stamp}_${suffix}"
+    if [[ -n "$suffix_tag" ]]; then
+      candidate="${base_output_dir}_${suffix_tag}_${run_stamp}_${suffix}"
+    fi
   done
   printf '%s\n' "$candidate"
 }
@@ -195,7 +262,13 @@ write_resolved_config() {
   local run_config_path="$2"
   local output_dir="$3"
 
-  RUN_OUTPUT_DIR="$output_dir" "$PYTHON_BIN" - "$config_path" "$run_config_path" <<'PY'
+  RUN_OUTPUT_DIR="$output_dir" \
+  RUN_FREEK_MODE="$FREEK_MODE" \
+  RUN_OVERRIDE_WORKERS="$OVERRIDE_WORKERS" \
+  RUN_OVERRIDE_INITIAL_SPECTRAL_CLUSTERS="$OVERRIDE_INITIAL_SPECTRAL_CLUSTERS" \
+  RUN_OVERRIDE_MAX_SPECTRAL_CLUSTERS="$OVERRIDE_MAX_SPECTRAL_CLUSTERS" \
+  RUN_OVERRIDE_LAMBDA_SEMANTIC="$OVERRIDE_LAMBDA_SEMANTIC" \
+  "$PYTHON_BIN" - "$config_path" "$run_config_path" <<'PY'
 from pathlib import Path
 import os
 import sys
@@ -205,6 +278,30 @@ src = Path(sys.argv[1])
 dst = Path(sys.argv[2])
 config = yaml.safe_load(src.read_text(encoding="utf-8"))
 config["model_path"] = os.environ["RUN_OUTPUT_DIR"]
+if os.environ.get("RUN_FREEK_MODE") == "1":
+    config["clustering_mode"] = "spectral_free_k"
+    config["reload"] = False
+
+override_workers = os.environ.get("RUN_OVERRIDE_WORKERS", "").strip()
+if override_workers:
+    config["workers"] = int(override_workers)
+
+override_initial_spectral_clusters = os.environ.get(
+    "RUN_OVERRIDE_INITIAL_SPECTRAL_CLUSTERS", ""
+).strip()
+if override_initial_spectral_clusters:
+    config["initial_spectral_clusters"] = int(override_initial_spectral_clusters)
+
+override_max_spectral_clusters = os.environ.get(
+    "RUN_OVERRIDE_MAX_SPECTRAL_CLUSTERS", ""
+).strip()
+if override_max_spectral_clusters:
+    config["max_spectral_clusters"] = int(override_max_spectral_clusters)
+
+override_lambda_semantic = os.environ.get("RUN_OVERRIDE_LAMBDA_SEMANTIC", "").strip()
+if override_lambda_semantic:
+    config["lambda_semantic"] = float(override_lambda_semantic)
+
 dst.write_text(yaml.safe_dump(config, sort_keys=False, allow_unicode=False), encoding="utf-8")
 PY
 }
@@ -233,7 +330,18 @@ launch_dataset() {
   model_path_rel="${config_info[1]}"
   reload_enabled="${config_info[2]}"
   base_output_dir="$ROOT_DIR/$model_path_rel"
-  output_dir="$(build_output_dir "$base_output_dir" "$reload_enabled")"
+  local output_suffix=""
+  if [[ "$FREEK_MODE" -eq 1 ]]; then
+    output_suffix="freek"
+  fi
+  if [[ -n "$OUTPUT_TAG" ]]; then
+    if [[ -n "$output_suffix" ]]; then
+      output_suffix="${output_suffix}_${OUTPUT_TAG}"
+    else
+      output_suffix="$OUTPUT_TAG"
+    fi
+  fi
+  output_dir="$(build_output_dir "$base_output_dir" "$reload_enabled" "$output_suffix")"
 
   pid_file="$output_dir/train.pid"
   launch_log="$output_dir/launcher.log"
@@ -265,6 +373,11 @@ launch_dataset() {
   echo "dataset_dir: $dataset_dir"
   echo "base_output_dir: $model_path_rel"
   echo "reload: $reload_enabled"
+  echo "freek_mode: $FREEK_MODE"
+  echo "override_workers: ${OVERRIDE_WORKERS:-<none>}"
+  echo "override_initial_spectral_clusters: ${OVERRIDE_INITIAL_SPECTRAL_CLUSTERS:-<none>}"
+  echo "override_max_spectral_clusters: ${OVERRIDE_MAX_SPECTRAL_CLUSTERS:-<none>}"
+  echo "override_lambda_semantic: ${OVERRIDE_LAMBDA_SEMANTIC:-<none>}"
   echo "run_output_dir: $output_dir"
   printf 'command:'
   printf ' %q' "${cmd[@]}"
