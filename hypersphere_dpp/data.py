@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
-from datasets.imagenet_shard_dataset import ImageNetH5Dataset
+from datasets.imagenet_shard_dataset import ImageNetWebDataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
@@ -87,6 +87,19 @@ class ImageNetTeacherFeatureTrainDataset(Dataset):
             "label": label,
             "index": base_index,
         }
+
+    def __getitems__(self, indices: Sequence[int]):
+        base_indices = [int(self.dataset.indices[int(index)]) for index in indices]
+        labels = [int(self.base_dataset.targets[base_index]) for base_index in base_indices]
+        teacher_batches = self.teacher_cache.get_many(base_indices)
+        return [
+            {
+                TEACHER_FEATURE_CANDIDATES_KEY: teacher_batches[offset],
+                "label": labels[offset],
+                "index": base_indices[offset],
+            }
+            for offset in range(len(base_indices))
+        ]
 
 
 @dataclass
@@ -310,19 +323,19 @@ def _default_official_eval_split(dataset_name: str) -> str:
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
-def _build_imagenet_h5_datasets(
+def _build_imagenet_webdataset_datasets(
     config: ExperimentConfig,
     official_eval_split: str,
 ) -> tuple[Dataset, Dataset]:
     label_wnids = load_label_wnids(config.dataset)
     class_names = label_wnids or None
-    train_base = ImageNetH5Dataset(
+    train_base = ImageNetWebDataset(
         root=config.dataset_dir,
         split="train",
         transform=None,
         class_names=class_names,
     )
-    eval_base = ImageNetH5Dataset(
+    eval_base = ImageNetWebDataset(
         root=config.dataset_dir,
         split=official_eval_split,
         transform=None,
@@ -376,10 +389,10 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "ImageNet1K":
-        return _build_imagenet_h5_datasets(config, official_eval_split)
+        return _build_imagenet_webdataset_datasets(config, official_eval_split)
 
     if config.dataset in {"Image50", "Image100", "Image200"}:
-        return _build_imagenet_h5_datasets(config, official_eval_split)
+        return _build_imagenet_webdataset_datasets(config, official_eval_split)
 
     if config.dataset == "TinyImageNet200":
         train_base = TinyImageNetDataset(

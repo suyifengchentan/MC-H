@@ -3,8 +3,8 @@
 # Data
 dataset: "Image50"
 dataset_dir: "/home/geyingjie/hypersphere-data/Image50"
-# 新逻辑统一使用 HDF5 shard:
-# data/train-*.h5, data/validation-*.h5, label_info.json
+# 新逻辑统一使用 WebDataset tar shard:
+# data/train-*.tar, data/train-*.index.npz, data/validation-*.tar, data/validation-*.index.npz, label_info.json
 class_num: 50
 validation_ratio: 0.1
 validation_seed: 42

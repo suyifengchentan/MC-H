@@ -189,6 +189,9 @@ def main():
                 batch_info["per_rank_batch_size"],
                 batch_info["effective_global_batch_size"],
             )
+            logger.info(
+                "distributed loss semantics: local_per_rank batches with standard DDP gradient averaging"
+            )
 
         if config.uses_imagenet1k_cached_teacher_views:
             if is_main_process(rank):

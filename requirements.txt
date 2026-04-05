@@ -8,3 +8,6 @@ pyarrow
 h5py
 kornia
 matplotlib
+numpy
+Pillow
+zarr

@@ -186,45 +186,6 @@ def reduce_metrics_across_ranks(
 
 
 @torch.no_grad()
-def gather_no_grad(x: torch.Tensor, world_size: int) -> torch.Tensor:
-    if world_size <= 1:
-        return x
-    gathered = [torch.empty_like(x) for _ in range(world_size)]
-    dist.all_gather(gathered, x.contiguous())
-    return torch.cat(gathered, dim=0)
-
-
-def gather_with_local_grad(
-    x: torch.Tensor,
-    world_size: int,
-    rank: int,
-) -> torch.Tensor:
-    if world_size <= 1:
-        return x
-    detached_x = x.detach().contiguous()
-    gathered = [torch.empty_like(detached_x) for _ in range(world_size)]
-    dist.all_gather(gathered, detached_x)
-    gathered[rank] = x
-    return torch.cat(gathered, dim=0)
-
-
-def gather_two_view_batch(
-    local_cat: torch.Tensor,
-    *,
-    world_size: int,
-    rank: int,
-    keep_local_grad: bool,
-) -> torch.Tensor:
-    view1_local, view2_local = local_cat.chunk(2)
-    if keep_local_grad:
-        view1 = gather_with_local_grad(view1_local, world_size, rank)
-        view2 = gather_with_local_grad(view2_local, world_size, rank)
-    else:
-        view1 = gather_no_grad(view1_local, world_size)
-        view2 = gather_no_grad(view2_local, world_size)
-    return torch.cat([view1, view2], dim=0)
-
-
 def broadcast_training_control(
     *,
     best_metric: float,
@@ -312,48 +273,27 @@ def train_one_epoch_distributed(
         amp_context = amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
         with amp_context:
             if teacher_feature_candidates is not None:
-                teacher1_local, teacher2_local = sample_two_teacher_feature_views(
+                teacher1, teacher2 = sample_two_teacher_feature_views(
                     teacher_feature_candidates
                 )
-                teacher_cat_local = torch.cat([teacher1_local, teacher2_local], dim=0)
-                student_cat_local = module.encode_student(
-                    teacher_features=teacher_cat_local
-                )
-                logits_cat_local = module.prototype_logits(student_cat_local)
+                teacher_cat = torch.cat([teacher1, teacher2], dim=0)
+                student_cat = module.encode_student(teacher_features=teacher_cat)
+                logits_cat = module.prototype_logits(student_cat)
             else:
-                teacher_cat_local, student_cat_local, logits_cat_local = model(
+                teacher_cat, student_cat, logits_cat = model(
                     view1,
                     view2,
                 )
-
-            teacher_cat = gather_two_view_batch(
-                teacher_cat_local,
-                world_size=world_size,
-                rank=rank,
-                keep_local_grad=False,
-            )
-            student_cat = gather_two_view_batch(
-                student_cat_local.float(),
-                world_size=world_size,
-                rank=rank,
-                keep_local_grad=True,
-            )
-            logits_cat = gather_two_view_batch(
-                logits_cat_local.float(),
-                world_size=world_size,
-                rank=rank,
-                keep_local_grad=True,
-            )
 
             student1, student2 = student_cat.chunk(2)
             logits1, logits2 = logits_cat.chunk(2)
 
             inst_loss = nt_xent_loss(
-                student1, student2, config.instance_temperature
+                student1.float(), student2.float(), config.instance_temperature
             )
             cluster_loss, assign1, assign2 = swav_cluster_loss(
-                logits_a=logits1,
-                logits_b=logits2,
+                logits_a=logits1.float(),
+                logits_b=logits2.float(),
                 temperature=config.cluster_temperature,
                 sinkhorn_epsilon=config.sinkhorn_epsilon,
                 sinkhorn_iters=config.sinkhorn_iters,
@@ -455,9 +395,8 @@ def train_one_epoch_distributed(
                 + config.lambda_subspace * subspace_loss
                 + alpha_div * dpp_loss
             )
-            backward_loss = loss * world_size if world_size > 1 else loss
 
-        scaler.scale(backward_loss).backward()
+        scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         module.normalize_prototypes()
@@ -586,6 +525,9 @@ def main():
                 train_batch_info["requested_batch_size"],
                 train_batch_info["per_rank_batch_size"],
                 train_batch_info["effective_global_batch_size"],
+            )
+            logger.info(
+                "distributed loss semantics: local_per_rank batches with standard DDP gradient averaging"
             )
             if (
                 world_size > 1

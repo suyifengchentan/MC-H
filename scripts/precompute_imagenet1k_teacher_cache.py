@@ -18,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from datasets.imagenet_shard_dataset import ImageNetH5Dataset
+from datasets.imagenet_shard_dataset import ImageNetWebDataset
 from hypersphere_dpp.config import load_experiment_config
 from hypersphere_dpp.data import safe_default_collate
 from hypersphere_dpp.labels import load_label_wnids
@@ -267,7 +267,7 @@ def prepare_cache_shard(
 
 def build_metadata(
     *,
-    dataset: ImageNetH5Dataset,
+    dataset: ImageNetWebDataset,
     cache_root: Path,
     config,
     save_dtype_name: str,
@@ -339,7 +339,7 @@ def main() -> int:
         save_dtype, save_dtype_name = storage_dtype(config.imagenet1k_cached_teacher_dtype)
 
         label_wnids = load_label_wnids(config.dataset)
-        dataset = ImageNetH5Dataset(
+        dataset = ImageNetWebDataset(
             root=config.dataset_dir,
             split=args.split,
             transform=build_train_decode_transform(
