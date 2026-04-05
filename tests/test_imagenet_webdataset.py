@@ -7,8 +7,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-import h5py
 import numpy as np
+import pyarrow as pa
+import pyarrow.parquet as pq
 import torch
 from PIL import Image
 
@@ -32,17 +33,26 @@ def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
     return buffer.getvalue()
 
 
-def _write_h5(path: Path, rows: list[dict]) -> None:
+def _write_parquet(path: Path, rows: list[dict]) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    vlen_dtype = h5py.vlen_dtype(np.dtype("uint8"))
-    utf8_dtype = h5py.string_dtype("utf-8")
-    with h5py.File(path, "w") as handle:
-        image_dataset = handle.create_dataset("image_bytes", shape=(len(rows),), dtype=vlen_dtype, chunks=(1,))
-        for index, row in enumerate(rows):
-            image_dataset[index] = np.frombuffer(row["image_bytes"], dtype=np.uint8)
-        handle.create_dataset("label", data=np.asarray([row["label"] for row in rows], dtype=np.int32), chunks=(1,))
-        handle.create_dataset("path", data=np.asarray([row["path"] for row in rows], dtype=object), dtype=utf8_dtype)
-        handle.create_dataset("wnid", data=np.asarray([row["wnid"] for row in rows], dtype=object), dtype=utf8_dtype)
+    image_type = pa.struct(
+        [
+            ("bytes", pa.binary()),
+            ("path", pa.string()),
+        ]
+    )
+    table = pa.table(
+        {
+            "image": pa.array(
+                [{"bytes": row["image_bytes"], "path": row["path"]} for row in rows],
+                type=image_type,
+            ),
+            "label": pa.array([row["label"] for row in rows], type=pa.int64()),
+        }
+    )
+    pq.write_table(table, path, row_group_size=1)
+
+
 def _write_teacher_cache_zarr(path: Path, teacher_features: np.ndarray) -> None:
     if zarr is None:
         raise unittest.SkipTest("zarr is not installed")
@@ -76,34 +86,26 @@ def _load_precompute_module():
 
 def _load_webdataset_convert_module():
     return _load_module(
-        "convert_imagenet_h5_to_webdataset.py",
-        "convert_imagenet_h5_to_webdataset_test",
+        "convert_imagenet_subsets_to_webdataset.py",
+        "convert_imagenet_subsets_to_webdataset_test",
     )
 
 
-def _write_source_metadata(root: Path, *, train_shards: int, train_samples: int, validation_shards: int, validation_samples: int) -> None:
-    with (root / "metadata.json").open("w", encoding="utf-8") as handle:
-        json.dump(
-            {
-                "dataset": "ImageNet1K",
-                "source_root": str(root),
-                "class_num": 2,
-                "format": "hdf5",
-                "splits": {
-                    "train": {"num_shards": train_shards, "num_samples": train_samples},
-                    "validation": {"num_shards": validation_shards, "num_samples": validation_samples},
-                    "test": {"num_shards": 0, "num_samples": 0},
-                },
-            },
-            handle,
-        )
+def _write_classes(root: Path) -> None:
+    root.mkdir(parents=True, exist_ok=True)
+    (root / "classes.py").write_text(
+        "IMAGENET2012_CLASSES = {\n"
+        "    'n00000001': 'red bird',\n"
+        "    'n00000002': 'green bird',\n"
+        "}\n",
+        encoding="utf-8",
+    )
 
 
-def _build_small_hdf5_source(root: Path) -> None:
+def _build_small_parquet_source(root: Path) -> None:
     data_root = root / "data"
     data_root.mkdir(parents=True, exist_ok=True)
-    with (root / "label_info.json").open("w", encoding="utf-8") as handle:
-        json.dump({"idx_to_wnid": {"0": "n00000001", "1": "n00000002"}}, handle)
+    _write_classes(root)
 
     train_rows = [
         {
@@ -127,24 +129,43 @@ def _build_small_hdf5_source(root: Path) -> None:
             "wnid": "n00000002",
         }
     ]
-    _write_h5(data_root / "train-00000-of-00001.h5", train_rows)
-    _write_h5(data_root / "validation-00000-of-00001.h5", validation_rows)
-    _write_source_metadata(
-        root,
-        train_shards=1,
-        train_samples=len(train_rows),
-        validation_shards=1,
-        validation_samples=len(validation_rows),
-    )
+    _write_parquet(data_root / "train-00000-of-00001.parquet", train_rows)
+    _write_parquet(data_root / "validation-00000-of-00001.parquet", validation_rows)
 
 
 def _convert_source_to_webdataset(source_root: Path, output_root: Path) -> None:
     module = _load_webdataset_convert_module()
-    module.convert_dataset(
-        input_root=source_root,
+    [spec] = module.resolve_subset_specs(
+        imagenet_root=source_root,
+        dataset_names=["ImageNet1K"],
         output_root=output_root,
-        splits=["train", "validation"],
+    )
+    split_summaries = module.convert_subset(
+        imagenet_root=source_root,
+        spec=spec,
+        max_shards_per_split=None,
         overwrite=True,
+    )
+    module.write_metadata_files(
+        spec=spec,
+        imagenet_root=source_root,
+        split_summaries=split_summaries,
+    )
+
+
+def _write_source_parquet(
+    root: Path,
+    *,
+    train_rows: list[dict],
+    validation_rows: list[dict],
+) -> None:
+    _write_classes(root)
+    data_root = root / "data"
+    data_root.mkdir(parents=True, exist_ok=True)
+    _write_parquet(data_root / "train-00000-of-00001.parquet", train_rows)
+    _write_parquet(
+        data_root / "validation-00000-of-00001.parquet",
+        validation_rows,
     )
 
 
@@ -153,7 +174,7 @@ class ImageNetWebDatasetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             output_root = Path(tmp_dir) / "webdataset"
-            _build_small_hdf5_source(source_root)
+            _build_small_parquet_source(source_root)
             _convert_source_to_webdataset(source_root, output_root)
 
             train_dataset = ImageNetWebDataset(root=str(output_root), split="train")
@@ -172,7 +193,7 @@ class ImageNetWebDatasetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             output_root = Path(tmp_dir) / "webdataset"
-            _build_small_hdf5_source(source_root)
+            _build_small_parquet_source(source_root)
             _convert_source_to_webdataset(source_root, output_root)
             (output_root / "label_info.json").unlink()
 
@@ -191,11 +212,6 @@ class ImageNetWebDatasetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             output_root = Path(tmp_dir) / "webdataset"
-            data_root = source_root / "data"
-            data_root.mkdir(parents=True, exist_ok=True)
-
-            with (source_root / "label_info.json").open("w", encoding="utf-8") as handle:
-                json.dump({"idx_to_wnid": {"0": "n00000001", "1": "n00000002"}}, handle)
 
             train_rows = []
             for label in (0, 1):
@@ -208,10 +224,10 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                             "wnid": f"n0000000{label + 1}",
                         }
                     )
-            _write_h5(data_root / "train-00000-of-00001.h5", train_rows)
-            _write_h5(
-                data_root / "validation-00000-of-00001.h5",
-                [
+            _write_source_parquet(
+                source_root,
+                train_rows=train_rows,
+                validation_rows=[
                     {
                         "image_bytes": _jpeg_bytes((0, 0, 255)),
                         "label": 0,
@@ -219,13 +235,6 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                         "wnid": "n00000001",
                     }
                 ],
-            )
-            _write_source_metadata(
-                source_root,
-                train_shards=1,
-                train_samples=len(train_rows),
-                validation_shards=1,
-                validation_samples=1,
             )
             _convert_source_to_webdataset(source_root, output_root)
 
@@ -256,11 +265,6 @@ class ImageNetWebDatasetTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp_dir:
             source_root = Path(tmp_dir) / "source"
             output_root = Path(tmp_dir) / "webdataset"
-            data_root = source_root / "data"
-            data_root.mkdir(parents=True, exist_ok=True)
-
-            with (source_root / "label_info.json").open("w", encoding="utf-8") as handle:
-                json.dump({"idx_to_wnid": {"0": "n00000001", "1": "n00000002"}}, handle)
 
             train_rows = []
             for label in (0, 1):
@@ -273,10 +277,10 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                             "wnid": f"n0000000{label + 1}",
                         }
                     )
-            _write_h5(data_root / "train-00000-of-00001.h5", train_rows)
-            _write_h5(
-                data_root / "validation-00000-of-00001.h5",
-                [
+            _write_source_parquet(
+                source_root,
+                train_rows=train_rows,
+                validation_rows=[
                     {
                         "image_bytes": _jpeg_bytes((0, 0, 255)),
                         "label": 0,
@@ -284,13 +288,6 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                         "wnid": "n00000001",
                     }
                 ],
-            )
-            _write_source_metadata(
-                source_root,
-                train_shards=1,
-                train_samples=len(train_rows),
-                validation_shards=1,
-                validation_samples=1,
             )
             _convert_source_to_webdataset(source_root, output_root)
 

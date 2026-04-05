@@ -224,15 +224,16 @@ cache_root/
   metadata.json
 ```
 
-若需要把现有 ImageNet HDF5 shard 导出成 WebDataset tar shard，可运行：
+若需要从原始 ImageNet parquet shard 直接导出成 WebDataset tar shard，可运行：
 
 ```bash
-/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_h5_to_webdataset.py \
-  --input-root /path/to/imagenet_h5_root \
+/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_webdataset.py \
+  --imagenet-root /path/to/imagenet-1k \
+  --datasets ImageNet1K \
   --output-root /path/to/imagenet_webdataset_root
 ```
 
-脚本会读取现有的 `data/train-*.h5` / `data/validation-*.h5`，并导出为 `data/*.tar` 以及配套的 `data/*.index.npz`。每个 tar shard 都保持 WebDataset 风格样本布局，配套索引用于当前训练代码的随机访问。
+脚本会读取现有的 `data/train-*.parquet` / `data/validation-*.parquet` / `data/test-*.parquet`，并导出为 `data/*.tar` 以及配套的 `data/*.index.npz`。每个 tar shard 都保持 WebDataset 风格样本布局，配套索引用于当前训练代码的随机访问。
 
 每个 WebDataset shard 至少包含以下内容：
 

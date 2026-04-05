@@ -2,7 +2,7 @@
 
 # Data
 dataset: "ImageNet1K"
-dataset_dir: "/111/ImageNet1K"
+dataset_dir: "/111/ImageNet1KWebDataset"
 class_num: 1000
 validation_ratio: 0.01
 validation_seed: 42
