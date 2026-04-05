@@ -144,6 +144,9 @@ class ExperimentConfig:
     train_prefetch_factor: int | None = None
     eval_prefetch_factor: int | None = None
     persistent_workers: bool | None = None
+    step_profile_enabled: bool = False
+    step_profile_log_interval: int = 1
+    step_profile_cuda_sync: bool = True
     distributed_batch_size_mode: str = "per_rank"
     reload: bool = False
     seed: int = 42
@@ -258,6 +261,9 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.eval_prefetch_factor is not None and config.eval_prefetch_factor <= 0:
         raise ValueError("eval_prefetch_factor must be positive when provided.")
+
+    if config.step_profile_log_interval <= 0:
+        raise ValueError("step_profile_log_interval must be a positive integer.")
 
     if config.persistent_workers and config.workers == 0:
         raise ValueError(

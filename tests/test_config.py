@@ -133,6 +133,29 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.imagenet1k_cached_teacher_num_views, 6)
         self.assertEqual(config.imagenet1k_cached_teacher_dtype, "float16")
 
+    def test_step_profile_fields_are_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "ImageNet1K"
+            dataset_dir: "/tmp/imagenet-1k"
+            class_num: 1000
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            step_profile_enabled: true
+            step_profile_log_interval: 3
+            step_profile_cuda_sync: false
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertTrue(config.step_profile_enabled)
+        self.assertEqual(config.step_profile_log_interval, 3)
+        self.assertFalse(config.step_profile_cuda_sync)
+
     def test_imagenet1k_single_and_parallel_train_configs_are_split(self):
         repo_root = Path(__file__).resolve().parents[1]
         single_config = load_experiment_config(
@@ -238,6 +261,27 @@ class ConfigLoaderTest(unittest.TestCase):
 
         with self.assertRaisesRegex(
             ValueError, "min_learning_rate must be less than or equal"
+        ):
+            load_experiment_config(config_path)
+
+    def test_step_profile_log_interval_must_be_positive(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image50"
+            dataset_dir: "/tmp/image50"
+            class_num: 50
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            step_profile_enabled: true
+            step_profile_log_interval: 0
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "step_profile_log_interval must be a positive integer"
         ):
             load_experiment_config(config_path)
 

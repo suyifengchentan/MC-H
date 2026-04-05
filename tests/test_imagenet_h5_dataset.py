@@ -7,9 +7,8 @@ import tempfile
 import unittest
 from pathlib import Path
 
+import h5py
 import numpy as np
-import pyarrow as pa
-import pyarrow.parquet as pq
 import torch
 from PIL import Image
 
@@ -18,7 +17,7 @@ try:
 except ImportError:  # pragma: no cover - optional dependency in some environments
     zarr = None
 
-from datasets.imagenet_shard_dataset import ImageNetWebDataset
+from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 from hypersphere_dpp.config import ExperimentConfig
 from hypersphere_dpp.data import TEACHER_FEATURE_CANDIDATES_KEY, build_experiment_dataloaders
 from hypersphere_dpp.teacher_cache import ImageNetTeacherFeatureCache
@@ -31,26 +30,6 @@ def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
     buffer = io.BytesIO()
     image.save(buffer, format="JPEG")
     return buffer.getvalue()
-
-
-def _write_parquet(path: Path, rows: list[dict]) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    image_type = pa.struct(
-        [
-            ("bytes", pa.binary()),
-            ("path", pa.string()),
-        ]
-    )
-    table = pa.table(
-        {
-            "image": pa.array(
-                [{"bytes": row["image_bytes"], "path": row["path"]} for row in rows],
-                type=image_type,
-            ),
-            "label": pa.array([row["label"] for row in rows], type=pa.int64()),
-        }
-    )
-    pq.write_table(table, path, row_group_size=1)
 
 
 def _write_teacher_cache_zarr(path: Path, teacher_features: np.ndarray) -> None:
@@ -84,13 +63,6 @@ def _load_precompute_module():
     )
 
 
-def _load_webdataset_convert_module():
-    return _load_module(
-        "convert_imagenet_subsets_to_webdataset.py",
-        "convert_imagenet_subsets_to_webdataset_test",
-    )
-
-
 def _write_classes(root: Path) -> None:
     root.mkdir(parents=True, exist_ok=True)
     (root / "classes.py").write_text(
@@ -102,83 +74,79 @@ def _write_classes(root: Path) -> None:
     )
 
 
-def _build_small_parquet_source(root: Path) -> None:
-    data_root = root / "data"
-    data_root.mkdir(parents=True, exist_ok=True)
-    _write_classes(root)
-
-    train_rows = [
-        {
-            "image_bytes": _jpeg_bytes((255, 0, 0)),
-            "label": 0,
-            "path": "train-red.jpg",
-            "wnid": "n00000001",
-        },
-        {
-            "image_bytes": _jpeg_bytes((0, 255, 0)),
-            "label": 1,
-            "path": "train-green.jpg",
-            "wnid": "n00000002",
-        },
-    ]
-    validation_rows = [
-        {
-            "image_bytes": _jpeg_bytes((0, 0, 255)),
-            "label": 1,
-            "path": "validation-blue.jpg",
-            "wnid": "n00000002",
-        }
-    ]
-    _write_parquet(data_root / "train-00000-of-00001.parquet", train_rows)
-    _write_parquet(data_root / "validation-00000-of-00001.parquet", validation_rows)
+def _write_label_info(root: Path) -> None:
+    with (root / "label_info.json").open("w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "idx_to_wnid": {"0": "n00000001", "1": "n00000002"},
+                "idx_to_class_name": {"0": "red bird", "1": "green bird"},
+            },
+            handle,
+        )
 
 
-def _convert_source_to_webdataset(source_root: Path, output_root: Path) -> None:
-    module = _load_webdataset_convert_module()
-    [spec] = module.resolve_subset_specs(
-        imagenet_root=source_root,
-        dataset_names=["ImageNet1K"],
-        output_root=output_root,
-    )
-    split_summaries = module.convert_subset(
-        imagenet_root=source_root,
-        spec=spec,
-        max_shards_per_split=None,
-        overwrite=True,
-    )
-    module.write_metadata_files(
-        spec=spec,
-        imagenet_root=source_root,
-        split_summaries=split_summaries,
-    )
+def _write_h5_shard(path: Path, rows: list[dict]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    image_dtype = h5py.vlen_dtype(np.dtype("uint8"))
+    text_dtype = h5py.string_dtype(encoding="utf-8")
+    with h5py.File(path, "w") as handle:
+        image_ds = handle.create_dataset("image_bytes", shape=(len(rows),), dtype=image_dtype)
+        label_ds = handle.create_dataset("label", data=np.asarray([row["label"] for row in rows], dtype=np.int32))
+        path_ds = handle.create_dataset("path", shape=(len(rows),), dtype=text_dtype)
+        wnid_ds = handle.create_dataset("wnid", shape=(len(rows),), dtype=text_dtype)
+        for index, row in enumerate(rows):
+            image_ds[index] = np.frombuffer(row["image_bytes"], dtype=np.uint8)
+            path_ds[index] = row["path"]
+            wnid_ds[index] = row["wnid"]
+        label_ds[:] = np.asarray([row["label"] for row in rows], dtype=np.int32)
 
 
-def _write_source_parquet(
+def _write_h5_root(
     root: Path,
     *,
     train_rows: list[dict],
     validation_rows: list[dict],
 ) -> None:
     _write_classes(root)
+    _write_label_info(root)
     data_root = root / "data"
     data_root.mkdir(parents=True, exist_ok=True)
-    _write_parquet(data_root / "train-00000-of-00001.parquet", train_rows)
-    _write_parquet(
-        data_root / "validation-00000-of-00001.parquet",
-        validation_rows,
-    )
+    _write_h5_shard(data_root / "train-00000-of-00001.h5", train_rows)
+    _write_h5_shard(data_root / "validation-00000-of-00001.h5", validation_rows)
 
 
-class ImageNetWebDatasetTest(unittest.TestCase):
-    def test_dataset_reads_webdataset_rows(self):
+class ImageNetH5DatasetTest(unittest.TestCase):
+    def test_dataset_reads_h5_rows(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            source_root = Path(tmp_dir) / "source"
-            output_root = Path(tmp_dir) / "webdataset"
-            _build_small_parquet_source(source_root)
-            _convert_source_to_webdataset(source_root, output_root)
+            root = Path(tmp_dir) / "imagenet_h5"
+            _write_h5_root(
+                root,
+                train_rows=[
+                    {
+                        "image_bytes": _jpeg_bytes((255, 0, 0)),
+                        "label": 0,
+                        "path": "train-red.jpg",
+                        "wnid": "n00000001",
+                    },
+                    {
+                        "image_bytes": _jpeg_bytes((0, 255, 0)),
+                        "label": 1,
+                        "path": "train-green.jpg",
+                        "wnid": "n00000002",
+                    },
+                ],
+                validation_rows=[
+                    {
+                        "image_bytes": _jpeg_bytes((0, 0, 255)),
+                        "label": 1,
+                        "path": "validation-blue.jpg",
+                        "wnid": "n00000002",
+                    }
+                ],
+            )
 
-            train_dataset = ImageNetWebDataset(root=str(output_root), split="train")
-            val_dataset = ImageNetWebDataset(root=str(output_root), split="val")
+            train_dataset = ImageNetH5Dataset(root=str(root), split="train")
+            val_dataset = ImageNetH5Dataset(root=str(root), split="val")
 
             image, label, sample_index = train_dataset[1]
 
@@ -191,14 +159,30 @@ class ImageNetWebDatasetTest(unittest.TestCase):
 
     def test_dataset_can_fall_back_to_explicit_class_names(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            source_root = Path(tmp_dir) / "source"
-            output_root = Path(tmp_dir) / "webdataset"
-            _build_small_parquet_source(source_root)
-            _convert_source_to_webdataset(source_root, output_root)
-            (output_root / "label_info.json").unlink()
+            root = Path(tmp_dir) / "imagenet_h5"
+            _write_h5_root(
+                root,
+                train_rows=[
+                    {
+                        "image_bytes": _jpeg_bytes((255, 0, 0)),
+                        "label": 0,
+                        "path": "train-red.jpg",
+                        "wnid": "n00000001",
+                    }
+                ],
+                validation_rows=[
+                    {
+                        "image_bytes": _jpeg_bytes((0, 0, 255)),
+                        "label": 1,
+                        "path": "validation-blue.jpg",
+                        "wnid": "n00000002",
+                    }
+                ],
+            )
+            (root / "label_info.json").unlink()
 
-            dataset = ImageNetWebDataset(
-                root=str(output_root),
+            dataset = ImageNetH5Dataset(
+                root=str(root),
                 split="train",
                 class_names=["n00000001", "n00000002"],
             )
@@ -210,8 +194,7 @@ class ImageNetWebDatasetTest(unittest.TestCase):
 
     def test_dataset_exposes_labels_for_stratified_splits(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            source_root = Path(tmp_dir) / "source"
-            output_root = Path(tmp_dir) / "webdataset"
+            root = Path(tmp_dir) / "imagenet_h5"
 
             train_rows = []
             for label in (0, 1):
@@ -224,8 +207,8 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                             "wnid": f"n0000000{label + 1}",
                         }
                     )
-            _write_source_parquet(
-                source_root,
+            _write_h5_root(
+                root,
                 train_rows=train_rows,
                 validation_rows=[
                     {
@@ -236,16 +219,15 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                     }
                 ],
             )
-            _convert_source_to_webdataset(source_root, output_root)
 
-            dataset = ImageNetWebDataset(root=str(output_root), split="train")
+            dataset = ImageNetH5Dataset(root=str(root), split="train")
             self.assertEqual(dataset.labels.count(0), 10)
             self.assertEqual(dataset.labels.count(1), 10)
             self.assertEqual(dataset.targets, dataset.labels)
 
             config = ExperimentConfig(
                 dataset="ImageNet1K",
-                dataset_dir=str(output_root),
+                dataset_dir=str(root),
                 class_num=2,
                 image_size=8,
                 feature_dim=512,
@@ -263,8 +245,7 @@ class ImageNetWebDatasetTest(unittest.TestCase):
 
     def test_dataloaders_can_use_imagenet_teacher_feature_cache(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
-            source_root = Path(tmp_dir) / "source"
-            output_root = Path(tmp_dir) / "webdataset"
+            root = Path(tmp_dir) / "imagenet_h5"
 
             train_rows = []
             for label in (0, 1):
@@ -277,8 +258,8 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                             "wnid": f"n0000000{label + 1}",
                         }
                     )
-            _write_source_parquet(
-                source_root,
+            _write_h5_root(
+                root,
                 train_rows=train_rows,
                 validation_rows=[
                     {
@@ -289,7 +270,6 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                     }
                 ],
             )
-            _convert_source_to_webdataset(source_root, output_root)
 
             cache_root = Path(tmp_dir) / "teacher_cache_vitb16_imagenet1k_two_view_views6"
             cache_root.mkdir(parents=True, exist_ok=True)
@@ -318,7 +298,7 @@ class ImageNetWebDatasetTest(unittest.TestCase):
 
             config = ExperimentConfig(
                 dataset="ImageNet1K",
-                dataset_dir=str(output_root),
+                dataset_dir=str(root),
                 class_num=2,
                 image_size=8,
                 feature_dim=512,

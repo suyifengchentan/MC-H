@@ -13,6 +13,8 @@ imagenet1k_cached_teacher_num_views: 6
 imagenet1k_cached_teacher_dtype: "float16"
 # Teacher cache layout:
 # data/train-*.zarr, metadata.json
+# ImageNet HDF5 shard layout:
+# data/train-*.h5, data/validation-*.h5, label_info.json
 
 # Model
 image_size: 224
@@ -91,6 +93,9 @@ workers: 12
 train_prefetch_factor: 3
 eval_prefetch_factor: 2
 persistent_workers: true
+step_profile_enabled: true
+step_profile_log_interval: 1
+step_profile_cuda_sync: true
 distributed_batch_size_mode: "global"
 reload: false
 seed: 42

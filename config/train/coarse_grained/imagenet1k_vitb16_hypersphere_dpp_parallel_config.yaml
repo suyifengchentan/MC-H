@@ -2,7 +2,7 @@
 
 # Data
 dataset: "ImageNet1K"
-dataset_dir: "/111/ImageNet1KWebDataset"
+dataset_dir: "/home/geyingjie/hypersphere-data/ImageNet1K"
 class_num: 1000
 validation_ratio: 0.01
 validation_seed: 42
@@ -13,8 +13,8 @@ imagenet1k_cached_teacher_num_views: 6
 imagenet1k_cached_teacher_dtype: "float16"
 # Teacher cache layout:
 # data/train-*.zarr, metadata.json
-# WebDataset tar shard layout:
-# data/train-*.tar, data/train-*.index.npz, data/validation-*.tar, data/validation-*.index.npz, label_info.json
+# ImageNet HDF5 shard layout:
+# data/train-*.h5, data/validation-*.h5, label_info.json
 
 # Model
 image_size: 224

@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
-from datasets.imagenet_shard_dataset import ImageNetWebDataset
+from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
 from datasets.stanford_dogs_dataset import StanfordDogsDataset
@@ -322,25 +322,27 @@ def _default_official_eval_split(dataset_name: str) -> str:
     raise ValueError(f"Unsupported dataset: {dataset_name}")
 
 
-def _build_imagenet_webdataset_datasets(
+def _build_imagenet_h5_datasets(
     config: ExperimentConfig,
     official_eval_split: str,
 ) -> tuple[Dataset, Dataset]:
     label_wnids = load_label_wnids(config.dataset)
     class_names = label_wnids or None
-    train_base = ImageNetWebDataset(
+    train_base = ImageNetH5Dataset(
         root=config.dataset_dir,
         split="train",
         transform=None,
         class_names=class_names,
     )
-    eval_base = ImageNetWebDataset(
+    eval_base = ImageNetH5Dataset(
         root=config.dataset_dir,
         split=official_eval_split,
         transform=None,
         class_names=class_names,
     )
     return train_base, eval_base
+
+
 def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
     official_eval_split = config.official_eval_split or _default_official_eval_split(
         config.dataset
@@ -379,13 +381,13 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "Image10":
-        return _build_imagenet_webdataset_datasets(config, official_eval_split)
+        return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset == "ImageNet1K":
-        return _build_imagenet_webdataset_datasets(config, official_eval_split)
+        return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset in {"Image50", "Image100", "Image200"}:
-        return _build_imagenet_webdataset_datasets(config, official_eval_split)
+        return _build_imagenet_h5_datasets(config, official_eval_split)
 
     if config.dataset == "TinyImageNet200":
         train_base = TinyImageNetDataset(

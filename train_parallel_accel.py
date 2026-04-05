@@ -182,6 +182,12 @@ def main():
                 world_size,
                 train_sampler is not None,
             )
+            if config.step_profile_enabled:
+                logger.info(
+                    "step profiling: enabled=True log_interval=%d cuda_sync=%s",
+                    config.step_profile_log_interval,
+                    config.step_profile_cuda_sync,
+                )
             logger.info(
                 "train batch: mode=%s requested=%d per_rank=%d effective_global=%d",
                 config.distributed_batch_size_mode,

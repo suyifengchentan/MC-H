@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import time
 from contextlib import nullcontext
 
 import torch
@@ -72,6 +73,19 @@ def use_cached_teacher_feature_candidates(batch: dict) -> bool:
     return TEACHER_FEATURE_CANDIDATES_KEY in batch
 
 
+def maybe_profile_sync(device: torch.device, enabled: bool) -> None:
+    if enabled and device.type == "cuda":
+        torch.cuda.synchronize(device)
+
+
+def should_log_step_profile(step: int, num_steps: int, profile_log_interval: int) -> bool:
+    return (
+        step == 0
+        or (step + 1) == num_steps
+        or ((step + 1) % max(1, profile_log_interval) == 0)
+    )
+
+
 def train_one_epoch(
     model: HypersphereDPPModel,
     dataloader,
@@ -103,8 +117,18 @@ def train_one_epoch(
     }
     num_steps = len(dataloader)
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
+    step_profile_enabled = config.step_profile_enabled
+    step_profile_cuda_sync = step_profile_enabled and config.step_profile_cuda_sync
+    data_iter = iter(dataloader)
+    previous_step_end = time.perf_counter()
 
-    for step, batch in enumerate(dataloader):
+    for step in range(num_steps):
+        batch = next(data_iter)
+        if step_profile_enabled:
+            data_wait_ms = (time.perf_counter() - previous_step_end) * 1000.0
+            maybe_profile_sync(device, step_profile_cuda_sync)
+            transfer_start = time.perf_counter()
+
         teacher_feature_candidates = None
         if use_cached_teacher_feature_candidates(batch):
             teacher_feature_candidates = batch[TEACHER_FEATURE_CANDIDATES_KEY].to(
@@ -116,6 +140,11 @@ def train_one_epoch(
                 raise ValueError("gpu_train_transform must be provided for image-based training batches.")
             images = batch["image"].to(device, non_blocking=True)
             view1, view2 = gpu_train_transform(images)
+
+        if step_profile_enabled:
+            maybe_profile_sync(device, step_profile_cuda_sync)
+            forward_start = time.perf_counter()
+            batch_to_device_ms = (forward_start - transfer_start) * 1000.0
 
         optimizer.zero_grad(set_to_none=True)
         autocast_kwargs = {"device_type": amp_device_type, "enabled": use_amp}
@@ -245,11 +274,25 @@ def train_one_epoch(
                 + alpha_div * dpp_loss
             )
 
+        if step_profile_enabled:
+            maybe_profile_sync(device, step_profile_cuda_sync)
+            backward_start = time.perf_counter()
+            forward_ms = (backward_start - forward_start) * 1000.0
+
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
         model.normalize_prototypes()
         queue.enqueue(teacher_cat, assignment_cat)
+
+        if step_profile_enabled:
+            maybe_profile_sync(device, step_profile_cuda_sync)
+            step_end = time.perf_counter()
+            backward_ms = (step_end - backward_start) * 1000.0
+            step_total_ms = (step_end - transfer_start) * 1000.0
+            previous_step_end = step_end
+        else:
+            previous_step_end = time.perf_counter()
 
         totals["loss"] += float(loss.item())
         totals["inst_loss"] += float(inst_loss.item())
@@ -282,6 +325,25 @@ def train_one_epoch(
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
                 totals["rho"] / running_denom,
+            )
+        if step_profile_enabled and should_log_step_profile(
+            step,
+            num_steps,
+            config.step_profile_log_interval,
+        ):
+            logger.info(
+                (
+                    "epoch=%03d step=%04d/%04d "
+                    "profile_ms data_wait=%.2f batch_to_device=%.2f forward=%.2f backward=%.2f step_total=%.2f"
+                ),
+                epoch,
+                step + 1,
+                num_steps,
+                data_wait_ms,
+                batch_to_device_ms,
+                forward_ms,
+                backward_ms,
+                step_total_ms,
             )
 
     denom = max(len(dataloader), 1)
@@ -425,6 +487,12 @@ def main():
         datasets.train_loader.persistent_workers,
         train_prefetch_factor,
     )
+    if config.step_profile_enabled:
+        logger.info(
+            "step profiling: enabled=True log_interval=%d cuda_sync=%s",
+            config.step_profile_log_interval,
+            config.step_profile_cuda_sync,
+        )
     if config.uses_imagenet1k_cached_teacher_views:
         logger.info(
             "imagenet1k cached teacher views: enabled=True dir=%s num_views=%d dtype=%s sampled_views=2",

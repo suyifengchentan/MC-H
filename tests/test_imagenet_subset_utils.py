@@ -17,7 +17,7 @@ class ImageNetSubsetUtilsTest(unittest.TestCase):
         [spec] = module.build_subset_specs(["ImageNet1K"], imagenet_items)
 
         self.assertEqual(spec.dataset_name, "ImageNet1K")
-        self.assertEqual(spec.output_root, Path("/home/geyingjie/hypersphere-data/ImageNet1KWebDataset"))
+        self.assertEqual(spec.output_root, Path("/home/geyingjie/hypersphere-data/ImageNet1K"))
         self.assertEqual([entry.wnid for entry in spec.entries], ["n00000001", "n00000002"])
         self.assertEqual(spec.source_label_to_subset_label, {0: 0, 1: 1})
         self.assertEqual(spec.subset_label_to_wnid, {0: "n00000001", 1: "n00000002"})

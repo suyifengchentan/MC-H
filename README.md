@@ -182,13 +182,13 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 针对 `Image10`、`Image50`、`Image100`、`Image200`、`TinyImageNet200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
 
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
-- `imagenet1k_two_view`: 面向完整 `ImageNet1K` WebDataset tar shard 导出，采用中等强度的自然图像增强
+- `imagenet1k_two_view`: 面向完整 `ImageNet1K` HDF5 shard 导出，采用中等强度的自然图像增强
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
 - `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
 - `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
 
-`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200` 现已统一切换到同一套 WebDataset tar shard 数据协议，默认目录分别是：
+`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200` 统一使用分片式 ImageNet 存储协议；当前主线直接读取 HDF5 shard，默认目录分别是：
 
 - `Image10`: `/home/geyingjie/hypersphere-data/imagenet-10`
 - `ImageNet1K`: `/home/geyingjie/hypersphere-data/ImageNet1K`
@@ -200,12 +200,9 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 
 ```text
 root/
-  data/train-*.tar
-  data/train-*.index.npz
-  data/validation-*.tar
-  data/validation-*.index.npz
+  data/train-*.h5
+  data/validation-*.h5
   label_info.json
-  metadata.json
 ```
 
 类别子集定义放在 `config/labels/` 下：
@@ -214,7 +211,7 @@ root/
 - `config/labels/imagenet_100.rtf`
 - `config/labels/imagenet_200.rtf`
 
-这些文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 WebDataset tar shard。
+这些文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 HDF5 shard。
 
 `ImageNet1K` 训练若启用 cached teacher views，teacher 特征缓存目录也统一为：
 
@@ -224,23 +221,13 @@ cache_root/
   metadata.json
 ```
 
-若需要从原始 ImageNet parquet shard 直接导出成 WebDataset tar shard，可运行：
-
-```bash
-/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_webdataset.py \
-  --imagenet-root /path/to/imagenet-1k \
-  --datasets ImageNet1K \
-  --output-root /path/to/imagenet_webdataset_root
-```
-
-脚本会读取现有的 `data/train-*.parquet` / `data/validation-*.parquet` / `data/test-*.parquet`，并导出为 `data/*.tar` 以及配套的 `data/*.index.npz`。每个 tar shard 都保持 WebDataset 风格样本布局，配套索引用于当前训练代码的随机访问。
-
-每个 WebDataset shard 至少包含以下内容：
+每个 ImageNet HDF5 shard 至少包含以下内容：
 
 ```text
-<key>.jpg: 原始 JPEG bytes
-<key>.cls: 子集内重映射后的连续标签
-index.npz: offsets / sizes / labels 随机访问索引
+image_bytes: 原始 JPEG bytes（以变长 uint8 数组存储）
+label: 连续标签
+path: 原始图像路径
+wnid: 类别 wnid
 ```
 
 其中 `Image10` 的 `official_eval_split` 默认使用 `test`，`ImageNet1K/Image50/Image100/Image200` 默认使用 `val`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
@@ -249,12 +236,9 @@ index.npz: offsets / sizes / labels 随机访问索引
 
 ```text
 root/
-  data/train-*.tar
-  data/train-*.index.npz
-  data/validation-*.tar 或 data/test-*.tar
-  data/validation-*.index.npz 或 data/test-*.index.npz
+  data/train-*.h5
+  data/validation-*.h5 或 data/test-*.h5
   label_info.json
-  metadata.json
 ```
 
 ## Git Ignore 规则
