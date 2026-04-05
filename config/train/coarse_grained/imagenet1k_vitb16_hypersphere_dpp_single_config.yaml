@@ -2,13 +2,13 @@
 
 # Data
 dataset: "ImageNet1K"
-dataset_dir: "/home/geyingjie/hypersphere-data/ImageNet1K"
+dataset_dir: "/home/geyingjie/hypersphere-data/ImageNet1KWebDataset"
 class_num: 1000
 validation_ratio: 0.01
 validation_seed: 42
 official_eval_split: "val"
 imagenet1k_cached_teacher_views_enabled: true
-imagenet1k_cached_teacher_views_dir: "/home/geyingjie/hypersphere-data/ImageNet1K/teacher_cache_vitb16_imagenet1k_two_view_views6"
+imagenet1k_cached_teacher_views_dir: "/home/geyingjie/hypersphere-data/ImageNet1KWebDataset/teacher_cache_vitb16_imagenet1k_two_view_views6"
 imagenet1k_cached_teacher_num_views: 6
 imagenet1k_cached_teacher_dtype: "float16"
 # Teacher cache layout:
