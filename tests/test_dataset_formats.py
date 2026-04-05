@@ -7,7 +7,6 @@ from pathlib import Path
 
 from PIL import Image
 
-from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.tiny_imagenet_dataset import (
     TinyImageNetDataset,
     load_tiny_imagenet_class_texts,
@@ -20,24 +19,6 @@ def _write_image(path: Path, color: tuple[int, int, int]) -> None:
 
 
 class DatasetFormatsTest(unittest.TestCase):
-    def test_indexed_image_folder_resolves_split_alias_groups(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            root = Path(tmp_dir)
-            _write_image(root / "train.X1" / "n0001" / "a.jpg", (255, 0, 0))
-            _write_image(root / "train.X2" / "n0002" / "b.jpg", (0, 255, 0))
-            _write_image(root / "val.X" / "n0001" / "c.jpg", (0, 0, 255))
-            _write_image(root / "val.X" / "n0002" / "d.jpg", (255, 255, 0))
-
-            train_dataset = IndexedImageFolderDataset(str(root), split="train")
-            val_dataset = IndexedImageFolderDataset(str(root), split="val")
-
-            self.assertEqual(len(train_dataset), 2)
-            self.assertEqual(len(val_dataset), 2)
-            self.assertEqual(train_dataset.classes, ["n0001", "n0002"])
-            self.assertEqual(train_dataset.class_to_idx["n0001"], 0)
-            self.assertEqual(train_dataset.class_to_idx["n0002"], 1)
-            self.assertEqual(sorted(target for _, target in train_dataset.samples), [0, 1])
-
     def test_tiny_imagenet_supports_standard_train_val_and_test(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir)

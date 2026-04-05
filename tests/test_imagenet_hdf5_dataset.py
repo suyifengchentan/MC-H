@@ -43,14 +43,6 @@ def _write_h5(path: Path, rows: list[dict]) -> None:
         handle.create_dataset("label", data=np.asarray([row["label"] for row in rows], dtype=np.int32), chunks=(1,))
         handle.create_dataset("path", data=np.asarray([row["path"] for row in rows], dtype=object), dtype=utf8_dtype)
         handle.create_dataset("wnid", data=np.asarray([row["wnid"] for row in rows], dtype=object), dtype=utf8_dtype)
-
-
-def _write_teacher_cache_h5(path: Path, teacher_features: np.ndarray) -> None:
-    path.parent.mkdir(parents=True, exist_ok=True)
-    with h5py.File(path, "w") as handle:
-        handle.create_dataset("teacher_features", data=teacher_features)
-
-
 def _write_teacher_cache_zarr(path: Path, teacher_features: np.ndarray) -> None:
     if zarr is None:
         raise unittest.SkipTest("zarr is not installed")
@@ -310,12 +302,20 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                         "num_views": 6,
                         "feature_dim": 512,
                         "dtype": "float16",
+                        "storage_format": "zarr",
+                        "shards": [
+                            {
+                                "name": "train-00000-of-00001.zarr",
+                                "num_rows": 20,
+                                "start_index": 0,
+                            }
+                        ],
                     },
                     handle,
                 )
             teacher_features = np.random.randn(20, 6, 512).astype(np.float16)
-            _write_teacher_cache_h5(
-                cache_root / "data" / "train-00000-of-00001.h5",
+            _write_teacher_cache_zarr(
+                cache_root / "data" / "train-00000-of-00001.zarr",
                 teacher_features,
             )
 
@@ -345,21 +345,22 @@ class ImageNetWebDatasetTest(unittest.TestCase):
             self.assertNotIn("image", batch)
             self.assertEqual(batch[TEACHER_FEATURE_CANDIDATES_KEY].shape[1:], (6, 512))
 
+    @unittest.skipIf(zarr is None, "zarr is not installed")
     def test_precompute_shard_progress_reads_rows_written(self):
         module = _load_precompute_module()
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            shard_path = Path(tmp_dir) / "train-00000-of-00001.h5"
-            shard_path.parent.mkdir(parents=True, exist_ok=True)
-            with h5py.File(shard_path, "w") as handle:
-                handle.create_dataset(
-                    "teacher_features",
-                    shape=(10, 6, 512),
-                    dtype="float16",
-                )
-                handle.attrs["rows_written"] = 4
+            shard_path = Path(tmp_dir) / "train-00000-of-00001.zarr"
+            shard_array = zarr.open(
+                shard_path,
+                mode="w",
+                shape=(10, 6, 512),
+                chunks=(2, 6, 512),
+                dtype="float16",
+            )
+            shard_array.attrs["rows_written"] = 4
 
-            handle, teacher_features_ds, rows_written = module.prepare_cache_shard(
+            teacher_features_ds, rows_written = module.prepare_cache_shard(
                 shard_path,
                 expected_num_rows=10,
                 expected_num_views=6,
@@ -369,45 +370,12 @@ class ImageNetWebDatasetTest(unittest.TestCase):
                 overwrite=False,
             )
             teacher_features_shape = tuple(int(dim) for dim in teacher_features_ds.shape)
-            handle.close()
 
             self.assertEqual(teacher_features_shape, (10, 6, 512))
             self.assertEqual(rows_written, 4)
 
-    def test_teacher_cache_get_many_preserves_order_for_hdf5(self):
-        with tempfile.TemporaryDirectory() as tmp_dir:
-            cache_root = Path(tmp_dir)
-            (cache_root / "data").mkdir(parents=True, exist_ok=True)
-            teacher_features = np.arange(10 * 6 * 4, dtype=np.float16).reshape(10, 6, 4)
-            _write_teacher_cache_h5(
-                cache_root / "data" / "train-00000-of-00001.h5",
-                teacher_features,
-            )
-            with (cache_root / "metadata.json").open("w", encoding="utf-8") as handle:
-                json.dump(
-                    {
-                        "num_views": 6,
-                        "feature_dim": 4,
-                        "dtype": "float16",
-                        "shards": [
-                            {
-                                "name": "train-00000-of-00001.h5",
-                                "num_rows": 10,
-                                "start_index": 0,
-                            }
-                        ],
-                    },
-                    handle,
-                )
-
-            cache = ImageNetTeacherFeatureCache(cache_root)
-            batch = cache.get_many([7, 1, 8, 2])
-
-            expected = torch.from_numpy(teacher_features[[7, 1, 8, 2]])
-            self.assertTrue(torch.equal(batch, expected))
-
     @unittest.skipIf(zarr is None, "zarr is not installed")
-    def test_teacher_cache_reads_zarr_backend(self):
+    def test_teacher_cache_get_many_preserves_order_for_zarr(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             cache_root = Path(tmp_dir)
             (cache_root / "data").mkdir(parents=True, exist_ok=True)

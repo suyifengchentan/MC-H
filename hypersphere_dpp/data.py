@@ -13,7 +13,6 @@ from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
 from datasets.imagenet_shard_dataset import ImageNetWebDataset
-from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
 from datasets.stanford_dogs_dataset import StanfordDogsDataset
@@ -380,13 +379,7 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "Image10":
-        train_base = IndexedImageFolderDataset(
-            root=config.dataset_dir, split=None, transform=None
-        )
-        eval_base = IndexedImageFolderDataset(
-            root=config.dataset_dir, split=official_eval_split, transform=None
-        )
-        return train_base, eval_base
+        return _build_imagenet_webdataset_datasets(config, official_eval_split)
 
     if config.dataset == "ImageNet1K":
         return _build_imagenet_webdataset_datasets(config, official_eval_split)

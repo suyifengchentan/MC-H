@@ -188,16 +188,9 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 - `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
 - `tiny_imagenet200_two_view`: 温和裁剪、较小颜色扰动，不使用模糊，避免低分辨率图像被破坏
 
-Image10 默认假设数据目录为标准 `ImageFolder` 结构：
+`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200` 现已统一切换到同一套 WebDataset tar shard 数据协议，默认目录分别是：
 
-```text
-root/
-  train/<class_name>/*.jpg
-  val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
-```
-
-`ImageNet1K`、`Image50`、`Image100`、`Image200` 现已统一切换到同一套 WebDataset tar shard 数据协议，默认目录分别是：
-
+- `Image10`: `/home/geyingjie/hypersphere-data/imagenet-10`
 - `ImageNet1K`: `/home/geyingjie/hypersphere-data/ImageNet1K`
 - `Image50`: `/home/geyingjie/hypersphere-data/Image50`
 - `Image100`: `/home/geyingjie/hypersphere-data/Image100`
@@ -221,7 +214,15 @@ root/
 - `config/labels/imagenet_100.rtf`
 - `config/labels/imagenet_200.rtf`
 
-这三份文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 WebDataset tar shard。
+这些文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 WebDataset tar shard。
+
+`ImageNet1K` 训练若启用 cached teacher views，teacher 特征缓存目录也统一为：
+
+```text
+cache_root/
+  data/train-*.zarr
+  metadata.json
+```
 
 若需要把现有 ImageNet HDF5 shard 导出成 WebDataset tar shard，可运行：
 
@@ -241,7 +242,7 @@ root/
 index.npz: offsets / sizes / labels 随机访问索引
 ```
 
-其中 `ImageNet1K/Image50/Image100/Image200` 的 `official_eval_split` 默认都使用 `val`，内部会读取 `validation-*.tar`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
+其中 `Image10` 的 `official_eval_split` 默认使用 `test`，`ImageNet1K/Image50/Image100/Image200` 默认使用 `val`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
 
 统一目录结构为：
 

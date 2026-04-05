@@ -3,6 +3,8 @@
 # Data
 dataset: "Image10"
 dataset_dir: "/home/geyingjie/hypersphere-data/imagenet-10"
+# WebDataset tar shard layout:
+# data/train-*.tar, data/train-*.index.npz, data/test-*.tar, data/test-*.index.npz, label_info.json
 class_num: 10
 validation_ratio: 0.1
 validation_seed: 42

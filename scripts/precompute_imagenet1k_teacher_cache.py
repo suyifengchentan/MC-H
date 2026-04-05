@@ -3,14 +3,14 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import shutil
 import sys
-import time
 from contextlib import nullcontext
 from pathlib import Path
 
-import h5py
 import torch
 import torch.distributed as dist
+import zarr
 from torch import amp
 from torch.utils.data import DataLoader, Subset
 
@@ -31,7 +31,7 @@ from train import resolve_amp_settings
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Precompute 6-way ImageNet-1K teacher feature candidates for cached 6-choose-2 training."
+            "Precompute ImageNet-1K teacher feature candidates into sharded zarr arrays."
         )
     )
     parser.add_argument(
@@ -136,33 +136,13 @@ def assigned_shard_indices(num_shards: int, rank: int, world_size: int) -> range
     return range(rank, num_shards, world_size)
 
 
-def open_h5_file_with_retry(
-    path: Path,
-    mode: str,
-    *,
-    attempts: int = 20,
-    sleep_seconds: float = 0.5,
-    locking: bool | None = False,
-) -> h5py.File:
-    last_error: BlockingIOError | None = None
-    for attempt in range(attempts):
-        try:
-            if locking is None:
-                return h5py.File(path, mode)
-            return h5py.File(path, mode, locking=locking)
-        except TypeError:
-            # Older h5py builds may not expose the locking kwarg. Fall back to
-            # the default open behavior in that case.
-            return h5py.File(path, mode)
-        except BlockingIOError as error:
-            last_error = error
-            if attempt + 1 >= attempts:
-                break
-            time.sleep(sleep_seconds)
-
-    raise BlockingIOError(
-        f"Unable to open HDF5 file after {attempts} attempts due to file locking: {path}"
-    ) from last_error
+def _remove_existing_output(path: Path) -> None:
+    if not path.exists():
+        return
+    if path.is_dir():
+        shutil.rmtree(path)
+        return
+    path.unlink()
 
 
 def validate_existing_cache_shard(
@@ -172,8 +152,8 @@ def validate_existing_cache_shard(
     expected_num_views: int,
     expected_feature_dim: int,
 ) -> int:
-    with open_h5_file_with_retry(output_path, "r") as handle:
-        cached_shape = tuple(int(dim) for dim in handle["teacher_features"].shape)
+    array = zarr.open(output_path, mode="r")
+    cached_shape = tuple(int(dim) for dim in array.shape)
     expected_shape = (
         expected_num_rows,
         expected_num_views,
@@ -188,15 +168,12 @@ def validate_existing_cache_shard(
 
 
 def resolve_rows_written(
-    handle: h5py.File,
+    array: zarr.Array,
     *,
     expected_num_rows: int,
 ) -> int:
-    rows_written_raw = handle.attrs.get("rows_written")
+    rows_written_raw = array.attrs.get("rows_written")
     if rows_written_raw is None:
-        # Legacy cache shards created before resume support do not carry
-        # incremental progress metadata. Treat them as complete so they can
-        # still be reused, but partial legacy shards should be deleted.
         return expected_num_rows
 
     rows_written = int(rows_written_raw)
@@ -216,53 +193,41 @@ def prepare_cache_shard(
     dtype_name: str,
     batch_size: int,
     overwrite: bool,
-) -> tuple[h5py.File, h5py.Dataset, int]:
-    if output_path.exists() and not overwrite:
-        handle = open_h5_file_with_retry(output_path, "r+")
-        if "teacher_features" not in handle:
-            handle.close()
-            raise KeyError(
-                f"Existing cache shard is missing required dataset 'teacher_features': {output_path}"
-            )
+) -> tuple[zarr.Array, int]:
+    expected_shape = (
+        expected_num_rows,
+        expected_num_views,
+        expected_feature_dim,
+    )
 
-        teacher_features_ds = handle["teacher_features"]
-        cached_shape = tuple(int(dim) for dim in teacher_features_ds.shape)
-        expected_shape = (
-            expected_num_rows,
-            expected_num_views,
-            expected_feature_dim,
-        )
+    if output_path.exists() and not overwrite:
+        array = zarr.open(output_path, mode="r+")
+        cached_shape = tuple(int(dim) for dim in array.shape)
         if cached_shape != expected_shape:
-            handle.close()
             raise ValueError(
                 f"Existing cache shard {output_path} has shape {cached_shape}, expected {expected_shape}. "
                 "Remove it or rerun with --overwrite."
             )
-
         rows_written = resolve_rows_written(
-            handle,
+            array,
             expected_num_rows=expected_num_rows,
         )
-        return handle, teacher_features_ds, rows_written
+        return array, rows_written
 
-    handle = open_h5_file_with_retry(output_path, "w")
-    teacher_features_ds = handle.create_dataset(
-        "teacher_features",
-        shape=(
-            expected_num_rows,
-            expected_num_views,
-            expected_feature_dim,
-        ),
-        dtype=dtype_name,
+    _remove_existing_output(output_path)
+    array = zarr.open(
+        output_path,
+        mode="w",
+        shape=expected_shape,
         chunks=(
             min(max(1, batch_size), expected_num_rows),
             expected_num_views,
             expected_feature_dim,
         ),
+        dtype=dtype_name,
     )
-    handle.attrs["rows_written"] = 0
-    handle.flush()
-    return handle, teacher_features_ds, 0
+    array.attrs["rows_written"] = 0
+    return array, 0
 
 
 def build_metadata(
@@ -275,7 +240,8 @@ def build_metadata(
 ) -> dict[str, object]:
     shard_summaries: list[dict[str, int | str]] = []
     for shard in dataset.shards:
-        output_path = cache_root / "data" / shard.path.name
+        output_name = Path(shard.path.name).with_suffix(".zarr").name
+        output_path = cache_root / "data" / output_name
         cached_rows = validate_existing_cache_shard(
             output_path,
             expected_num_rows=shard.num_rows,
@@ -284,7 +250,7 @@ def build_metadata(
         )
         shard_summaries.append(
             {
-                "name": output_path.name,
+                "name": output_name,
                 "num_rows": cached_rows,
                 "start_index": shard.start_index,
             }
@@ -298,6 +264,7 @@ def build_metadata(
         "num_views": config.imagenet1k_cached_teacher_num_views,
         "feature_dim": config.feature_dim,
         "dtype": save_dtype_name,
+        "storage_format": "zarr",
         "backbone_name": config.backbone_name,
         "pretrained": config.pretrained,
         "pretrained_checkpoint": config.pretrained_checkpoint,
@@ -376,15 +343,16 @@ def main() -> int:
             log(
                 (
                     f"teacher_cache: num_views={config.imagenet1k_cached_teacher_num_views} "
-                    f"feature_dim={config.feature_dim} dtype={save_dtype_name}"
+                    f"feature_dim={config.feature_dim} dtype={save_dtype_name} storage=zarr"
                 ),
                 rank=rank,
             )
 
         for shard_index in assigned_shard_indices(len(dataset.shards), rank, world_size):
             shard = dataset.shards[shard_index]
-            output_path = output_data_root / shard.path.name
-            handle, teacher_features_ds, write_offset = prepare_cache_shard(
+            output_name = Path(shard.path.name).with_suffix(".zarr").name
+            output_path = output_data_root / output_name
+            teacher_features_array, write_offset = prepare_cache_shard(
                 output_path,
                 expected_num_rows=shard.num_rows,
                 expected_num_views=config.imagenet1k_cached_teacher_num_views,
@@ -394,7 +362,6 @@ def main() -> int:
                 overwrite=args.overwrite,
             )
             if write_offset >= shard.num_rows:
-                handle.close()
                 log(
                     f"[skip] {output_path.name} already complete ({write_offset} rows)",
                     rank=rank,
@@ -433,53 +400,49 @@ def main() -> int:
                 collate_fn=safe_default_collate,
             )
 
-            with handle:
-                for images, _labels, _indices in loader:
-                    images = images.to(device, non_blocking=True)
-                    feature_views: list[torch.Tensor] = []
-                    view_batches_needed = (
-                        config.imagenet1k_cached_teacher_num_views + 1
-                    ) // 2
+            for images, _labels, _indices in loader:
+                images = images.to(device, non_blocking=True)
+                feature_views: list[torch.Tensor] = []
+                view_batches_needed = (
+                    config.imagenet1k_cached_teacher_num_views + 1
+                ) // 2
 
-                    autocast_kwargs = {
-                        "device_type": amp_device_type,
-                        "enabled": use_amp,
-                    }
-                    if amp_dtype is not None:
-                        autocast_kwargs["dtype"] = amp_dtype
-                    amp_context = (
-                        amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
-                    )
-                    with torch.no_grad():
-                        with amp_context:
-                            for _ in range(view_batches_needed):
-                                view_a, view_b = gpu_train_transform(images)
-                                feature_views.append(backbone(view_a))
-                                if (
-                                    len(feature_views)
-                                    < config.imagenet1k_cached_teacher_num_views
-                                ):
-                                    feature_views.append(backbone(view_b))
+                autocast_kwargs = {
+                    "device_type": amp_device_type,
+                    "enabled": use_amp,
+                }
+                if amp_dtype is not None:
+                    autocast_kwargs["dtype"] = amp_dtype
+                amp_context = (
+                    amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
+                )
+                with torch.no_grad():
+                    with amp_context:
+                        for _ in range(view_batches_needed):
+                            view_a, view_b = gpu_train_transform(images)
+                            feature_views.append(backbone(view_a))
+                            if (
+                                len(feature_views)
+                                < config.imagenet1k_cached_teacher_num_views
+                            ):
+                                feature_views.append(backbone(view_b))
 
-                    stacked = torch.stack(
-                        feature_views[: config.imagenet1k_cached_teacher_num_views],
-                        dim=1,
-                    ).to(save_dtype)
-                    batch_size = stacked.size(0)
-                    teacher_features_ds[
-                        write_offset : write_offset + batch_size
-                    ] = stacked.cpu().numpy()
-                    write_offset += batch_size
-                    handle.attrs["rows_written"] = write_offset
-                    handle.flush()
+                stacked = torch.stack(
+                    feature_views[: config.imagenet1k_cached_teacher_num_views],
+                    dim=1,
+                ).to(save_dtype)
+                batch_size = stacked.size(0)
+                teacher_features_array[
+                    write_offset : write_offset + batch_size
+                ] = stacked.cpu().numpy()
+                write_offset += batch_size
+                teacher_features_array.attrs["rows_written"] = write_offset
 
-                if write_offset != shard.num_rows:
-                    raise RuntimeError(
-                        f"Teacher cache row count mismatch for {output_path}: expected {shard.num_rows}, wrote {write_offset}."
-                    )
-                handle.attrs["rows_written"] = write_offset
-                handle.flush()
-
+            if write_offset != shard.num_rows:
+                raise RuntimeError(
+                    f"Teacher cache row count mismatch for {output_path}: expected {shard.num_rows}, wrote {write_offset}."
+                )
+            teacher_features_array.attrs["rows_written"] = write_offset
             log(f"[done] {output_path.name} ({shard.num_rows} rows)", rank=rank, force=True)
 
         maybe_barrier(world_size)

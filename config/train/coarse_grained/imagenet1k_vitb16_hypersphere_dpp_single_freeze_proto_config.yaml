@@ -11,6 +11,8 @@ imagenet1k_cached_teacher_views_enabled: true
 imagenet1k_cached_teacher_views_dir: "/home/geyingjie/hypersphere-data/ImageNet1K/teacher_cache_vitb16_imagenet1k_two_view_views6"
 imagenet1k_cached_teacher_num_views: 6
 imagenet1k_cached_teacher_dtype: "float16"
+# Teacher cache layout:
+# data/train-*.zarr, metadata.json
 
 # Model
 image_size: 224

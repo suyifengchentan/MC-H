@@ -12,7 +12,6 @@ import torch.nn.functional as F
 
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar100_dataset import CIFAR100Dataset
-from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.stl10_dataset import STL10Dataset
 from datasets.tiny_imagenet_dataset import load_tiny_imagenet_class_texts
 
@@ -256,6 +255,14 @@ def _load_imagenet1k_class_texts(dataset_dir: str) -> list[str]:
                 for _, name in sorted_pairs
             ]
 
+        idx_to_wnid = raw.get("idx_to_wnid")
+        if isinstance(idx_to_wnid, dict) and idx_to_wnid:
+            sorted_pairs = sorted((int(index), name) for index, name in idx_to_wnid.items())
+            return [
+                _canonicalize_imagenet_class_name(name)
+                for _, name in sorted_pairs
+            ]
+
     classes_path = Path(dataset_dir) / "classes.py"
     spec = importlib.util.spec_from_file_location(
         "imagenet1k_classes_module",
@@ -287,6 +294,11 @@ def _load_imagenet1k_class_synonyms(dataset_dir: str) -> list[list[str]]:
         if isinstance(idx_to_class_name, dict) and idx_to_class_name:
             sorted_pairs = sorted((int(index), name) for index, name in idx_to_class_name.items())
             return [_parse_imagenet_synonyms(name) for _, name in sorted_pairs]
+
+        idx_to_wnid = raw.get("idx_to_wnid")
+        if isinstance(idx_to_wnid, dict) and idx_to_wnid:
+            sorted_pairs = sorted((int(index), name) for index, name in idx_to_wnid.items())
+            return [[str(name).strip()] for _, name in sorted_pairs]
 
     classes_path = Path(dataset_dir) / "classes.py"
     spec = importlib.util.spec_from_file_location(
@@ -564,8 +576,7 @@ def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     if dataset_name == "FGVC_Aircraft":
         return AircraftDataset(root=dataset_dir, split="train", transform=None).classes
     if dataset_name == "Image10":
-        dataset = IndexedImageFolderDataset(root=dataset_dir, split="train", transform=None)
-        return [class_name.replace("_", " ").replace("-", " ") for class_name in dataset.classes]
+        return _load_imagenet1k_class_texts(dataset_dir)
     if dataset_name == "ImageNet1K":
         return _load_imagenet1k_class_texts(dataset_dir)
     if dataset_name == "TinyImageNet200":
