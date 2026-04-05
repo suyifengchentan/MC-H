@@ -1,6 +1,6 @@
 # Hypersphere-DPP CUB Prototype
 
-这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`Image50`、`Image100` 和 `Image200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
+这个目录现在包含一版面向 `CUB_200_2011`、`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200` 和 `TinyImageNet200` 的自包含原型实现，对应 `ViT-L/14 + Hypersphere DPP` 的训练与评估流程。
 
 ## 方法概要
 
@@ -26,15 +26,17 @@
 
 ## 数据协议
 
-- 支持 `CUB_200_2011`、`Image10`、`Image50`、`Image100`、`Image200`
+- 支持 `CUB_200_2011`、`Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200`、`TinyImageNet200`
 - 训练只使用官方 `train` split
 - validation 从 `train` 中按 `validation_ratio` 划分
 - 官方评估 split 由 `official_eval_split` 控制：
   - `CUB_200_2011`: 默认 `test`
   - `Image10`: 默认 `test`
+  - `ImageNet1K`: 默认 `val`
   - `Image50`: 默认 `val`
   - `Image100`: 默认 `val`
   - `Image200`: 默认 `val`
+  - `TinyImageNet200`: 默认 `val`
 
 这版实现不复用 `datasets/data_loader_orthogonal.py` 中的 train/test 合并逻辑。
 
@@ -63,12 +65,14 @@ python3 train.py --config config/train/fine_grained/cub_vitb16_hypersphere_dpp_c
 
 ```bash
 bash scripts/train_by_dataset.sh Image200
+bash scripts/train_by_dataset.sh TinyImageNet200
 ```
 
 可选参数示例：
 
 ```bash
 bash scripts/train_by_dataset.sh Image50 Image100 Image200 --device cuda:0
+bash scripts/train_by_dataset.sh TinyImageNet200 --device cuda:0
 bash scripts/train_by_dataset.sh --datasets cub dogs flowers --device cuda:1
 bash scripts/train_by_dataset.sh Image10 --device cuda:0
 bash scripts/train_by_dataset.sh cub --foreground
@@ -175,9 +179,10 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 
 ## ImageNet 系列增强
 
-针对 `Image10`、`Image50`、`Image100`、`Image200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
+针对 `Image10`、`Image50`、`Image100`、`Image200`、`TinyImageNet200`，训练增强不再沿用 CUB 的细粒度设置，而是按自然图像与分辨率特性区分：
 
 - `imagenet10_two_view`: 更强的随机裁剪和颜色扰动，适合粗粒度 ImageNet 子集
+- `imagenet1k_two_view`: 面向完整 `ImageNet1K` WebDataset tar shard 导出，采用中等强度的自然图像增强
 - `imagenet50_two_view`: 中等强度裁剪与颜色增强，兼顾语义稳定性与视图多样性
 - `imagenet100_two_view`: 与 `Image50` 接近的中等增强，适配更大类别数的 ImageNet 子集
 - `imagenet200_two_view`: 更保主体的中强度裁剪，适合含较多近邻类别的 200 类混合子集
@@ -191,18 +196,21 @@ root/
   val/<class_name>/*.jpg 或 test/<class_name>/*.jpg
 ```
 
-`Image50`、`Image100`、`Image200` 现已统一切换到同一套 HDF5 shard 数据协议，默认目录分别是：
+`ImageNet1K`、`Image50`、`Image100`、`Image200` 现已统一切换到同一套 WebDataset tar shard 数据协议，默认目录分别是：
 
-- `Image50`: `/home/geyingjie/gmm-data/Image50`
-- `Image100`: `/home/geyingjie/gmm-data/Image100`
-- `Image200`: `/home/geyingjie/gmm-data/Image200`
+- `ImageNet1K`: `/home/geyingjie/hypersphere-data/ImageNet1K`
+- `Image50`: `/home/geyingjie/hypersphere-data/Image50`
+- `Image100`: `/home/geyingjie/hypersphere-data/Image100`
+- `Image200`: `/home/geyingjie/hypersphere-data/Image200`
 
 目录结构统一为：
 
 ```text
 root/
-  data/train-*.h5
-  data/validation-*.h5
+  data/train-*.tar
+  data/train-*.index.npz
+  data/validation-*.tar
+  data/validation-*.index.npz
   label_info.json
   metadata.json
 ```
@@ -213,26 +221,39 @@ root/
 - `config/labels/imagenet_100.rtf`
 - `config/labels/imagenet_200.rtf`
 
-这三份文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 HDF5 shard。
+这三份文件决定了类顺序、wnid 映射和导出子集内容。训练与评估都会按 `label_info.json` 中的类索引读取 WebDataset tar shard。
 
-若需要从 Hugging Face 的 `imagenet-1k` parquet 原始导出生成这三套数据，可运行：
+若需要把现有 ImageNet HDF5 shard 导出成 WebDataset tar shard，可运行：
 
 ```bash
-/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py
+/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_h5_to_webdataset.py \
+  --input-root /path/to/imagenet_h5_root \
+  --output-root /path/to/imagenet_webdataset_root
 ```
 
-脚本会从 `/home/geyingjie/imagenet-1k` 读取 parquet，并把三套子集写到上面的默认目录中。也可以通过 `--datasets Image50 Image100 Image200`、`--overwrite`、`--max-shards-per-split` 控制转换范围。
+脚本会读取现有的 `data/train-*.h5` / `data/validation-*.h5`，并导出为 `data/*.tar` 以及配套的 `data/*.index.npz`。每个 tar shard 都保持 WebDataset 风格样本布局，配套索引用于当前训练代码的随机访问。
 
-每个 HDF5 shard 至少包含以下字段：
+每个 WebDataset shard 至少包含以下内容：
 
 ```text
-image_bytes: 原始 JPEG bytes
-label: 子集内重映射后的连续标签
-path: 原始样本路径
-wnid: 样本所属 wnid
+<key>.jpg: 原始 JPEG bytes
+<key>.cls: 子集内重映射后的连续标签
+index.npz: offsets / sizes / labels 随机访问索引
 ```
 
-其中 `official_eval_split` 固定使用 `val`，内部会读取 `validation-*.h5`。
+其中 `ImageNet1K/Image50/Image100/Image200` 的 `official_eval_split` 默认都使用 `val`，内部会读取 `validation-*.tar`。训练期间的 `val_loader` 仍然会从 `train` 按 `validation_ratio` 再切分出来。
+
+统一目录结构为：
+
+```text
+root/
+  data/train-*.tar
+  data/train-*.index.npz
+  data/validation-*.tar 或 data/test-*.tar
+  data/validation-*.index.npz 或 data/test-*.index.npz
+  label_info.json
+  metadata.json
+```
 
 ## Git Ignore 规则
 
