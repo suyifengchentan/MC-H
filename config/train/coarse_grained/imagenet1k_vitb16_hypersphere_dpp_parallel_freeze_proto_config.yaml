@@ -12,7 +12,7 @@ imagenet1k_cached_teacher_views_dir: "/localdisk-tmp/teacher_cache_vitb16_imagen
 imagenet1k_cached_teacher_num_views: 6
 imagenet1k_cached_teacher_dtype: "float16"
 # Teacher cache layout:
-# data/train-*.zarr, metadata.json
+# data/train-*.mmap, data/train-*.mmap.progress.json, metadata.json
 
 # Model
 image_size: 224

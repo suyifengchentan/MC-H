@@ -12,11 +12,6 @@ import numpy as np
 import torch
 from PIL import Image
 
-try:
-    import zarr
-except ImportError:  # pragma: no cover - optional dependency in some environments
-    zarr = None
-
 from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 from hypersphere_dpp.config import ExperimentConfig
 from hypersphere_dpp.data import TEACHER_FEATURE_CANDIDATES_KEY, build_experiment_dataloaders
@@ -32,18 +27,32 @@ def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:
     return buffer.getvalue()
 
 
-def _write_teacher_cache_zarr(path: Path, teacher_features: np.ndarray) -> None:
-    if zarr is None:
-        raise unittest.SkipTest("zarr is not installed")
+def _write_teacher_cache_memmap(
+    path: Path,
+    teacher_features: np.ndarray,
+    *,
+    rows_written: int | None = None,
+) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
-    array = zarr.open(
+    array = np.memmap(
         path,
-        mode="w",
+        mode="w+",
         shape=teacher_features.shape,
-        chunks=teacher_features.shape,
         dtype=teacher_features.dtype,
     )
     array[:] = teacher_features
+    array.flush()
+    progress_path = path.with_suffix(path.suffix + ".progress.json")
+    with progress_path.open("w", encoding="utf-8") as handle:
+        json.dump(
+            {
+                "shape": list(teacher_features.shape),
+                "dtype": str(teacher_features.dtype),
+                "rows_written": teacher_features.shape[0] if rows_written is None else rows_written,
+            },
+            handle,
+            indent=2,
+        )
 
 
 def _load_module(script_name: str, module_name: str):
@@ -58,8 +67,8 @@ def _load_module(script_name: str, module_name: str):
 
 def _load_precompute_module():
     return _load_module(
-        "precompute_imagenet1k_teacher_cache.py",
-        "precompute_imagenet1k_teacher_cache_test",
+        "precompute_imagenet1k_teacher_memmap.py",
+        "precompute_imagenet1k_teacher_memmap_test",
     )
 
 
@@ -279,10 +288,10 @@ class ImageNetH5DatasetTest(unittest.TestCase):
                         "num_views": 6,
                         "feature_dim": 512,
                         "dtype": "float16",
-                        "storage_format": "zarr",
+                        "storage_format": "memmap",
                         "shards": [
                             {
-                                "name": "train-00000-of-00001.zarr",
+                                "name": "train-00000-of-00001.mmap",
                                 "num_rows": 20,
                                 "start_index": 0,
                             }
@@ -291,8 +300,8 @@ class ImageNetH5DatasetTest(unittest.TestCase):
                     handle,
                 )
             teacher_features = np.random.randn(20, 6, 512).astype(np.float16)
-            _write_teacher_cache_zarr(
-                cache_root / "data" / "train-00000-of-00001.zarr",
+            _write_teacher_cache_memmap(
+                cache_root / "data" / "train-00000-of-00001.mmap",
                 teacher_features,
             )
 
@@ -322,20 +331,17 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             self.assertNotIn("image", batch)
             self.assertEqual(batch[TEACHER_FEATURE_CANDIDATES_KEY].shape[1:], (6, 512))
 
-    @unittest.skipIf(zarr is None, "zarr is not installed")
     def test_precompute_shard_progress_reads_rows_written(self):
         module = _load_precompute_module()
 
         with tempfile.TemporaryDirectory() as tmp_dir:
-            shard_path = Path(tmp_dir) / "train-00000-of-00001.zarr"
-            shard_array = zarr.open(
+            shard_path = Path(tmp_dir) / "train-00000-of-00001.mmap"
+            teacher_features = np.zeros((10, 6, 512), dtype=np.float16)
+            _write_teacher_cache_memmap(
                 shard_path,
-                mode="w",
-                shape=(10, 6, 512),
-                chunks=(2, 6, 512),
-                dtype="float16",
+                teacher_features,
+                rows_written=4,
             )
-            shard_array.attrs["rows_written"] = 4
 
             teacher_features_ds, rows_written = module.prepare_cache_shard(
                 shard_path,
@@ -343,7 +349,7 @@ class ImageNetH5DatasetTest(unittest.TestCase):
                 expected_num_views=6,
                 expected_feature_dim=512,
                 dtype_name="float16",
-                batch_size=2,
+                numpy_dtype=np.dtype(np.float16),
                 overwrite=False,
             )
             teacher_features_shape = tuple(int(dim) for dim in teacher_features_ds.shape)
@@ -351,14 +357,13 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             self.assertEqual(teacher_features_shape, (10, 6, 512))
             self.assertEqual(rows_written, 4)
 
-    @unittest.skipIf(zarr is None, "zarr is not installed")
-    def test_teacher_cache_get_many_preserves_order_for_zarr(self):
+    def test_teacher_cache_get_many_preserves_order_for_memmap(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             cache_root = Path(tmp_dir)
             (cache_root / "data").mkdir(parents=True, exist_ok=True)
             teacher_features = np.arange(12 * 6 * 4, dtype=np.float16).reshape(12, 6, 4)
-            _write_teacher_cache_zarr(
-                cache_root / "data" / "train-00000-of-00001.zarr",
+            _write_teacher_cache_memmap(
+                cache_root / "data" / "train-00000-of-00001.mmap",
                 teacher_features,
             )
             with (cache_root / "metadata.json").open("w", encoding="utf-8") as handle:
@@ -367,10 +372,10 @@ class ImageNetH5DatasetTest(unittest.TestCase):
                         "num_views": 6,
                         "feature_dim": 4,
                         "dtype": "float16",
-                        "storage_format": "zarr",
+                        "storage_format": "memmap",
                         "shards": [
                             {
-                                "name": "train-00000-of-00001.zarr",
+                                "name": "train-00000-of-00001.mmap",
                                 "num_rows": 12,
                                 "start_index": 0,
                             }
@@ -383,6 +388,38 @@ class ImageNetH5DatasetTest(unittest.TestCase):
             batch = cache.get_many([9, 0, 3])
 
             expected = torch.from_numpy(teacher_features[[9, 0, 3]])
+            self.assertTrue(torch.equal(batch, expected))
+
+    def test_teacher_cache_keeps_working_after_memmap_file_is_removed(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            cache_root = Path(tmp_dir)
+            shard_path = cache_root / "data" / "train-00000-of-00001.mmap"
+            teacher_features = np.arange(8 * 2 * 3, dtype=np.float16).reshape(8, 2, 3)
+            _write_teacher_cache_memmap(shard_path, teacher_features)
+            with (cache_root / "metadata.json").open("w", encoding="utf-8") as handle:
+                json.dump(
+                    {
+                        "num_views": 2,
+                        "feature_dim": 3,
+                        "dtype": "float16",
+                        "storage_format": "memmap",
+                        "shards": [
+                            {
+                                "name": "train-00000-of-00001.mmap",
+                                "num_rows": 8,
+                                "start_index": 0,
+                            }
+                        ],
+                    },
+                    handle,
+                )
+
+            cache = ImageNetTeacherFeatureCache(cache_root)
+            shard_path.unlink()
+            shard_path.with_suffix(".mmap.progress.json").unlink()
+
+            expected = torch.from_numpy(teacher_features[[1, 6]])
+            batch = cache.get_many([1, 6])
             self.assertTrue(torch.equal(batch, expected))
 
 

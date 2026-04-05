@@ -217,7 +217,8 @@ root/
 
 ```text
 cache_root/
-  data/train-*.zarr
+  data/train-*.mmap
+  data/train-*.mmap.progress.json
   metadata.json
 ```
 
