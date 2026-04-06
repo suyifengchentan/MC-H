@@ -10,7 +10,7 @@ import h5py
 import numpy as np
 from PIL import Image
 
-from datasets.imagenet_shard_dataset import ImageNetH5Dataset
+from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:

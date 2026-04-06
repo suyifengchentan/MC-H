@@ -215,6 +215,4 @@ class ImageNetWebDataset(Dataset):
     def __getitems__(self, indices: Sequence[int]):
         return [self[index] for index in indices]
 
-
-ImageNetH5Dataset = ImageNetWebDataset
 ImageNetShardDataset = ImageNetWebDataset

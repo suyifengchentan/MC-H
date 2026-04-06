@@ -12,7 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
-from datasets.imagenet_shard_dataset import ImageNetH5Dataset
+from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 from datasets.indexed_image_folder_dataset import IndexedImageFolderDataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
