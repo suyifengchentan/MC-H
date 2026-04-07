@@ -47,20 +47,66 @@ class FrozenCLIPBackbone(nn.Module):
 class FeatureAdapter(nn.Module):
     def __init__(self, feature_dim: int, hidden_dim: int, dropout: float):
         super().__init__()
+        self.block_hidden_dim = max(1, hidden_dim // 2)
+        self.main_scale = nn.Parameter(torch.tensor(1.0))
         self.norm = nn.LayerNorm(feature_dim)
-        self.fc1 = nn.Linear(feature_dim, hidden_dim)
+        self.fc1 = nn.Linear(feature_dim, self.block_hidden_dim)
         self.act = nn.GELU()
         self.dropout = nn.Dropout(dropout)
-        self.fc2 = nn.Linear(hidden_dim, feature_dim)
+        self.fc2 = nn.Linear(self.block_hidden_dim, feature_dim)
+        self.refine_scale = nn.Parameter(torch.tensor(1.0))
+        self.refine_norm = nn.LayerNorm(feature_dim)
+        self.refine_fc1 = nn.Linear(feature_dim, self.block_hidden_dim)
+        self.refine_fc2 = nn.Linear(self.block_hidden_dim, feature_dim)
 
-    def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
+    def _apply_residual_block(
+        self,
+        teacher_features: torch.Tensor,
+        norm: nn.LayerNorm,
+        fc1: nn.Linear,
+        fc2: nn.Linear,
+        scale: nn.Parameter,
+    ) -> torch.Tensor:
         residual = teacher_features
-        x = self.norm(teacher_features)
-        x = self.fc1(x)
+        x = norm(teacher_features)
+        x = fc1(x)
         x = self.act(x)
         x = self.dropout(x)
-        x = self.fc2(x)
-        return F.normalize(residual + x, dim=-1)
+        x = fc2(x)
+        return residual + scale * x
+
+    def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        x = self._apply_residual_block(
+            teacher_features,
+            self.norm,
+            self.fc1,
+            self.fc2,
+            self.main_scale,
+        )
+        x = self._apply_residual_block(
+            x,
+            self.refine_norm,
+            self.refine_fc1,
+            self.refine_fc2,
+            self.refine_scale,
+        )
+        return F.normalize(x, dim=-1)
+
+    def trainable_state_dict(self) -> dict[str, torch.Tensor]:
+        return self.state_dict()
+
+    def load_trainable_state_dict(self, state_dict: dict[str, torch.Tensor]) -> None:
+        try:
+            self.load_state_dict(state_dict)
+        except RuntimeError as exc:
+            adapter_keys = sorted(state_dict.keys())
+            raise RuntimeError(
+                "FeatureAdapter checkpoint is incompatible with the current "
+                "two-block residual adapter. "
+                f"Expected two smaller residual blocks with bottleneck width "
+                f"{self.block_hidden_dim}, but received adapter keys {adapter_keys}. "
+                "Use a checkpoint trained with the same adapter architecture."
+            ) from exc
 
 
 class PrototypeHead(nn.Module):
@@ -162,10 +208,10 @@ class HypersphereDPPModel(nn.Module):
 
     def trainable_state_dict(self) -> dict[str, dict[str, torch.Tensor]]:
         return {
-            "adapter": self.adapter.state_dict(),
+            "adapter": self.adapter.trainable_state_dict(),
             "prototypes": self.prototypes.state_dict(),
         }
 
     def load_trainable_state_dict(self, state_dict: dict[str, dict[str, torch.Tensor]]) -> None:
-        self.adapter.load_state_dict(state_dict["adapter"])
+        self.adapter.load_trainable_state_dict(state_dict["adapter"])
         self.prototypes.load_state_dict(state_dict["prototypes"])
