@@ -15,10 +15,9 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from matplotlib.colors import ListedColormap
+from matplotlib.colors import ListedColormap, to_rgba_array
 from matplotlib.lines import Line2D
 from scipy.optimize import linear_sum_assignment
-from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader, Subset
@@ -79,34 +78,23 @@ class TSNEResult:
     teacher_tsne: np.ndarray
     student_tsne: np.ndarray
     true_labels: np.ndarray
-    teacher_kmeans_labels: np.ndarray
-    student_kmeans_labels: np.ndarray
+    teacher_prototype_labels: np.ndarray
     student_prototype_labels: np.ndarray
-    teacher_kmeans_aligned_labels: np.ndarray
-    student_kmeans_aligned_labels: np.ndarray
+    teacher_prototype_aligned_labels: np.ndarray
     student_prototype_aligned_labels: np.ndarray
-    teacher_kmeans_mismatch_mask: np.ndarray
-    student_kmeans_mismatch_mask: np.ndarray
-    student_prototype_mismatch_mask: np.ndarray
-    teacher_kmeans_acc: float
-    teacher_kmeans_nmi: float
-    teacher_kmeans_ari: float
-    student_kmeans_acc: float
-    student_kmeans_nmi: float
-    student_kmeans_ari: float
+    teacher_prototype_acc: float
+    teacher_prototype_nmi: float
+    teacher_prototype_ari: float
     student_prototype_acc: float
     student_prototype_nmi: float
     student_prototype_ari: float
 
 
 def apply_neurips_style() -> None:
-    """Apply a publication-friendly style with Computer Modern typography."""
+    """Apply a publication-friendly style with Arial sans-serif typography."""
     neurips_rc = {
-        "font.family": "serif",
-        "font.serif": ["Computer Modern Roman", "CMU Serif", "cmr10", "DejaVu Serif"],
-        "mathtext.fontset": "cm",
-        "mathtext.rm": "cmr10",
-        "axes.formatter.use_mathtext": True,
+        "font.family": "sans-serif",
+        "font.sans-serif": ["Arial", "Helvetica", "DejaVu Sans"],
         "font.size": 11,
         "font.weight": "semibold",
         "axes.titlesize": 14,
@@ -501,10 +489,11 @@ def _build_visualization_loader(
 
 def _extract_features(
     model: HypersphereDPPModel, dataloader: DataLoader, device: torch.device
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     teacher_features: list[np.ndarray] = []
     student_features: list[np.ndarray] = []
-    prototype_labels: list[np.ndarray] = []
+    teacher_prototype_labels: list[np.ndarray] = []
+    student_prototype_labels: list[np.ndarray] = []
     labels: list[np.ndarray] = []
     model.eval()
     with torch.inference_mode():
@@ -513,16 +502,19 @@ def _extract_features(
             batch_labels = batch["label"].cpu().numpy()
             teacher = model.encode_teacher(images)
             student = model.encode_student(teacher_features=teacher)
-            logits = model.prototype_logits(student)
+            teacher_logits = model.prototype_logits(teacher)
+            student_logits = model.prototype_logits(student)
             teacher_features.append(teacher.cpu().numpy())
             student_features.append(student.cpu().numpy())
-            prototype_labels.append(logits.argmax(dim=1).cpu().numpy())
+            teacher_prototype_labels.append(teacher_logits.argmax(dim=1).cpu().numpy())
+            student_prototype_labels.append(student_logits.argmax(dim=1).cpu().numpy())
             labels.append(batch_labels)
 
     return (
         np.concatenate(teacher_features, axis=0),
         np.concatenate(student_features, axis=0),
-        np.concatenate(prototype_labels, axis=0),
+        np.concatenate(teacher_prototype_labels, axis=0),
+        np.concatenate(student_prototype_labels, axis=0),
         np.concatenate(labels, axis=0),
     )
 
@@ -669,26 +661,6 @@ def _run_tsne(
     return embedding
 
 
-def _run_kmeans(
-    features: np.ndarray, n_clusters: int, seed: int, stage_label: str
-) -> np.ndarray:
-    effective_clusters = max(1, min(n_clusters, features.shape[0]))
-    _log_progress(
-        f"[{stage_label}] KMeans start: samples={features.shape[0]}, "
-        f"dim={features.shape[1]}, clusters={effective_clusters}"
-    )
-    kmeans_start = time.perf_counter()
-    labels = KMeans(
-        n_clusters=effective_clusters,
-        random_state=seed,
-        n_init=10,
-    ).fit_predict(features)
-    _log_progress(
-        f"[{stage_label}] KMeans done in {time.perf_counter() - kmeans_start:.2f}s"
-    )
-    return labels.astype(np.int64, copy=False)
-
-
 def _remap_labels(labels: np.ndarray) -> np.ndarray:
     unique_labels = np.unique(labels)
     label_map = {int(label): index for index, label in enumerate(unique_labels.tolist())}
@@ -755,6 +727,16 @@ def _build_label_colormap(class_num: int) -> ListedColormap:
 
     tab20 = plt.get_cmap("tab20", class_num)
     return ListedColormap(tab20(np.arange(class_num)))
+
+
+def _build_consistent_comparison_colormaps(
+    class_num: int,
+) -> tuple[ListedColormap, ListedColormap]:
+    base_cmap = _build_label_colormap(class_num)
+    base_colors = to_rgba_array(base_cmap.colors)
+    unmatched_color = np.array([[0.72, 0.72, 0.72, 1.0]], dtype=np.float32)
+    cluster_colors = np.concatenate([base_colors, unmatched_color], axis=0)
+    return ListedColormap(base_colors), ListedColormap(cluster_colors)
 
 
 def _scatter_panel(ax, embedding: np.ndarray, labels: np.ndarray, cmap) -> None:
@@ -847,12 +829,12 @@ def _render_representation_figure(results: list[TSNEResult], output_path: Path, 
         ax_teacher.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
         if col_index == 0:
             ax_teacher.set_ylabel(
-                "Frozen CLIP + GT", fontsize=13, fontweight="bold", labelpad=20
+                "CLIP + GT", fontsize=13, fontweight="normal", labelpad=20
             )
             ax_student.set_ylabel(
-                "Frozen CLIP + Adapter + GT",
+                "CLIP + Adapter + GT",
                 fontsize=13,
-                fontweight="bold",
+                fontweight="normal",
                 labelpad=20,
             )
 
@@ -895,9 +877,9 @@ def _render_representation_figure(results: list[TSNEResult], output_path: Path, 
 def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
     n_cols = len(results)
     fig_width = max(5.0, 3.5 * n_cols)
-    fig_height = 6.3
+    fig_height = 9.1
     fig, axes = plt.subplots(
-        2,
+        3,
         n_cols,
         figsize=(fig_width, fig_height),
         constrained_layout=False,
@@ -906,15 +888,25 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
     fig.patch.set_facecolor("#ffffff")
 
     for col_index, result in enumerate(results):
-        cluster_cmap = _build_label_colormap(int(result.true_labels.max()) + 2)
+        gt_cmap, cluster_cmap = _build_consistent_comparison_colormaps(
+            int(result.true_labels.max()) + 1
+        )
 
-        ax_kmeans = axes[0, col_index]
-        ax_ours = axes[1, col_index]
+        ax_gt = axes[0, col_index]
+        ax_teacher = axes[1, col_index]
+        ax_ours = axes[2, col_index]
+
+        _scatter_panel(
+            ax_gt,
+            result.teacher_tsne,
+            result.true_labels,
+            cmap=gt_cmap,
+        )
 
         _scatter_cluster_panel(
-            ax_kmeans,
+            ax_teacher,
             result.teacher_tsne,
-            result.teacher_kmeans_aligned_labels,
+            result.teacher_prototype_aligned_labels,
             cmap=cluster_cmap,
         )
         _scatter_cluster_panel(
@@ -925,17 +917,17 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         )
 
         dataset_title = result.dataset_name.replace("_", " ")
-        ax_kmeans.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
+        ax_gt.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
 
-        ax_kmeans.text(
+        ax_teacher.text(
             0.02,
             0.98,
-            f"ACC {result.teacher_kmeans_acc:.1%}",
-            transform=ax_kmeans.transAxes,
+            f"ACC {result.teacher_prototype_acc:.1%}",
+            transform=ax_teacher.transAxes,
             ha="left",
             va="top",
             fontsize=9,
-            fontweight="bold",
+            fontweight="normal",
             color="#222222",
             bbox={
                 "facecolor": "white",
@@ -952,7 +944,7 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
             ha="left",
             va="top",
             fontsize=9,
-            fontweight="bold",
+            fontweight="normal",
             color="#222222",
             bbox={
                 "facecolor": "white",
@@ -963,28 +955,37 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         )
 
         if col_index == 0:
-            ax_kmeans.set_ylabel(
-                "Frozen CLIP + KMeans", fontsize=13, fontweight="bold", labelpad=20
+            ax_gt.set_ylabel(
+                "GT Distribution",
+                fontsize=13,
+                fontweight="normal",
+                labelpad=20,
+            )
+            ax_teacher.set_ylabel(
+                "CLIP + w/o Adapter",
+                fontsize=13,
+                fontweight="normal",
+                labelpad=20,
             )
             ax_ours.set_ylabel(
-                "Frozen CLIP + Adapter + Ours",
+                "CLIP + Adapter",
                 fontsize=13,
-                fontweight="bold",
+                fontweight="normal",
                 labelpad=20,
             )
 
     fig.subplots_adjust(
         left=0.08 if n_cols > 1 else 0.18,
         right=0.98,
-        top=0.93,
-        bottom=0.06,
+        top=0.94,
+        bottom=0.05,
         hspace=0.08,
         wspace=0.05,
     )
 
     if n_cols > 1:
         separator_y0 = min(
-            axes[1, col_index].get_position().y0 for col_index in range(n_cols)
+            axes[2, col_index].get_position().y0 for col_index in range(n_cols)
         )
         separator_y1 = max(
             axes[0, col_index].get_position().y1 for col_index in range(n_cols)
@@ -1041,7 +1042,13 @@ def _generate_tsne_result(
     ).to(device)
     load_checkpoint(checkpoint_path, model=model, map_location=device)
 
-    teacher_features, student_features, prototype_labels, labels = _extract_features(
+    (
+        teacher_features,
+        student_features,
+        teacher_prototype_labels,
+        student_prototype_labels,
+        labels,
+    ) = _extract_features(
         model, loader, device
     )
 
@@ -1071,38 +1078,21 @@ def _generate_tsne_result(
         verbose=args.tsne_verbose,
         stage_label=f"{config.dataset}/student",
     )
-    teacher_kmeans_labels = _run_kmeans(
-        teacher_features,
-        n_clusters=len(selected_class_ids),
-        seed=args.seed,
-        stage_label=f"{config.dataset}/teacher-kmeans",
-    )
-    student_kmeans_labels = _run_kmeans(
-        student_features,
-        n_clusters=len(selected_class_ids),
-        seed=args.seed,
-        stage_label=f"{config.dataset}/student-kmeans",
-    )
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
     true_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
-    prototype_labels = _remap_labels(prototype_labels)
-    teacher_kmeans_aligned_labels, teacher_kmeans_mismatch_mask = (
-        _align_predictions_to_truth(true_labels, teacher_kmeans_labels)
+    teacher_prototype_labels = _remap_labels(teacher_prototype_labels)
+    student_prototype_labels = _remap_labels(student_prototype_labels)
+    teacher_prototype_aligned_labels, _ = _align_predictions_to_truth(
+        true_labels, teacher_prototype_labels
     )
-    student_kmeans_aligned_labels, student_kmeans_mismatch_mask = (
-        _align_predictions_to_truth(true_labels, student_kmeans_labels)
+    student_prototype_aligned_labels, _ = _align_predictions_to_truth(
+        true_labels, student_prototype_labels
     )
-    student_prototype_aligned_labels, student_prototype_mismatch_mask = (
-        _align_predictions_to_truth(true_labels, prototype_labels)
-    )
-    teacher_kmeans_acc, teacher_kmeans_nmi, teacher_kmeans_ari = (
-        _compute_clustering_metrics(true_labels, teacher_kmeans_labels)
-    )
-    student_kmeans_acc, student_kmeans_nmi, student_kmeans_ari = (
-        _compute_clustering_metrics(true_labels, student_kmeans_labels)
+    teacher_prototype_acc, teacher_prototype_nmi, teacher_prototype_ari = (
+        _compute_clustering_metrics(true_labels, teacher_prototype_labels)
     )
     student_prototype_acc, student_prototype_nmi, student_prototype_ari = (
-        _compute_clustering_metrics(true_labels, prototype_labels)
+        _compute_clustering_metrics(true_labels, student_prototype_labels)
     )
 
     return TSNEResult(
@@ -1113,21 +1103,13 @@ def _generate_tsne_result(
         teacher_tsne=teacher_tsne,
         student_tsne=student_tsne,
         true_labels=true_labels,
-        teacher_kmeans_labels=teacher_kmeans_labels,
-        student_kmeans_labels=student_kmeans_labels,
-        student_prototype_labels=prototype_labels,
-        teacher_kmeans_aligned_labels=teacher_kmeans_aligned_labels,
-        student_kmeans_aligned_labels=student_kmeans_aligned_labels,
+        teacher_prototype_labels=teacher_prototype_labels,
+        student_prototype_labels=student_prototype_labels,
+        teacher_prototype_aligned_labels=teacher_prototype_aligned_labels,
         student_prototype_aligned_labels=student_prototype_aligned_labels,
-        teacher_kmeans_mismatch_mask=teacher_kmeans_mismatch_mask,
-        student_kmeans_mismatch_mask=student_kmeans_mismatch_mask,
-        student_prototype_mismatch_mask=student_prototype_mismatch_mask,
-        teacher_kmeans_acc=teacher_kmeans_acc,
-        teacher_kmeans_nmi=teacher_kmeans_nmi,
-        teacher_kmeans_ari=teacher_kmeans_ari,
-        student_kmeans_acc=student_kmeans_acc,
-        student_kmeans_nmi=student_kmeans_nmi,
-        student_kmeans_ari=student_kmeans_ari,
+        teacher_prototype_acc=teacher_prototype_acc,
+        teacher_prototype_nmi=teacher_prototype_nmi,
+        teacher_prototype_ari=teacher_prototype_ari,
         student_prototype_acc=student_prototype_acc,
         student_prototype_nmi=student_prototype_nmi,
         student_prototype_ari=student_prototype_ari,
