@@ -2,8 +2,11 @@
 from __future__ import annotations
 
 import argparse
+import io
+import pickle
 import sys
 import time
+import zipfile
 from contextlib import nullcontext
 from dataclasses import dataclass
 from pathlib import Path
@@ -14,10 +17,11 @@ import numpy as np
 import torch
 from matplotlib.colors import ListedColormap
 from matplotlib.lines import Line2D
+from scipy.optimize import linear_sum_assignment
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader, Subset
-from torchvision import transforms
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 if str(PROJECT_ROOT) not in sys.path:
@@ -31,6 +35,7 @@ from hypersphere_dpp.data import (
     safe_default_collate,
 )
 from hypersphere_dpp.labels import load_label_name_map
+from hypersphere_dpp.metrics import clustering_accuracy
 from hypersphere_dpp.model import HypersphereDPPModel
 from hypersphere_dpp.utils import resolve_device, set_seed
 
@@ -71,9 +76,27 @@ class TSNEResult:
     checkpoint_path: Path
     split: str
     sample_count: int
-    raw_tsne: np.ndarray
+    teacher_tsne: np.ndarray
     student_tsne: np.ndarray
-    display_labels: np.ndarray
+    true_labels: np.ndarray
+    teacher_kmeans_labels: np.ndarray
+    student_kmeans_labels: np.ndarray
+    student_prototype_labels: np.ndarray
+    teacher_kmeans_aligned_labels: np.ndarray
+    student_kmeans_aligned_labels: np.ndarray
+    student_prototype_aligned_labels: np.ndarray
+    teacher_kmeans_mismatch_mask: np.ndarray
+    student_kmeans_mismatch_mask: np.ndarray
+    student_prototype_mismatch_mask: np.ndarray
+    teacher_kmeans_acc: float
+    teacher_kmeans_nmi: float
+    teacher_kmeans_ari: float
+    student_kmeans_acc: float
+    student_kmeans_nmi: float
+    student_kmeans_ari: float
+    student_prototype_acc: float
+    student_prototype_nmi: float
+    student_prototype_ari: float
 
 
 def apply_neurips_style() -> None:
@@ -200,6 +223,13 @@ def _resolve_checkpoint(config_path: Path, checkpoint_arg: str | None) -> Path:
         checkpoint_path = Path(checkpoint_arg)
         if not checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
+        model_keys = _peek_checkpoint_model_keys(checkpoint_path)
+        if "prototypes" not in model_keys:
+            raise ValueError(
+                "The provided checkpoint is incompatible with t-SNE visualization: "
+                f"{checkpoint_path} has model keys {model_keys}, but a prototype-based "
+                "checkpoint with model keys ['adapter', 'prototypes'] is required."
+            )
         return checkpoint_path
 
     model_path_prefix = _resolve_model_path_prefix(config_path)
@@ -219,15 +249,30 @@ def _resolve_checkpoint(config_path: Path, checkpoint_arg: str | None) -> Path:
 
     for directory in candidate_dirs:
         best_checkpoint = directory / "best.pt"
-        if best_checkpoint.is_file():
+        if best_checkpoint.is_file() and _checkpoint_supports_prototype_labels(
+            best_checkpoint
+        ):
             return best_checkpoint
         last_checkpoint = directory / "last.pt"
-        if last_checkpoint.is_file():
+        if last_checkpoint.is_file() and _checkpoint_supports_prototype_labels(
+            last_checkpoint
+        ):
             return last_checkpoint
 
+    incompatible_candidates: list[str] = []
+    for directory in candidate_dirs:
+        for checkpoint_name in ("best.pt", "last.pt"):
+            checkpoint_path = directory / checkpoint_name
+            if checkpoint_path.is_file():
+                model_keys = _peek_checkpoint_model_keys(checkpoint_path)
+                incompatible_candidates.append(
+                    f"{checkpoint_path} (model keys: {model_keys})"
+                )
+
     raise FileNotFoundError(
-        "Could not resolve a checkpoint from model_path prefix "
-        f"{model_path_prefix} derived from config {config_path}."
+        "Could not resolve a prototype-compatible checkpoint from model_path prefix "
+        f"{model_path_prefix} derived from config {config_path}. "
+        f"Checked candidates: {incompatible_candidates or 'none'}"
     )
 
 
@@ -249,6 +294,48 @@ def _resolve_config_path_list(args: argparse.Namespace) -> list[Path]:
         return [Path(config_path) for config_path in args.configs]
 
     return [Path(args.config)]
+
+
+def _peek_checkpoint_model_keys(checkpoint_path: Path) -> list[str]:
+    class _DummyOrderedDict(dict):
+        pass
+
+    class _PeekUnpickler(pickle.Unpickler):
+        def find_class(self, module, name):
+            if module == "collections" and name == "OrderedDict":
+                return _DummyOrderedDict
+            if module in ("torch._utils", "torch"):
+                def _stub(*args, **kwargs):
+                    return ("TORCH_OBJ", module, name, args)
+
+                return _stub
+            return super().find_class(module, name)
+
+        def persistent_load(self, pid):
+            return ("PERSISTENT", pid)
+
+    if not zipfile.is_zipfile(checkpoint_path):
+        return []
+
+    with zipfile.ZipFile(checkpoint_path) as archive:
+        data_members = [name for name in archive.namelist() if name.endswith("data.pkl")]
+        if not data_members:
+            return []
+        payload = archive.read(data_members[0])
+
+    try:
+        checkpoint = _PeekUnpickler(io.BytesIO(payload)).load()
+    except Exception:
+        return []
+
+    model_state = checkpoint.get("model")
+    if not isinstance(model_state, dict):
+        return []
+    return list(model_state.keys())
+
+
+def _checkpoint_supports_prototype_labels(checkpoint_path: Path) -> bool:
+    return "prototypes" in _peek_checkpoint_model_keys(checkpoint_path)
 
 
 def _balanced_indices(
@@ -414,8 +501,10 @@ def _build_visualization_loader(
 
 def _extract_features(
     model: HypersphereDPPModel, dataloader: DataLoader, device: torch.device
-) -> tuple[np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    teacher_features: list[np.ndarray] = []
     student_features: list[np.ndarray] = []
+    prototype_labels: list[np.ndarray] = []
     labels: list[np.ndarray] = []
     model.eval()
     with torch.inference_mode():
@@ -424,25 +513,18 @@ def _extract_features(
             batch_labels = batch["label"].cpu().numpy()
             teacher = model.encode_teacher(images)
             student = model.encode_student(teacher_features=teacher)
+            logits = model.prototype_logits(student)
+            teacher_features.append(teacher.cpu().numpy())
             student_features.append(student.cpu().numpy())
+            prototype_labels.append(logits.argmax(dim=1).cpu().numpy())
             labels.append(batch_labels)
 
-    return np.concatenate(student_features, axis=0), np.concatenate(labels, axis=0)
-
-
-def _extract_raw_image_features(raw_subset: Subset, raw_image_size: int) -> np.ndarray:
-    raw_transform = transforms.Compose(
-        [
-            transforms.Resize((raw_image_size, raw_image_size)),
-            transforms.ToTensor(),
-        ]
+    return (
+        np.concatenate(teacher_features, axis=0),
+        np.concatenate(student_features, axis=0),
+        np.concatenate(prototype_labels, axis=0),
+        np.concatenate(labels, axis=0),
     )
-    features: list[np.ndarray] = []
-    for index in range(len(raw_subset)):
-        image, _, _ = raw_subset[index]
-        image_tensor = raw_transform(image)
-        features.append(image_tensor.flatten().numpy())
-    return np.stack(features, axis=0)
 
 
 def _resolve_tsne_backend(requested_backend: str) -> str:
@@ -587,6 +669,74 @@ def _run_tsne(
     return embedding
 
 
+def _run_kmeans(
+    features: np.ndarray, n_clusters: int, seed: int, stage_label: str
+) -> np.ndarray:
+    effective_clusters = max(1, min(n_clusters, features.shape[0]))
+    _log_progress(
+        f"[{stage_label}] KMeans start: samples={features.shape[0]}, "
+        f"dim={features.shape[1]}, clusters={effective_clusters}"
+    )
+    kmeans_start = time.perf_counter()
+    labels = KMeans(
+        n_clusters=effective_clusters,
+        random_state=seed,
+        n_init=10,
+    ).fit_predict(features)
+    _log_progress(
+        f"[{stage_label}] KMeans done in {time.perf_counter() - kmeans_start:.2f}s"
+    )
+    return labels.astype(np.int64, copy=False)
+
+
+def _remap_labels(labels: np.ndarray) -> np.ndarray:
+    unique_labels = np.unique(labels)
+    label_map = {int(label): index for index, label in enumerate(unique_labels.tolist())}
+    return np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
+
+
+def _align_predictions_to_truth(
+    true_labels: np.ndarray, predicted_labels: np.ndarray
+) -> tuple[np.ndarray, np.ndarray]:
+    true_unique = np.unique(true_labels)
+    pred_unique = np.unique(predicted_labels)
+    contingency = np.zeros((pred_unique.size, true_unique.size), dtype=np.int64)
+
+    pred_index = {int(label): index for index, label in enumerate(pred_unique.tolist())}
+    true_index = {int(label): index for index, label in enumerate(true_unique.tolist())}
+
+    for true_label, pred_label in zip(true_labels, predicted_labels):
+        contingency[pred_index[int(pred_label)], true_index[int(true_label)]] += 1
+
+    if contingency.size == 0:
+        return np.empty_like(true_labels), np.zeros_like(true_labels, dtype=bool)
+
+    row_ind, col_ind = linear_sum_assignment(contingency.max() - contingency)
+    assignment = {
+        int(pred_unique[row]): int(true_unique[col])
+        for row, col in zip(row_ind.tolist(), col_ind.tolist())
+    }
+
+    unmatched_label = int(true_unique.size)
+    aligned_labels = np.asarray(
+        [assignment.get(int(pred_label), unmatched_label) for pred_label in predicted_labels],
+        dtype=np.int64,
+    )
+    mismatch_mask = aligned_labels != true_labels
+    return aligned_labels, mismatch_mask
+
+
+def _compute_clustering_metrics(
+    true_labels: np.ndarray, predicted_labels: np.ndarray
+) -> tuple[float, float, float]:
+    from sklearn.metrics import adjusted_rand_score, normalized_mutual_info_score
+
+    acc = clustering_accuracy(true_labels, predicted_labels)
+    nmi = float(normalized_mutual_info_score(true_labels, predicted_labels))
+    ari = float(adjusted_rand_score(true_labels, predicted_labels))
+    return acc, nmi, ari
+
+
 def _build_label_colormap(class_num: int) -> ListedColormap:
     neurips_colors = [
         "#332288",
@@ -600,7 +750,11 @@ def _build_label_colormap(class_num: int) -> ListedColormap:
         "#AA4499",
         "#DDDDDD",
     ]
-    return ListedColormap(neurips_colors[:class_num])
+    if class_num <= len(neurips_colors):
+        return ListedColormap(neurips_colors[:class_num])
+
+    tab20 = plt.get_cmap("tab20", class_num)
+    return ListedColormap(tab20(np.arange(class_num)))
 
 
 def _scatter_panel(ax, embedding: np.ndarray, labels: np.ndarray, cmap) -> None:
@@ -625,6 +779,236 @@ def _scatter_panel(ax, embedding: np.ndarray, labels: np.ndarray, cmap) -> None:
         spine.set_visible(False)
 
 
+def _scatter_cluster_panel(
+    ax,
+    embedding: np.ndarray,
+    aligned_labels: np.ndarray,
+    cmap,
+) -> None:
+    ax.set_facecolor("#ffffff")
+    ax.scatter(
+        embedding[:, 0],
+        embedding[:, 1],
+        c=aligned_labels,
+        cmap=cmap,
+        s=18,
+        alpha=0.78,
+        linewidths=0.12,
+        edgecolors="white",
+        rasterized=True,
+    )
+    ax.set_xticks([])
+    ax.set_yticks([])
+    ax.set_box_aspect(1)
+    ax.margins(0.03)
+    for spine in ax.spines.values():
+        spine.set_visible(False)
+
+
+def _build_output_paths(output_arg: str | None, results: list[TSNEResult]) -> tuple[Path, Path]:
+    if len(results) == 1:
+        default_base = (
+            f"experiments/generated/figures/{results[0].dataset_name.lower()}_tsne"
+        )
+    else:
+        default_base = "experiments/generated/figures/multi_dataset_tsne"
+
+    base_path = Path(output_arg or default_base)
+    if base_path.suffix:
+        base_path = base_path.with_suffix("")
+
+    representation_path = base_path.parent / f"{base_path.name}_representation.png"
+    clustering_path = base_path.parent / f"{base_path.name}_clustering.png"
+    return representation_path, clustering_path
+
+
+def _render_representation_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
+    n_cols = len(results)
+    fig_width = max(5.0, 3.5 * n_cols)
+    fig_height = 6.8
+    fig, axes = plt.subplots(
+        2,
+        n_cols,
+        figsize=(fig_width, fig_height),
+        constrained_layout=False,
+        squeeze=False,
+    )
+    fig.patch.set_facecolor("#ffffff")
+
+    for col_index, result in enumerate(results):
+        cmap = _build_label_colormap(int(result.true_labels.max()) + 1)
+        ax_teacher = axes[0, col_index]
+        ax_student = axes[1, col_index]
+
+        _scatter_panel(ax_teacher, result.teacher_tsne, result.true_labels, cmap=cmap)
+        _scatter_panel(ax_student, result.student_tsne, result.true_labels, cmap=cmap)
+
+        dataset_title = result.dataset_name.replace("_", " ")
+        ax_teacher.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
+        if col_index == 0:
+            ax_teacher.set_ylabel(
+                "Frozen CLIP + GT", fontsize=13, fontweight="bold", labelpad=20
+            )
+            ax_student.set_ylabel(
+                "Frozen CLIP + Adapter + GT",
+                fontsize=13,
+                fontweight="bold",
+                labelpad=20,
+            )
+
+    fig.subplots_adjust(
+        left=0.08 if n_cols > 1 else 0.18,
+        right=0.98,
+        top=0.92,
+        bottom=0.06,
+        hspace=0.10,
+        wspace=0.05,
+    )
+
+    if n_cols > 1:
+        separator_y0 = min(
+            axes[1, col_index].get_position().y0 for col_index in range(n_cols)
+        )
+        separator_y1 = max(
+            axes[0, col_index].get_position().y1 for col_index in range(n_cols)
+        )
+        for col_index in range(n_cols - 1):
+            left_box = axes[0, col_index].get_position()
+            right_box = axes[0, col_index + 1].get_position()
+            separator_x = (left_box.x1 + right_box.x0) / 2.0
+            fig.add_artist(
+                Line2D(
+                    [separator_x, separator_x],
+                    [separator_y0, separator_y1],
+                    transform=fig.transFigure,
+                    color="#8f8f8f",
+                    linewidth=1.0,
+                    linestyle=(0, (4, 4)),
+                    alpha=0.9,
+                )
+            )
+
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
+def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
+    n_cols = len(results)
+    fig_width = max(5.0, 3.5 * n_cols)
+    fig_height = 6.3
+    fig, axes = plt.subplots(
+        2,
+        n_cols,
+        figsize=(fig_width, fig_height),
+        constrained_layout=False,
+        squeeze=False,
+    )
+    fig.patch.set_facecolor("#ffffff")
+
+    for col_index, result in enumerate(results):
+        cluster_cmap = _build_label_colormap(int(result.true_labels.max()) + 2)
+
+        ax_kmeans = axes[0, col_index]
+        ax_ours = axes[1, col_index]
+
+        _scatter_cluster_panel(
+            ax_kmeans,
+            result.teacher_tsne,
+            result.teacher_kmeans_aligned_labels,
+            cmap=cluster_cmap,
+        )
+        _scatter_cluster_panel(
+            ax_ours,
+            result.student_tsne,
+            result.student_prototype_aligned_labels,
+            cmap=cluster_cmap,
+        )
+
+        dataset_title = result.dataset_name.replace("_", " ")
+        ax_kmeans.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
+
+        ax_kmeans.text(
+            0.02,
+            0.98,
+            f"ACC {result.teacher_kmeans_acc:.1%}",
+            transform=ax_kmeans.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            fontweight="bold",
+            color="#222222",
+            bbox={
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.80,
+                "boxstyle": "round,pad=0.14",
+            },
+        )
+        ax_ours.text(
+            0.02,
+            0.98,
+            f"ACC {result.student_prototype_acc:.1%}",
+            transform=ax_ours.transAxes,
+            ha="left",
+            va="top",
+            fontsize=9,
+            fontweight="bold",
+            color="#222222",
+            bbox={
+                "facecolor": "white",
+                "edgecolor": "none",
+                "alpha": 0.80,
+                "boxstyle": "round,pad=0.14",
+            },
+        )
+
+        if col_index == 0:
+            ax_kmeans.set_ylabel(
+                "Frozen CLIP + KMeans", fontsize=13, fontweight="bold", labelpad=20
+            )
+            ax_ours.set_ylabel(
+                "Frozen CLIP + Adapter + Ours",
+                fontsize=13,
+                fontweight="bold",
+                labelpad=20,
+            )
+
+    fig.subplots_adjust(
+        left=0.08 if n_cols > 1 else 0.18,
+        right=0.98,
+        top=0.93,
+        bottom=0.06,
+        hspace=0.08,
+        wspace=0.05,
+    )
+
+    if n_cols > 1:
+        separator_y0 = min(
+            axes[1, col_index].get_position().y0 for col_index in range(n_cols)
+        )
+        separator_y1 = max(
+            axes[0, col_index].get_position().y1 for col_index in range(n_cols)
+        )
+        for col_index in range(n_cols - 1):
+            left_box = axes[0, col_index].get_position()
+            right_box = axes[0, col_index + 1].get_position()
+            separator_x = (left_box.x1 + right_box.x0) / 2.0
+            fig.add_artist(
+                Line2D(
+                    [separator_x, separator_x],
+                    [separator_y0, separator_y1],
+                    transform=fig.transFigure,
+                    color="#8f8f8f",
+                    linewidth=1.0,
+                    linestyle=(0, (4, 4)),
+                    alpha=0.9,
+                )
+            )
+
+    fig.savefig(output_path, dpi=dpi)
+    plt.close(fig)
+
+
 def _generate_tsne_result(
     config_path: Path, args: argparse.Namespace, checkpoint_arg: str | None = None
 ) -> TSNEResult:
@@ -634,7 +1018,7 @@ def _generate_tsne_result(
 
     device = resolve_device(args.device or config.device)
     split = args.split or config.official_eval_split or "test"
-    loader, raw_subset, selected_class_ids, _ = _build_visualization_loader(
+    loader, _, selected_class_ids, _ = _build_visualization_loader(
         config_path,
         split,
         args.samples_per_class,
@@ -657,15 +1041,16 @@ def _generate_tsne_result(
     ).to(device)
     load_checkpoint(checkpoint_path, model=model, map_location=device)
 
-    raw_image_features = _extract_raw_image_features(raw_subset, args.raw_image_size)
-    student_features, labels = _extract_features(model, loader, device)
+    teacher_features, student_features, prototype_labels, labels = _extract_features(
+        model, loader, device
+    )
 
     _log_progress(
         f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}, "
-        f"samples={labels.shape[0]}"
+        f"samples={student_features.shape[0]}"
     )
-    raw_tsne = _run_tsne(
-        raw_image_features,
+    teacher_tsne = _run_tsne(
+        teacher_features,
         args.perplexity,
         args.learning_rate,
         args.seed,
@@ -673,7 +1058,7 @@ def _generate_tsne_result(
         tsne_jobs=args.tsne_jobs,
         pca_threads=args.pca_threads,
         verbose=args.tsne_verbose,
-        stage_label=f"{config.dataset}/raw",
+        stage_label=f"{config.dataset}/teacher",
     )
     student_tsne = _run_tsne(
         student_features,
@@ -686,20 +1071,66 @@ def _generate_tsne_result(
         verbose=args.tsne_verbose,
         stage_label=f"{config.dataset}/student",
     )
-
+    teacher_kmeans_labels = _run_kmeans(
+        teacher_features,
+        n_clusters=len(selected_class_ids),
+        seed=args.seed,
+        stage_label=f"{config.dataset}/teacher-kmeans",
+    )
+    student_kmeans_labels = _run_kmeans(
+        student_features,
+        n_clusters=len(selected_class_ids),
+        seed=args.seed,
+        stage_label=f"{config.dataset}/student-kmeans",
+    )
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
-    display_labels = np.asarray(
-        [label_map[int(label)] for label in labels], dtype=np.int64
+    true_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
+    prototype_labels = _remap_labels(prototype_labels)
+    teacher_kmeans_aligned_labels, teacher_kmeans_mismatch_mask = (
+        _align_predictions_to_truth(true_labels, teacher_kmeans_labels)
+    )
+    student_kmeans_aligned_labels, student_kmeans_mismatch_mask = (
+        _align_predictions_to_truth(true_labels, student_kmeans_labels)
+    )
+    student_prototype_aligned_labels, student_prototype_mismatch_mask = (
+        _align_predictions_to_truth(true_labels, prototype_labels)
+    )
+    teacher_kmeans_acc, teacher_kmeans_nmi, teacher_kmeans_ari = (
+        _compute_clustering_metrics(true_labels, teacher_kmeans_labels)
+    )
+    student_kmeans_acc, student_kmeans_nmi, student_kmeans_ari = (
+        _compute_clustering_metrics(true_labels, student_kmeans_labels)
+    )
+    student_prototype_acc, student_prototype_nmi, student_prototype_ari = (
+        _compute_clustering_metrics(true_labels, prototype_labels)
     )
 
     return TSNEResult(
         dataset_name=config.dataset,
         checkpoint_path=checkpoint_path,
         split=split,
-        sample_count=int(labels.shape[0]),
-        raw_tsne=raw_tsne,
+        sample_count=int(student_features.shape[0]),
+        teacher_tsne=teacher_tsne,
         student_tsne=student_tsne,
-        display_labels=display_labels,
+        true_labels=true_labels,
+        teacher_kmeans_labels=teacher_kmeans_labels,
+        student_kmeans_labels=student_kmeans_labels,
+        student_prototype_labels=prototype_labels,
+        teacher_kmeans_aligned_labels=teacher_kmeans_aligned_labels,
+        student_kmeans_aligned_labels=student_kmeans_aligned_labels,
+        student_prototype_aligned_labels=student_prototype_aligned_labels,
+        teacher_kmeans_mismatch_mask=teacher_kmeans_mismatch_mask,
+        student_kmeans_mismatch_mask=student_kmeans_mismatch_mask,
+        student_prototype_mismatch_mask=student_prototype_mismatch_mask,
+        teacher_kmeans_acc=teacher_kmeans_acc,
+        teacher_kmeans_nmi=teacher_kmeans_nmi,
+        teacher_kmeans_ari=teacher_kmeans_ari,
+        student_kmeans_acc=student_kmeans_acc,
+        student_kmeans_nmi=student_kmeans_nmi,
+        student_kmeans_ari=student_kmeans_ari,
+        student_prototype_acc=student_prototype_acc,
+        student_prototype_nmi=student_prototype_nmi,
+        student_prototype_ari=student_prototype_ari,
     )
 
 
@@ -718,76 +1149,14 @@ def main() -> None:
         for config_path in config_paths
     ]
 
-    if len(results) == 1:
-        default_output = f"experiments/generated/figures/{results[0].dataset_name.lower()}_tsne_before_after.png"
-    else:
-        default_output = (
-            "experiments/generated/figures/multi_dataset_tsne_before_after.png"
-        )
+    representation_path, clustering_path = _build_output_paths(args.output, results)
+    representation_path.parent.mkdir(parents=True, exist_ok=True)
+    clustering_path.parent.mkdir(parents=True, exist_ok=True)
 
-    output_path = Path(args.output or default_output)
-    output_path = output_path.with_suffix(".png")
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-
-    # 布局参数：2行（Before / After），N列（数据集数量）
-    n_cols = len(results)
-    # 根据列数动态调整画布宽度，保证每个面板约占用 3.5 英寸
-    fig_width = max(5.0, 3.5 * n_cols)
-    fig_height = 7.0
-
-    fig, axes = plt.subplots(
-        2,
-        n_cols,
-        figsize=(fig_width, fig_height),
-        constrained_layout=False,
-        squeeze=False,
-    )
-    fig.patch.set_facecolor("#ffffff")
-
-    for col_index, result in enumerate(results):
-        cmap = _build_label_colormap(int(result.display_labels.max()) + 1)
-
-        ax_before = axes[0, col_index]
-        ax_after = axes[1, col_index]
-
-        _scatter_panel(ax_before, result.raw_tsne, result.display_labels, cmap=cmap)
-        _scatter_panel(ax_after, result.student_tsne, result.display_labels, cmap=cmap)
-
-        # 设置列标题（顶部）：数据集名称
-        dataset_title = result.dataset_name.replace("_", " ")
-        ax_before.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
-
-    # 精细化调整内部子图间距，确保论文中紧凑排版
-    fig.subplots_adjust(
-        left=0.08 if n_cols > 1 else 0.18,
-        right=0.98,
-        top=0.90,
-        bottom=0.05,
-        hspace=0.08,  # 行间距紧凑
-        wspace=0.05,  # 列间距紧凑
-    )
-
-    if n_cols > 1:
-        separator_y0 = min(axes[1, col_index].get_position().y0 for col_index in range(n_cols))
-        separator_y1 = max(axes[0, col_index].get_position().y1 for col_index in range(n_cols))
-        for col_index in range(n_cols - 1):
-            left_box = axes[0, col_index].get_position()
-            right_box = axes[0, col_index + 1].get_position()
-            separator_x = (left_box.x1 + right_box.x0) / 2.0
-            fig.add_artist(
-                Line2D(
-                    [separator_x, separator_x],
-                    [separator_y0, separator_y1],
-                    transform=fig.transFigure,
-                    color="#8f8f8f",
-                    linewidth=1.0,
-                    linestyle=(0, (4, 4)),
-                    alpha=0.9,
-                )
-            )
-
-    fig.savefig(output_path, dpi=args.dpi)
-    print(f"Saved figure to {output_path}")
+    _render_representation_figure(results, representation_path, dpi=args.dpi)
+    _render_clustering_figure(results, clustering_path, dpi=args.dpi)
+    print(f"Saved representation figure to {representation_path}")
+    print(f"Saved clustering figure to {clustering_path}")
     for result in results:
         print(
             f"[{result.dataset_name}] checkpoint={result.checkpoint_path} "
