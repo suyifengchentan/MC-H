@@ -877,9 +877,9 @@ def _render_representation_figure(results: list[TSNEResult], output_path: Path, 
 def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
     n_cols = len(results)
     fig_width = max(5.0, 3.5 * n_cols)
-    fig_height = 9.1
+    fig_height = 6.3
     fig, axes = plt.subplots(
-        3,
+        2,
         n_cols,
         figsize=(fig_width, fig_height),
         constrained_layout=False,
@@ -888,20 +888,12 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
     fig.patch.set_facecolor("#ffffff")
 
     for col_index, result in enumerate(results):
-        gt_cmap, cluster_cmap = _build_consistent_comparison_colormaps(
+        _, cluster_cmap = _build_consistent_comparison_colormaps(
             int(result.true_labels.max()) + 1
         )
 
-        ax_gt = axes[0, col_index]
-        ax_teacher = axes[1, col_index]
-        ax_ours = axes[2, col_index]
-
-        _scatter_panel(
-            ax_gt,
-            result.teacher_tsne,
-            result.true_labels,
-            cmap=gt_cmap,
-        )
+        ax_teacher = axes[0, col_index]
+        ax_ours = axes[1, col_index]
 
         _scatter_cluster_panel(
             ax_teacher,
@@ -917,7 +909,7 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         )
 
         dataset_title = result.dataset_name.replace("_", " ")
-        ax_gt.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
+        ax_teacher.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
 
         ax_teacher.text(
             0.02,
@@ -955,12 +947,6 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         )
 
         if col_index == 0:
-            ax_gt.set_ylabel(
-                "GT Distribution",
-                fontsize=13,
-                fontweight="normal",
-                labelpad=20,
-            )
             ax_teacher.set_ylabel(
                 "CLIP + w/o Adapter",
                 fontsize=13,
@@ -977,15 +963,15 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
     fig.subplots_adjust(
         left=0.08 if n_cols > 1 else 0.18,
         right=0.98,
-        top=0.94,
-        bottom=0.05,
+        top=0.93,
+        bottom=0.06,
         hspace=0.08,
         wspace=0.05,
     )
 
     if n_cols > 1:
         separator_y0 = min(
-            axes[2, col_index].get_position().y0 for col_index in range(n_cols)
+            axes[1, col_index].get_position().y0 for col_index in range(n_cols)
         )
         separator_y1 = max(
             axes[0, col_index].get_position().y1 for col_index in range(n_cols)
