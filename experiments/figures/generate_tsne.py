@@ -36,6 +36,7 @@ from hypersphere_dpp.data import (
 from hypersphere_dpp.labels import load_label_name_map
 from hypersphere_dpp.metrics import clustering_accuracy
 from hypersphere_dpp.model import HypersphereDPPModel
+from hypersphere_dpp.semantic import build_semantic_text_features
 from hypersphere_dpp.utils import resolve_device, set_seed
 
 DEFAULT_CONFIG = (
@@ -78,13 +79,13 @@ class TSNEResult:
     teacher_tsne: np.ndarray
     student_tsne: np.ndarray
     true_labels: np.ndarray
-    teacher_prototype_labels: np.ndarray
+    teacher_text_labels: np.ndarray
     student_prototype_labels: np.ndarray
-    teacher_prototype_aligned_labels: np.ndarray
+    teacher_text_aligned_labels: np.ndarray
     student_prototype_aligned_labels: np.ndarray
-    teacher_prototype_acc: float
-    teacher_prototype_nmi: float
-    teacher_prototype_ari: float
+    teacher_text_acc: float
+    teacher_text_nmi: float
+    teacher_text_ari: float
     student_prototype_acc: float
     student_prototype_nmi: float
     student_prototype_ari: float
@@ -489,10 +490,9 @@ def _build_visualization_loader(
 
 def _extract_features(
     model: HypersphereDPPModel, dataloader: DataLoader, device: torch.device
-) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
     teacher_features: list[np.ndarray] = []
     student_features: list[np.ndarray] = []
-    teacher_prototype_labels: list[np.ndarray] = []
     student_prototype_labels: list[np.ndarray] = []
     labels: list[np.ndarray] = []
     model.eval()
@@ -502,21 +502,39 @@ def _extract_features(
             batch_labels = batch["label"].cpu().numpy()
             teacher = model.encode_teacher(images)
             student = model.encode_student(teacher_features=teacher)
-            teacher_logits = model.prototype_logits(teacher)
             student_logits = model.prototype_logits(student)
             teacher_features.append(teacher.cpu().numpy())
             student_features.append(student.cpu().numpy())
-            teacher_prototype_labels.append(teacher_logits.argmax(dim=1).cpu().numpy())
             student_prototype_labels.append(student_logits.argmax(dim=1).cpu().numpy())
             labels.append(batch_labels)
 
     return (
         np.concatenate(teacher_features, axis=0),
         np.concatenate(student_features, axis=0),
-        np.concatenate(teacher_prototype_labels, axis=0),
         np.concatenate(student_prototype_labels, axis=0),
         np.concatenate(labels, axis=0),
     )
+
+
+def _predict_text_labels(
+    features: np.ndarray,
+    class_text_features: torch.Tensor,
+    stage_label: str,
+) -> np.ndarray:
+    _log_progress(
+        f"[{stage_label}] text assignment start: samples={features.shape[0]}, "
+        f"classes={class_text_features.shape[0]}"
+    )
+    assign_start = time.perf_counter()
+    feature_tensor = torch.from_numpy(features).to(
+        class_text_features.device, dtype=torch.float32
+    )
+    logits = feature_tensor @ class_text_features.float().t()
+    labels = logits.argmax(dim=1).cpu().numpy().astype(np.int64, copy=False)
+    _log_progress(
+        f"[{stage_label}] text assignment done in {time.perf_counter() - assign_start:.2f}s"
+    )
+    return labels
 
 
 def _resolve_tsne_backend(requested_backend: str) -> str:
@@ -898,7 +916,7 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         _scatter_cluster_panel(
             ax_teacher,
             result.teacher_tsne,
-            result.teacher_prototype_aligned_labels,
+            result.teacher_text_aligned_labels,
             cmap=cluster_cmap,
         )
         _scatter_cluster_panel(
@@ -914,7 +932,7 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         ax_teacher.text(
             0.02,
             0.98,
-            f"ACC {result.teacher_prototype_acc:.1%}",
+            f"ACC {result.teacher_text_acc:.1%}",
             transform=ax_teacher.transAxes,
             ha="left",
             va="top",
@@ -948,7 +966,7 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
 
         if col_index == 0:
             ax_teacher.set_ylabel(
-                "CLIP + w/o Adapter",
+                "CLIP + Text",
                 fontsize=13,
                 fontweight="normal",
                 labelpad=20,
@@ -1031,12 +1049,26 @@ def _generate_tsne_result(
     (
         teacher_features,
         student_features,
-        teacher_prototype_labels,
         student_prototype_labels,
         labels,
     ) = _extract_features(
         model, loader, device
     )
+    class_text_features, _ = build_semantic_text_features(
+        backbone_model=model.backbone,
+        backbone_name=config.backbone_name,
+        dataset_name=config.dataset,
+        dataset_dir=config.dataset_dir,
+        prompt_style=config.semantic_prompt_style,
+        aggregation=config.semantic_prototype_aggregation,
+        imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
+        semantic_primary_weight=config.semantic_primary_weight,
+        semantic_template_topk=config.semantic_template_topk,
+        device=device,
+    )
+    selected_class_text_features = class_text_features[
+        torch.tensor(selected_class_ids, device=class_text_features.device, dtype=torch.long)
+    ]
 
     _log_progress(
         f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}, "
@@ -1066,16 +1098,20 @@ def _generate_tsne_result(
     )
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
     true_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
-    teacher_prototype_labels = _remap_labels(teacher_prototype_labels)
+    teacher_text_labels = _predict_text_labels(
+        teacher_features,
+        selected_class_text_features,
+        stage_label=f"{config.dataset}/teacher-text",
+    )
     student_prototype_labels = _remap_labels(student_prototype_labels)
-    teacher_prototype_aligned_labels, _ = _align_predictions_to_truth(
-        true_labels, teacher_prototype_labels
+    teacher_text_aligned_labels, _ = _align_predictions_to_truth(
+        true_labels, teacher_text_labels
     )
     student_prototype_aligned_labels, _ = _align_predictions_to_truth(
         true_labels, student_prototype_labels
     )
-    teacher_prototype_acc, teacher_prototype_nmi, teacher_prototype_ari = (
-        _compute_clustering_metrics(true_labels, teacher_prototype_labels)
+    teacher_text_acc, teacher_text_nmi, teacher_text_ari = (
+        _compute_clustering_metrics(true_labels, teacher_text_labels)
     )
     student_prototype_acc, student_prototype_nmi, student_prototype_ari = (
         _compute_clustering_metrics(true_labels, student_prototype_labels)
@@ -1089,13 +1125,13 @@ def _generate_tsne_result(
         teacher_tsne=teacher_tsne,
         student_tsne=student_tsne,
         true_labels=true_labels,
-        teacher_prototype_labels=teacher_prototype_labels,
+        teacher_text_labels=teacher_text_labels,
         student_prototype_labels=student_prototype_labels,
-        teacher_prototype_aligned_labels=teacher_prototype_aligned_labels,
+        teacher_text_aligned_labels=teacher_text_aligned_labels,
         student_prototype_aligned_labels=student_prototype_aligned_labels,
-        teacher_prototype_acc=teacher_prototype_acc,
-        teacher_prototype_nmi=teacher_prototype_nmi,
-        teacher_prototype_ari=teacher_prototype_ari,
+        teacher_text_acc=teacher_text_acc,
+        teacher_text_nmi=teacher_text_nmi,
+        teacher_text_ari=teacher_text_ari,
         student_prototype_acc=student_prototype_acc,
         student_prototype_nmi=student_prototype_nmi,
         student_prototype_ari=student_prototype_ari,
