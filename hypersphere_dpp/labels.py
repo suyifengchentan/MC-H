@@ -12,6 +12,7 @@ class LabelEntry:
 
 
 _DATASET_TO_LABEL_FILE = {
+    "Image10": "imagenet_10.rtf",
     "Image50": "imagenet_50.rtf",
     "Image100": "imagenet_100.rtf",
     "Image200": "imagenet_200.rtf",

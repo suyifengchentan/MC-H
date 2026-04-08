@@ -12,6 +12,7 @@ from torch.utils.data import DataLoader, Dataset, Subset
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
 from datasets.cub_dataset import CUB200Dataset
+from datasets.image10_dataset import Image10Dataset
 from datasets.imagenet_h5_dataset import ImageNetH5Dataset
 from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from datasets.oxford_pet_dataset import OxfordPetDataset
@@ -381,7 +382,17 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
         return train_base, eval_base
 
     if config.dataset == "Image10":
-        return _build_imagenet_h5_datasets(config, official_eval_split)
+        train_base = Image10Dataset(
+            root=config.dataset_dir,
+            split="train",
+            transform=None,
+        )
+        eval_base = Image10Dataset(
+            root=config.dataset_dir,
+            split=official_eval_split,
+            transform=None,
+        )
+        return train_base, eval_base
 
     if config.dataset == "ImageNet1K":
         return _build_imagenet_h5_datasets(config, official_eval_split)

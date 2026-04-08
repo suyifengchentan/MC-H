@@ -3,8 +3,6 @@
 # Data
 dataset: "Image10"
 dataset_dir: "/home/geyingjie/hypersphere-data/imagenet-10"
-# ImageNet HDF5 shard layout:
-# data/train-*.h5, data/test-*.h5, label_info.json
 class_num: 10
 validation_ratio: 0.1
 validation_seed: 42
@@ -56,7 +54,7 @@ dpp_jitter: 0.00001
 
 # Runtime / output
 eval_interval: 3
-model_path: "save/hypersphere_dpp/Image10_CLIP_ViTL14_HypersphereDPP"
+model_path: "save/hypersphere_dpp/Image10_CLIP_ViTB16_HypersphereDPP"
 workers: 8
 reload: false
 seed: 42
