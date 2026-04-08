@@ -68,4 +68,4 @@ model_path: "save/hypersphere_dpp/Oxford_Flowers_CLIP_ViTB16_HypersphereDPP"
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 40
+best_checkpoint_patience: 15

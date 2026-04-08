@@ -150,7 +150,7 @@ class ExperimentConfig:
     distributed_batch_size_mode: str = "per_rank"
     reload: bool = False
     seed: int = 42
-    best_checkpoint_patience: int = 50
+    best_checkpoint_patience: int = 15
     model_path: str = "save/hypersphere_dpp/cub_vitl14"
     device: str | None = None
 

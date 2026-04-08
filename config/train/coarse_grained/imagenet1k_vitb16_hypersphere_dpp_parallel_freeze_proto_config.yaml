@@ -94,4 +94,4 @@ persistent_workers: true
 distributed_batch_size_mode: "per_rank"
 reload: false
 seed: 42
-best_checkpoint_patience: 30
+best_checkpoint_patience: 15
