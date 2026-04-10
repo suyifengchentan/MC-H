@@ -26,6 +26,9 @@ class SemanticPrototypeState:
     retrieval_class_indices: torch.Tensor
     info: dict[str, int | str | float]
 
+
+_DEFAULT_SEMANTIC_TEXT_BATCH_SIZE = 256
+
 _CIFAR10_CLASS_NAMES = [
     "airplane",
     "automobile",
@@ -329,6 +332,27 @@ def _pool_prompt_embeddings(
     raise ValueError(f"Unsupported semantic aggregation: {normalized_aggregation!r}")
 
 
+def _encode_text_prompts_batched(
+    backbone_model,
+    tokenizer,
+    prompts: list[str],
+    device: torch.device,
+    batch_size: int = _DEFAULT_SEMANTIC_TEXT_BATCH_SIZE,
+) -> torch.Tensor:
+    if not prompts:
+        raise ValueError("prompts must not be empty.")
+    if batch_size <= 0:
+        raise ValueError("batch_size must be positive.")
+
+    encoded_chunks = []
+    for start in range(0, len(prompts), batch_size):
+        prompt_chunk = prompts[start : start + batch_size]
+        tokenized = tokenizer(prompt_chunk).to(device)
+        encoded_chunk = backbone_model.encode_text(tokenized)
+        encoded_chunks.append(F.normalize(encoded_chunk.float(), dim=-1))
+    return torch.cat(encoded_chunks, dim=0)
+
+
 def _encode_label_text_feature(
     backbone_model,
     tokenizer,
@@ -340,9 +364,12 @@ def _encode_label_text_feature(
     reference_feature: torch.Tensor | None = None,
 ) -> torch.Tensor:
     prompts = [template.format(label=label).strip() for template in prompt_templates]
-    tokenized = tokenizer(prompts).to(device)
-    encoded = backbone_model.encode_text(tokenized)
-    encoded = F.normalize(encoded.float(), dim=-1)
+    encoded = _encode_text_prompts_batched(
+        backbone_model=backbone_model,
+        tokenizer=tokenizer,
+        prompts=prompts,
+        device=device,
+    )
 
     if template_topk > 0 and encoded.size(0) > template_topk:
         if reference_feature is None:
@@ -372,9 +399,12 @@ def _pool_imagenet1k_text_features(
 
     def encode_label_prompts(label: str) -> torch.Tensor:
         prompts = [template.format(label=label).strip() for template in prompt_templates]
-        tokenized = tokenizer(prompts).to(device)
-        encoded = backbone_model.encode_text(tokenized)
-        return F.normalize(encoded.float(), dim=-1)
+        return _encode_text_prompts_batched(
+            backbone_model=backbone_model,
+            tokenizer=tokenizer,
+            prompts=prompts,
+            device=device,
+        )
 
     primary_encoded = encode_label_prompts(primary)
 
@@ -640,10 +670,20 @@ def build_semantic_text_features(
             for class_text in class_texts
         ]
         flat_prompts = [prompt for prompt_group in prompt_groups for prompt in prompt_group]
-        tokenized = tokenizer(flat_prompts).to(device)
-        encoded = backbone_model.encode_text(tokenized)
-        encoded = F.normalize(encoded.float(), dim=-1)
+        encoded = _encode_text_prompts_batched(
+            backbone_model=backbone_model,
+            tokenizer=tokenizer,
+            prompts=flat_prompts,
+            device=device,
+        )
         encoded = encoded.view(len(class_texts), len(prompt_templates), -1)
+
+        if 0 < semantic_template_topk < encoded.size(1):
+            template_reference = F.normalize(encoded.mean(dim=1), dim=-1)
+            template_scores = (encoded * template_reference.unsqueeze(1)).sum(dim=-1)
+            keep_indices = template_scores.topk(k=semantic_template_topk, dim=1).indices
+            gather_index = keep_indices.unsqueeze(-1).expand(-1, -1, encoded.size(-1))
+            encoded = torch.gather(encoded, dim=1, index=gather_index)
 
         if normalized_aggregation == "mean":
             final_pooled = encoded.mean(dim=1)
@@ -654,7 +694,11 @@ def build_semantic_text_features(
         else:
             raise ValueError(f"Unsupported semantic aggregation: {aggregation!r}")
 
-        num_templates_used = len(prompt_templates)
+        num_templates_used = (
+            min(len(prompt_templates), semantic_template_topk)
+            if semantic_template_topk > 0
+            else len(prompt_templates)
+        )
 
     return F.normalize(final_pooled, dim=-1), {
         "num_classes": num_classes,

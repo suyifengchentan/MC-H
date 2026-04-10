@@ -38,6 +38,7 @@ lambda_cluster: 1.0
 semantic_prototype_enabled: true
 semantic_prompt_style: "auto"
 semantic_prototype_aggregation: "mean"
+semantic_template_topk: 16
 lambda_semantic: 0.15
 semantic_temperature: 0.2
 

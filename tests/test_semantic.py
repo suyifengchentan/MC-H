@@ -5,7 +5,9 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from hypersphere_dpp.semantic import load_class_texts
+import torch
+
+from hypersphere_dpp.semantic import _encode_text_prompts_batched, load_class_texts
 
 
 class SemanticClassTextTest(unittest.TestCase):
@@ -61,6 +63,52 @@ class SemanticClassTextTest(unittest.TestCase):
             self.assertEqual(
                 load_class_texts("ImageNet1K", str(root)),
                 ["great white shark", "water ouzel"],
+            )
+
+    def test_encode_text_prompts_batched_matches_single_pass(self):
+        class FakeTokenizer:
+            def __call__(self, prompts):
+                values = [
+                    [float(prompt[1:]), float(prompt[1:]) + 0.5]
+                    for prompt in prompts
+                ]
+                return torch.tensor(values, dtype=torch.float32)
+
+        class FakeBackbone:
+            def encode_text(self, tokenized):
+                return tokenized + 1.0
+
+        prompts = ["p0", "p1", "p2", "p3", "p4"]
+        tokenizer = FakeTokenizer()
+        backbone = FakeBackbone()
+
+        expected = torch.nn.functional.normalize(
+            backbone.encode_text(tokenizer(prompts)).float(), dim=-1
+        )
+        actual = _encode_text_prompts_batched(
+            backbone_model=backbone,
+            tokenizer=tokenizer,
+            prompts=prompts,
+            device=torch.device("cpu"),
+            batch_size=2,
+        )
+        self.assertTrue(torch.allclose(actual, expected))
+
+    def test_encode_text_prompts_batched_rejects_empty_prompt_lists(self):
+        class FakeTokenizer:
+            def __call__(self, prompts):
+                return torch.tensor(prompts)
+
+        class FakeBackbone:
+            def encode_text(self, tokenized):
+                return tokenized
+
+        with self.assertRaises(ValueError):
+            _encode_text_prompts_batched(
+                backbone_model=FakeBackbone(),
+                tokenizer=FakeTokenizer(),
+                prompts=[],
+                device=torch.device("cpu"),
             )
 
 
