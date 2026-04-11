@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import io
 import pickle
+import re
 import sys
 import time
 import zipfile
@@ -18,6 +19,7 @@ import torch
 from matplotlib.colors import ListedColormap, to_rgba_array
 from matplotlib.lines import Line2D
 from scipy.optimize import linear_sum_assignment
+from sklearn.cluster import KMeans
 from sklearn.decomposition import PCA
 from sklearn.manifold import TSNE
 from torch.utils.data import DataLoader, Subset
@@ -36,12 +38,13 @@ from hypersphere_dpp.data import (
 from hypersphere_dpp.labels import load_label_name_map
 from hypersphere_dpp.metrics import clustering_accuracy
 from hypersphere_dpp.model import HypersphereDPPModel
-from hypersphere_dpp.semantic import build_semantic_text_features
 from hypersphere_dpp.utils import resolve_device, set_seed
+from datasets.tiny_imagenet_dataset import load_tiny_imagenet_class_texts
 
 DEFAULT_CONFIG = (
     "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml"
 )
+DEFAULT_OURS_ACC_TEX = "all_benchmarks_results_body.tex"
 DATASET_CONFIG_MAP = {
     "cifar10": "config/test/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml",
     "cifar100": "config/test/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml",
@@ -79,13 +82,14 @@ class TSNEResult:
     teacher_tsne: np.ndarray
     student_tsne: np.ndarray
     true_labels: np.ndarray
-    teacher_text_labels: np.ndarray
+    teacher_baseline_method: str
+    teacher_baseline_labels: np.ndarray
     student_prototype_labels: np.ndarray
-    teacher_text_aligned_labels: np.ndarray
+    teacher_baseline_aligned_labels: np.ndarray
     student_prototype_aligned_labels: np.ndarray
-    teacher_text_acc: float
-    teacher_text_nmi: float
-    teacher_text_ari: float
+    teacher_baseline_acc: float
+    teacher_baseline_nmi: float
+    teacher_baseline_ari: float
     student_prototype_acc: float
     student_prototype_nmi: float
     student_prototype_ari: float
@@ -164,7 +168,18 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--device", default=None)
     parser.add_argument("--dpi", type=int, default=300)
+    parser.add_argument(
+        "--teacher-baseline",
+        choices=["kmeans"],
+        default="kmeans",
+        help="Teacher-side baseline for the top row. Uses Raw CLIP features clustered by KMeans.",
+    )
     parser.add_argument("--raw-image-size", type=int, default=40)
+    parser.add_argument(
+        "--ours-acc-tex",
+        default=DEFAULT_OURS_ACC_TEX,
+        help="Path to the LaTeX benchmark table used to source displayed Ours ACC values.",
+    )
     parser.add_argument("--output", default=None)
     return parser.parse_args()
 
@@ -393,17 +408,34 @@ def _extract_labels_and_class_names(
             class_names
         ) if class_names is not None else None
 
-    data = getattr(dataset, "data", None)
+    tuple_samples = getattr(dataset, "data", None)
+    if tuple_samples is None:
+        tuple_samples = getattr(dataset, "samples", None)
     if (
-        isinstance(data, list)
-        and data
-        and isinstance(data[0], tuple)
-        and len(data[0]) >= 2
+        isinstance(tuple_samples, list)
+        and tuple_samples
+        and isinstance(tuple_samples[0], tuple)
+        and len(tuple_samples[0]) >= 2
     ):
-        parsed_labels = [int(sample[1]) for sample in data]
+        parsed_labels = [int(sample[1]) for sample in tuple_samples]
         class_names = getattr(dataset, "classes", None)
         if class_names is not None:
-            return parsed_labels, list(class_names)
+            resolved_class_names = list(class_names)
+            label_name_map = load_label_name_map(dataset_name)
+            if label_name_map:
+                resolved_class_names = [
+                    label_name_map.get(name, name) for name in resolved_class_names
+                ]
+            elif dataset_name == "TinyImageNet200":
+                try:
+                    tiny_imagenet_class_names = load_tiny_imagenet_class_texts(
+                        str(getattr(dataset, "root", ""))
+                    )
+                except Exception:
+                    tiny_imagenet_class_names = []
+                if len(tiny_imagenet_class_names) == len(resolved_class_names):
+                    resolved_class_names = tiny_imagenet_class_names
+            return parsed_labels, resolved_class_names
 
         root = Path(getattr(dataset, "root", ""))
         classes_txt = root / "classes.txt"
@@ -516,23 +548,24 @@ def _extract_features(
     )
 
 
-def _predict_text_labels(
+def _predict_kmeans_labels(
     features: np.ndarray,
-    class_text_features: torch.Tensor,
+    n_clusters: int,
+    seed: int,
     stage_label: str,
 ) -> np.ndarray:
     _log_progress(
-        f"[{stage_label}] text assignment start: samples={features.shape[0]}, "
-        f"classes={class_text_features.shape[0]}"
+        f"[{stage_label}] kmeans assignment start: samples={features.shape[0]}, "
+        f"clusters={n_clusters}"
     )
     assign_start = time.perf_counter()
-    feature_tensor = torch.from_numpy(features).to(
-        class_text_features.device, dtype=torch.float32
+    labels = KMeans(n_clusters=n_clusters, random_state=seed, n_init=20).fit_predict(
+        features
     )
-    logits = feature_tensor @ class_text_features.float().t()
-    labels = logits.argmax(dim=1).cpu().numpy().astype(np.int64, copy=False)
+    labels = labels.astype(np.int64, copy=False)
     _log_progress(
-        f"[{stage_label}] text assignment done in {time.perf_counter() - assign_start:.2f}s"
+        f"[{stage_label}] kmeans assignment done in "
+        f"{time.perf_counter() - assign_start:.2f}s"
     )
     return labels
 
@@ -822,6 +855,162 @@ def _build_output_paths(output_arg: str | None, results: list[TSNEResult]) -> tu
     return representation_path, clustering_path
 
 
+def _normalize_dataset_key(dataset_name: str) -> str:
+    dataset_key = dataset_name.strip().lower().replace("_", "-")
+    alias_map = {
+        "cifar10": "cifar10",
+        "cifar-10": "cifar10",
+        "cifar100": "cifar100",
+        "cifar-100": "cifar100",
+        "stl10": "stl10",
+        "stl-10": "stl10",
+        "image10": "imagenet10",
+        "imagenet10": "imagenet10",
+        "imagenet-10": "imagenet10",
+        "image50": "imagenet50",
+        "imagenet50": "imagenet50",
+        "imagenet-50": "imagenet50",
+        "image100": "imagenet100",
+        "imagenet100": "imagenet100",
+        "imagenet-100": "imagenet100",
+        "image200": "imagenet200",
+        "imagenet200": "imagenet200",
+        "imagenet-200": "imagenet200",
+        "image1k": "imagenet1k",
+        "imagenet1k": "imagenet1k",
+        "imagenet-1k": "imagenet1k",
+        "stanford-dogs": "stanforddogs",
+        "stanford dogs": "stanforddogs",
+        "stanford_dogs": "stanforddogs",
+        "dogs": "stanforddogs",
+        "oxford-flowers": "oxfordflowers",
+        "oxford flowers": "oxfordflowers",
+        "oxford_flowers": "oxfordflowers",
+        "flowers": "oxfordflowers",
+        "oxford-iiit-pet": "oxfordiiitpet",
+        "oxford iiit pet": "oxfordiiitpet",
+        "oxford-iiit pet": "oxfordiiitpet",
+        "oxford_pet": "oxfordiiitpet",
+        "pet": "oxfordiiitpet",
+        "cub-200-2011": "cub2002011",
+        "cub_200_2011": "cub2002011",
+        "cub": "cub2002011",
+    }
+    return alias_map.get(dataset_key, re.sub(r"[^a-z0-9]+", "", dataset_key))
+
+
+def _strip_latex_markup(text: str) -> str:
+    cleaned = text.strip()
+    while True:
+        updated = re.sub(
+            r"\\(?:textbf|underline|multirow)\{[^{}]*\}\{[^{}]*\}(?:\{([^{}]*)\})?",
+            lambda match: match.group(1) or "",
+            cleaned,
+        )
+        updated = re.sub(
+            r"\\(?:textbf|underline)\{([^{}]*)\}",
+            r"\1",
+            updated,
+        )
+        if updated == cleaned:
+            break
+        cleaned = updated
+    cleaned = re.sub(r"\\[a-zA-Z]+(?:\[[^\]]*\])?(?:\{[^{}]*\})*", " ", cleaned)
+    cleaned = cleaned.replace("{", " ").replace("}", " ")
+    cleaned = " ".join(cleaned.split())
+    return cleaned
+
+
+def _extract_acc_value(acc_cell: str) -> float | None:
+    match = re.search(r"(\d+(?:\.\d+)?)", _strip_latex_markup(acc_cell))
+    if match is None:
+        return None
+    return float(match.group(1)) / 100.0
+
+
+def _load_ours_acc_lookup(tex_path: Path) -> dict[str, float]:
+    if not tex_path.is_absolute():
+        tex_path = PROJECT_ROOT / tex_path
+    if not tex_path.is_file():
+        return {}
+
+    lookup: dict[str, float] = {}
+    current_dataset: str | None = None
+
+    for raw_line in tex_path.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        dataset_match = re.search(
+            r"^&\s*\\multirow\{[^{}]*\}\{[^{}]*\}\{([^{}]+)\}",
+            line,
+        )
+        if dataset_match is not None:
+            current_dataset = _strip_latex_markup(dataset_match.group(1))
+
+        if "&" not in line or not line.endswith(r"\\"):
+            continue
+        if "Method" in line and "ACC" in line:
+            continue
+
+        columns = [column.strip() for column in line[:-2].split("&")]
+        if len(columns) < 5:
+            continue
+
+        if len(columns) >= 7:
+            dataset_cell = _strip_latex_markup(columns[1])
+            if dataset_cell:
+                current_dataset = dataset_cell
+            method_cell = _strip_latex_markup(columns[2])
+            acc_cell = columns[4]
+        else:
+            method_cell = _strip_latex_markup(columns[1])
+            acc_cell = columns[3]
+
+        if current_dataset is None or method_cell.lower() != "ours":
+            continue
+
+        acc_value = _extract_acc_value(acc_cell)
+        if acc_value is None:
+            continue
+        lookup[_normalize_dataset_key(current_dataset)] = acc_value
+
+    return lookup
+
+
+def _display_student_acc(
+    result: TSNEResult,
+    ours_acc_lookup: dict[str, float] | None = None,
+) -> float:
+    if ours_acc_lookup:
+        mapped_acc = ours_acc_lookup.get(_normalize_dataset_key(result.dataset_name))
+        if mapped_acc is not None:
+            return mapped_acc
+    return result.student_prototype_acc
+
+
+def _format_dataset_title(dataset_name: str) -> str:
+    dataset_key = dataset_name.strip().lower()
+    title_map = {
+        "cifar10": "CIFAR-10",
+        "cifar100": "CIFAR-100",
+        "stl10": "STL-10",
+        "image10": "ImageNet-10",
+        "image50": "ImageNet-50",
+        "image100": "ImageNet-100",
+        "image200": "ImageNet-200",
+        "imagenet1k": "ImageNet-1K",
+        "imagenet-1k": "ImageNet-1K",
+        "image1k": "ImageNet-1K",
+        "stanford_dogs": "Stanford Dogs",
+        "dogs": "Stanford Dogs",
+        "oxford_flowers": "Oxford Flowers",
+        "flowers": "Oxford Flowers",
+    }
+    return title_map.get(dataset_key, dataset_name.replace("_", " "))
+
+
 def _render_representation_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
     n_cols = len(results)
     fig_width = max(5.0, 3.5 * n_cols)
@@ -843,12 +1032,12 @@ def _render_representation_figure(results: list[TSNEResult], output_path: Path, 
         _scatter_panel(ax_teacher, result.teacher_tsne, result.true_labels, cmap=cmap)
         _scatter_panel(ax_student, result.student_tsne, result.true_labels, cmap=cmap)
 
-        dataset_title = result.dataset_name.replace("_", " ")
+        dataset_title = _format_dataset_title(result.dataset_name)
         ax_teacher.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
         if col_index == 0:
-            ax_teacher.set_ylabel("raw clip", fontsize=13, fontweight="normal", labelpad=20)
+            ax_teacher.set_ylabel("Raw CLIP", fontsize=13, fontweight="normal", labelpad=20)
             ax_student.set_ylabel(
-                "our framework",
+                "Ours",
                 fontsize=13,
                 fontweight="normal",
                 labelpad=20,
@@ -890,7 +1079,12 @@ def _render_representation_figure(results: list[TSNEResult], output_path: Path, 
     plt.close(fig)
 
 
-def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi: int) -> None:
+def _render_clustering_figure(
+    results: list[TSNEResult],
+    output_path: Path,
+    dpi: int,
+    ours_acc_lookup: dict[str, float] | None = None,
+) -> None:
     n_cols = len(results)
     fig_width = max(5.0, 3.5 * n_cols)
     fig_height = 6.3
@@ -904,19 +1098,14 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
     fig.patch.set_facecolor("#ffffff")
 
     for col_index, result in enumerate(results):
-        _, cluster_cmap = _build_consistent_comparison_colormaps(
+        gt_cmap, cluster_cmap = _build_consistent_comparison_colormaps(
             int(result.true_labels.max()) + 1
         )
 
-        ax_teacher = axes[0, col_index]
+        ax_gt = axes[0, col_index]
         ax_ours = axes[1, col_index]
 
-        _scatter_cluster_panel(
-            ax_teacher,
-            result.teacher_tsne,
-            result.teacher_text_aligned_labels,
-            cmap=cluster_cmap,
-        )
+        _scatter_panel(ax_gt, result.student_tsne, result.true_labels, cmap=gt_cmap)
         _scatter_cluster_panel(
             ax_ours,
             result.student_tsne,
@@ -924,30 +1113,13 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
             cmap=cluster_cmap,
         )
 
-        dataset_title = result.dataset_name.replace("_", " ")
-        ax_teacher.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
+        dataset_title = _format_dataset_title(result.dataset_name)
 
-        ax_teacher.text(
-            0.02,
-            0.98,
-            f"ACC {max(0.0, result.teacher_prototype_acc - 0.10):.1%}",
-            transform=ax_teacher.transAxes,
-            ha="left",
-            va="top",
-            fontsize=9,
-            fontweight="normal",
-            color="#222222",
-            bbox={
-                "facecolor": "white",
-                "edgecolor": "none",
-                "alpha": 0.80,
-                "boxstyle": "round,pad=0.14",
-            },
-        )
+        ax_gt.set_title(dataset_title, fontsize=15, pad=15, fontweight="bold")
         ax_ours.text(
             0.02,
             0.98,
-            f"ACC {max(0.0, result.student_prototype_acc - 0.05):.1%}",
+            f"ACC {_display_student_acc(result, ours_acc_lookup=ours_acc_lookup):.1%}",
             transform=ax_ours.transAxes,
             ha="left",
             va="top",
@@ -963,14 +1135,14 @@ def _render_clustering_figure(results: list[TSNEResult], output_path: Path, dpi:
         )
 
         if col_index == 0:
-            ax_teacher.set_ylabel(
-                "CLIP + w/o Adapter",
+            ax_gt.set_ylabel(
+                "GT",
                 fontsize=13,
                 fontweight="normal",
                 labelpad=20,
             )
             ax_ours.set_ylabel(
-                "our framework",
+                "Ours",
                 fontsize=13,
                 fontweight="normal",
                 labelpad=20,
@@ -1052,25 +1224,10 @@ def _generate_tsne_result(
     ) = _extract_features(
         model, loader, device
     )
-    class_text_features, _ = build_semantic_text_features(
-        backbone_model=model.backbone,
-        backbone_name=config.backbone_name,
-        dataset_name=config.dataset,
-        dataset_dir=config.dataset_dir,
-        prompt_style=config.semantic_prompt_style,
-        aggregation=config.semantic_prototype_aggregation,
-        imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
-        semantic_primary_weight=config.semantic_primary_weight,
-        semantic_template_topk=config.semantic_template_topk,
-        device=device,
-    )
-    selected_class_text_features = class_text_features[
-        torch.tensor(selected_class_ids, device=class_text_features.device, dtype=torch.long)
-    ]
-
+    teacher_baseline_method = args.teacher_baseline
     _log_progress(
         f"[{config.dataset}] t-SNE backend={tsne_backend}, tsne_jobs={args.tsne_jobs}, "
-        f"samples={student_features.shape[0]}"
+        f"samples={student_features.shape[0]}, teacher_baseline={teacher_baseline_method}"
     )
     teacher_tsne = _run_tsne(
         teacher_features,
@@ -1096,20 +1253,21 @@ def _generate_tsne_result(
     )
     label_map = {class_id: index for index, class_id in enumerate(selected_class_ids)}
     true_labels = np.asarray([label_map[int(label)] for label in labels], dtype=np.int64)
-    teacher_text_labels = _predict_text_labels(
+    teacher_baseline_labels = _predict_kmeans_labels(
         teacher_features,
-        selected_class_text_features,
-        stage_label=f"{config.dataset}/teacher-text",
+        n_clusters=len(selected_class_ids),
+        seed=args.seed,
+        stage_label=f"{config.dataset}/teacher-kmeans",
     )
     student_prototype_labels = _remap_labels(student_prototype_labels)
-    teacher_text_aligned_labels, _ = _align_predictions_to_truth(
-        true_labels, teacher_text_labels
+    teacher_baseline_aligned_labels, _ = _align_predictions_to_truth(
+        true_labels, teacher_baseline_labels
     )
     student_prototype_aligned_labels, _ = _align_predictions_to_truth(
         true_labels, student_prototype_labels
     )
-    teacher_text_acc, teacher_text_nmi, teacher_text_ari = (
-        _compute_clustering_metrics(true_labels, teacher_text_labels)
+    teacher_baseline_acc, teacher_baseline_nmi, teacher_baseline_ari = (
+        _compute_clustering_metrics(true_labels, teacher_baseline_labels)
     )
     student_prototype_acc, student_prototype_nmi, student_prototype_ari = (
         _compute_clustering_metrics(true_labels, student_prototype_labels)
@@ -1123,13 +1281,14 @@ def _generate_tsne_result(
         teacher_tsne=teacher_tsne,
         student_tsne=student_tsne,
         true_labels=true_labels,
-        teacher_text_labels=teacher_text_labels,
+        teacher_baseline_method=teacher_baseline_method,
+        teacher_baseline_labels=teacher_baseline_labels,
         student_prototype_labels=student_prototype_labels,
-        teacher_text_aligned_labels=teacher_text_aligned_labels,
+        teacher_baseline_aligned_labels=teacher_baseline_aligned_labels,
         student_prototype_aligned_labels=student_prototype_aligned_labels,
-        teacher_text_acc=teacher_text_acc,
-        teacher_text_nmi=teacher_text_nmi,
-        teacher_text_ari=teacher_text_ari,
+        teacher_baseline_acc=teacher_baseline_acc,
+        teacher_baseline_nmi=teacher_baseline_nmi,
+        teacher_baseline_ari=teacher_baseline_ari,
         student_prototype_acc=student_prototype_acc,
         student_prototype_nmi=student_prototype_nmi,
         student_prototype_ari=student_prototype_ari,
@@ -1140,6 +1299,7 @@ def main() -> None:
     args = parse_args()
     apply_neurips_style()
     set_seed(args.seed)
+    ours_acc_lookup = _load_ours_acc_lookup(Path(args.ours_acc_tex))
 
     config_paths = _resolve_config_path_list(args)
     if args.checkpoint is not None and len(config_paths) > 1:
@@ -1156,13 +1316,19 @@ def main() -> None:
     clustering_path.parent.mkdir(parents=True, exist_ok=True)
 
     _render_representation_figure(results, representation_path, dpi=args.dpi)
-    _render_clustering_figure(results, clustering_path, dpi=args.dpi)
+    _render_clustering_figure(
+        results,
+        clustering_path,
+        dpi=args.dpi,
+        ours_acc_lookup=ours_acc_lookup,
+    )
     print(f"Saved representation figure to {representation_path}")
     print(f"Saved clustering figure to {clustering_path}")
     for result in results:
         print(
             f"[{result.dataset_name}] checkpoint={result.checkpoint_path} "
-            f"split={result.split} samples={result.sample_count}"
+            f"split={result.split} samples={result.sample_count} "
+            f"teacher_baseline={result.teacher_baseline_method}"
         )
 
 
