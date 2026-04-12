@@ -2,7 +2,7 @@
 
 # Data
 dataset: "TinyImageNet200"
-dataset_dir: "/home/geyingjie/hypersphere-data/tiny-imagenet-200"
+dataset_dir: "/opt/hypersphere-data/tiny-imagenet-200"
 class_num: 200
 validation_ratio: 0.1
 validation_seed: 42

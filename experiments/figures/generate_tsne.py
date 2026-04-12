@@ -16,7 +16,7 @@ import matplotlib
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
-from matplotlib.colors import ListedColormap, to_rgba_array
+from matplotlib.colors import ListedColormap, hsv_to_rgb, to_rgba_array
 from matplotlib.lines import Line2D
 from scipy.optimize import linear_sum_assignment
 from sklearn.cluster import KMeans
@@ -771,13 +771,53 @@ def _build_label_colormap(class_num: int) -> ListedColormap:
         "#CC6677",
         "#882255",
         "#AA4499",
-        "#DDDDDD",
+        "#EE7733",
     ]
     if class_num <= len(neurips_colors):
         return ListedColormap(neurips_colors[:class_num])
 
-    tab20 = plt.get_cmap("tab20", class_num)
-    return ListedColormap(tab20(np.arange(class_num)))
+    def _is_grayish(color: np.ndarray) -> bool:
+        rgb = color[:3]
+        channel_spread = float(np.max(rgb) - np.min(rgb))
+        return channel_spread < 0.08
+
+    palette: list[np.ndarray] = [np.asarray(color) for color in to_rgba_array(neurips_colors)]
+    seen = {tuple(np.round(color, 4)) for color in palette}
+
+    for cmap_name in ("tab20", "tab20b", "tab20c", "Set1", "Set2", "Dark2", "Paired"):
+        cmap = plt.get_cmap(cmap_name)
+        if hasattr(cmap, "colors"):
+            candidates = to_rgba_array(cmap.colors)
+        else:
+            candidates = cmap(np.linspace(0, 1, 256, endpoint=False))
+
+        for color in candidates:
+            rounded = tuple(np.round(color, 4))
+            if rounded in seen or _is_grayish(color):
+                continue
+            palette.append(np.asarray(color))
+            seen.add(rounded)
+            if len(palette) >= class_num:
+                return ListedColormap(np.asarray(palette[:class_num]))
+
+    if len(palette) < class_num:
+        extra_count = class_num - len(palette)
+        hues = np.linspace(0, 1, extra_count, endpoint=False)
+        extra_colors = hsv_to_rgb(
+            np.column_stack(
+                [
+                    hues,
+                    np.full(extra_count, 0.72, dtype=np.float32),
+                    np.full(extra_count, 0.92, dtype=np.float32),
+                ]
+            )
+        )
+        extra_rgba = np.column_stack(
+            [extra_colors, np.ones(extra_count, dtype=np.float32)]
+        )
+        palette.extend(np.asarray(color) for color in extra_rgba)
+
+    return ListedColormap(np.asarray(palette[:class_num]))
 
 
 def _build_consistent_comparison_colormaps(
