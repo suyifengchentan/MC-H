@@ -441,6 +441,11 @@ def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, de
     return start_epoch, global_step, best_metric
 
 
+def eval_snapshot_checkpoint_path(config, epoch: int) -> Path:
+    # Save eval-triggered snapshots in a dedicated folder so best/last semantics stay unchanged.
+    return config.output_dir / "eval_checkpoints" / f"epoch_{epoch + 1:04d}.pt"
+
+
 def main():
     args = parse_args()
     config = load_experiment_config(args.config)
@@ -666,6 +671,29 @@ def main():
         selected_split, selected_metrics, tracked_metric = select_checkpoint_score(
             eval_metrics, logger
         )
+
+        eval_snapshot_path = eval_snapshot_checkpoint_path(config, epoch)
+        save_checkpoint(
+            checkpoint_path=eval_snapshot_path,
+            model=model,
+            optimizer=optimizer,
+            scaler=scaler,
+            scheduler=scheduler,
+            queue_state=queue.state_dict(),
+            epoch=epoch,
+            global_step=global_step,
+            best_metric=best_metric,
+            config=config.as_dict(),
+        )
+        logger.info(
+            "saved eval snapshot=%s trigger_epoch=%03d split=%s %s selection_score=%.6f",
+            eval_snapshot_path,
+            epoch,
+            selected_split,
+            format_clustering_metrics(selected_metrics),
+            tracked_metric,
+        )
+
         is_best = tracked_metric > best_metric
         if is_best:
             best_metric = tracked_metric
