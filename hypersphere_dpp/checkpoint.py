@@ -36,6 +36,7 @@ def save_checkpoint(
     global_step: int,
     best_metric: float,
     config: dict,
+    training_state: dict[str, Any] | None = None,
 ) -> None:
     path = Path(checkpoint_path)
     path.parent.mkdir(parents=True, exist_ok=True)
@@ -49,6 +50,7 @@ def save_checkpoint(
         "global_step": global_step,
         "best_metric": best_metric,
         "config": config,
+        "training_state": _to_cpu(training_state or {}),
     }
     torch.save(payload, path)
 

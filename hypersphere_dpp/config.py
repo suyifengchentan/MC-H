@@ -133,10 +133,12 @@ class ExperimentConfig:
     alpha_div_decay_end_epoch: float = -1.0
     alpha_div_decay_target: float = 1.0
     dpp_warmup_epochs: int = 20
+    dpp_curve_epochs: int = 3
     dpp_every_n_steps: int = 4
     dpp_jitter: float = 1e-5
     class_aware_dpp: bool = False
     class_aware_dpp_min_mass: float = 1.0
+    rho_ema_momentum: float = 0.85
 
     # Runtime / output
     eval_interval: int = 1
@@ -307,6 +309,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.alpha_div_max <= 0:
         raise ValueError("alpha_div_max must be positive.")
+
+    if config.dpp_curve_epochs < 0:
+        raise ValueError("dpp_curve_epochs must be non-negative.")
+
+    if not 0.0 <= config.rho_ema_momentum < 1.0:
+        raise ValueError("rho_ema_momentum must be in [0, 1).")
 
     if (
         config.alpha_div_decay_end_epoch > 0

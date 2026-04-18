@@ -97,6 +97,7 @@ def train_one_epoch(
     config,
     device: torch.device,
     epoch: int,
+    rho_state: dict[str, float | None],
     logger,
 ) -> dict[str, float]:
     model.train()
@@ -114,6 +115,7 @@ def train_one_epoch(
         "prototype_anchor_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
+        "rho_raw": 0.0,
     }
     num_steps = len(dataloader)
     log_interval = max(1, num_steps // 5) if num_steps > 0 else 1
@@ -237,7 +239,7 @@ def train_one_epoch(
                 subspace_loss = student_cat.new_zeros(())
 
             if step % config.dpp_every_n_steps == 0:
-                dpp_loss, rho, _ = dpp_diversity_loss(
+                dpp_loss, observed_rho, _ = dpp_diversity_loss(
                     features=student_cat,
                     assignments=assignment_cat,
                     jitter=config.dpp_jitter,
@@ -245,6 +247,15 @@ def train_one_epoch(
                     class_aware_min_mass=config.class_aware_dpp_min_mass,
                 )
                 epoch_progress = epoch + step / max(num_steps, 1)
+                previous_rho = rho_state.get("ema")
+                if previous_rho is None or config.rho_ema_momentum <= 0.0:
+                    rho = observed_rho
+                else:
+                    rho = observed_rho.new_tensor(previous_rho).lerp(
+                        observed_rho.detach(),
+                        1.0 - config.rho_ema_momentum,
+                    )
+                rho_state["ema"] = float(rho.item())
                 alpha_div = adaptive_diversity_weight(
                     rho=rho,
                     alpha_div_base=config.alpha_div_base,
@@ -258,9 +269,11 @@ def train_one_epoch(
                     alpha_div_decay_target=config.alpha_div_decay_target,
                     epoch_progress=epoch_progress,
                     warmup_epochs=config.dpp_warmup_epochs,
+                    curve_epochs=config.dpp_curve_epochs,
                 )
             else:
                 dpp_loss = student_cat.new_zeros(())
+                observed_rho = student_cat.new_zeros(())
                 rho = student_cat.new_zeros(())
                 alpha_div = student_cat.new_zeros(())
 
@@ -304,13 +317,14 @@ def train_one_epoch(
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
         totals["rho"] += float(rho.item())
+        totals["rho_raw"] += float(observed_rho.item())
 
         if (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps:
             running_denom = step + 1
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f proto_reg=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f proto_reg=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f raw_rho=%.4f"
                 ),
                 epoch,
                 step + 1,
@@ -325,6 +339,7 @@ def train_one_epoch(
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
                 totals["rho"] / running_denom,
+                totals["rho_raw"] / running_denom,
             )
         if step_profile_enabled and should_log_step_profile(
             step,
@@ -424,7 +439,7 @@ def select_checkpoint_score(
 def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, device):
     last_checkpoint = config.output_dir / "last.pt"
     if not config.reload or not last_checkpoint.exists():
-        return 0, 0, float("-inf")
+        return 0, 0, float("-inf"), {"ema": None}
 
     checkpoint = load_checkpoint(
         checkpoint_path=last_checkpoint,
@@ -438,7 +453,11 @@ def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, de
     start_epoch = int(checkpoint.get("epoch", -1)) + 1
     global_step = int(checkpoint.get("global_step", 0))
     best_metric = float(checkpoint.get("best_metric", float("-inf")))
-    return start_epoch, global_step, best_metric
+    training_state = checkpoint.get("training_state") or {}
+    rho_ema = training_state.get("rho_ema")
+    if rho_ema is not None:
+        rho_ema = float(rho_ema)
+    return start_epoch, global_step, best_metric, {"ema": rho_ema}
 
 
 def eval_snapshot_checkpoint_path(config, epoch: int) -> Path:
@@ -559,6 +578,11 @@ def main():
         config.class_aware_dpp,
         config.class_aware_dpp_min_mass,
     )
+    logger.info(
+        "dpp smoothing: curve_epochs=%d rho_ema_momentum=%.2f",
+        config.dpp_curve_epochs,
+        config.rho_ema_momentum,
+    )
     optimizer = build_optimizer(model, config)
     scheduler = build_lr_scheduler(optimizer, config)
     scaler = amp.GradScaler(
@@ -572,7 +596,7 @@ def main():
         device=device,
     )
 
-    start_epoch, global_step, best_metric = maybe_resume_training(
+    start_epoch, global_step, best_metric, rho_state = maybe_resume_training(
         model=model,
         optimizer=optimizer,
         scaler=scaler,
@@ -583,11 +607,12 @@ def main():
     )
     if start_epoch > 0:
         logger.info(
-            "resumed_from=%s epoch=%d global_step=%d best_metric=%.6f",
+            "resumed_from=%s epoch=%d global_step=%d best_metric=%.6f rho_ema=%s",
             config.output_dir / "last.pt",
             start_epoch,
             global_step,
             best_metric,
+            "none" if rho_state.get("ema") is None else f"{rho_state['ema']:.6f}",
         )
     logger.info(
         "optimizer: adapter_lr=%.8f prototype_lr=%.8f prototype_lr_multiplier=%.4f lambda_prototype_anchor=%.4f weight_decay=%.8f lr_scheduler=%s min_lr=%.8f",
@@ -620,6 +645,7 @@ def main():
             config=config,
             device=device,
             epoch=epoch,
+            rho_state=rho_state,
             logger=logger,
         )
         global_step += len(datasets.train_loader)
@@ -684,6 +710,7 @@ def main():
             global_step=global_step,
             best_metric=best_metric,
             config=config.as_dict(),
+            training_state={"rho_ema": rho_state.get("ema")},
         )
         logger.info(
             "saved eval snapshot=%s trigger_epoch=%03d split=%s %s selection_score=%.6f",
@@ -709,6 +736,7 @@ def main():
                 global_step=global_step,
                 best_metric=best_metric,
                 config=config.as_dict(),
+                training_state={"rho_ema": rho_state.get("ema")},
             )
             logger.info(
                 "saved checkpoint=%s split=%s %s selection_score=%.6f",
@@ -731,6 +759,7 @@ def main():
             global_step=global_step,
             best_metric=best_metric,
             config=config.as_dict(),
+            training_state={"rho_ema": rho_state.get("ema")},
         )
         logger.info(
             "saved checkpoint=%s current_best_selection_score=%.6f",

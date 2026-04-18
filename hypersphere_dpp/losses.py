@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import math
+
 import torch
 import torch.nn.functional as F
 
@@ -143,11 +145,17 @@ def adaptive_diversity_weight(
     alpha_div_decay_target: float,
     epoch_progress: float,
     warmup_epochs: int,
+    curve_epochs: int = 0,
 ) -> torch.Tensor:
     if warmup_epochs <= 0:
         curriculum = 1.0
     else:
         curriculum = min(max(epoch_progress / warmup_epochs, 0.0), 1.0)
+    if curve_epochs <= 0:
+        curve_factor = 1.0
+    else:
+        curve_progress = min(max(epoch_progress / curve_epochs, 0.0), 1.0)
+        curve_factor = 0.5 * (1.0 - math.cos(math.pi * curve_progress))
     if (
         alpha_div_decay_start_epoch >= 0
         and alpha_div_decay_end_epoch > alpha_div_decay_start_epoch
@@ -165,7 +173,9 @@ def adaptive_diversity_weight(
     else:
         decay_multiplier = 1.0
 
-    curriculum_tensor = rho.detach().new_tensor(curriculum * decay_multiplier)
+    curriculum_tensor = rho.detach().new_tensor(
+        curriculum * curve_factor * decay_multiplier
+    )
 
     if alpha_div_mode == "clamp_positive":
         rho_value = rho.detach().clamp(min=0.0)
