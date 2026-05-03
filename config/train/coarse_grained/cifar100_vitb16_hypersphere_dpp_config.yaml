@@ -31,30 +31,42 @@ min_learning_rate: 0.00001
 
 # Compact / clustering
 instance_temperature: 0.2
-cluster_temperature: 0.3
+cluster_temperature: 0.25
 lambda_instance: 1.0
 lambda_cluster: 1.0
 semantic_prototype_enabled: true
-semantic_prompt_style: "auto"
+semantic_prompt_style: "clip_ensemble"
 semantic_prototype_aggregation: "mean"
-lambda_semantic: 0.1
+lambda_semantic: 0.05
 semantic_temperature: 0.2
+semantic_target_topk: 1
+prototype_freeze_epochs: 1
+prototype_lr_multiplier: 0.5
+lambda_prototype_anchor: 0.0
 
-sinkhorn_iters: 3
-sinkhorn_epsilon: 0.05
+sinkhorn_iters: 5
+sinkhorn_epsilon: 0.07
 
 # Subspace
-lambda_subspace: 0.12
+lambda_subspace: 0.03
 subspace_rank: 8
 subspace_queue_size: 64
 subspace_min_mass: 8.0
 subspace_every_n_steps: 2
 subspace_pca_q_offset: 2
-subspace_topk_clusters: 32
+subspace_topk_clusters: 16
 
 # DPP
 alpha_div_base: 0.3
-dpp_warmup_epochs: 20
+alpha_div_mode: "sigmoid_floor"
+alpha_div_floor: 0.12
+alpha_div_rho_center: 0.015
+alpha_div_rho_scale: 0.01
+alpha_div_max: 0.05
+alpha_div_decay_start_epoch: 12
+alpha_div_decay_end_epoch: 32
+alpha_div_decay_target: 0.2
+dpp_warmup_epochs: 8
 dpp_every_n_steps: 4
 dpp_jitter: 0.00001
 
@@ -64,4 +76,4 @@ model_path: "save/hypersphere_dpp/CIFAR100_CLIP_ViTB16_HypersphereDPP"
 workers: 8
 reload: false
 seed: 42
-best_checkpoint_patience: 15
+best_checkpoint_patience: 20

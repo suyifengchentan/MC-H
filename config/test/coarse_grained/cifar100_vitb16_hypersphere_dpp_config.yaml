@@ -19,12 +19,13 @@ adapter_hidden_dim: 768
 adapter_dropout: 0.1
 transform_profile: "small_image_two_view"
 semantic_prototype_enabled: true
-semantic_prompt_style: "auto"
+semantic_prompt_style: "clip_ensemble"
 semantic_prototype_aggregation: "mean"
-lambda_semantic: 0.1
+lambda_semantic: 0.05
 semantic_temperature: 0.2
+semantic_target_topk: 1
 
 # Evaluation / runtime
-eval_batch_size: 128
+eval_batch_size: 256
 workers: 8
 seed: 42
