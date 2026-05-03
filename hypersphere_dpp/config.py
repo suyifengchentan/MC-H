@@ -53,6 +53,7 @@ SUPPORTED_SEMANTIC_MODES = {"legacy", "tac_imagenet1k"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
+SUPPORTED_CIFAR100_LABEL_MODES = {"fine", "coarse"}
 
 
 @dataclass
@@ -61,6 +62,7 @@ class ExperimentConfig:
     dataset: str = "CUB_200_2011"
     dataset_dir: str = ""
     class_num: int = 200
+    cifar100_label_mode: str = "fine"
     validation_ratio: float = 0.1
     validation_seed: int = 42
     official_eval_split: str | None = None
@@ -233,6 +235,21 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
+
+    if config.cifar100_label_mode not in SUPPORTED_CIFAR100_LABEL_MODES:
+        raise ValueError(
+            "cifar100_label_mode must be one of "
+            f"{sorted(SUPPORTED_CIFAR100_LABEL_MODES)}, got {config.cifar100_label_mode!r}."
+        )
+
+    if config.dataset == "CIFAR100":
+        expected_class_num = 20 if config.cifar100_label_mode == "coarse" else 100
+        if config.class_num != expected_class_num:
+            raise ValueError(
+                "class_num for CIFAR100 must match cifar100_label_mode: "
+                f"expected {expected_class_num} for mode {config.cifar100_label_mode!r}, "
+                f"got {config.class_num}."
+            )
 
     if config.imagenet1k_cached_teacher_views_enabled and config.dataset != "ImageNet1K":
         raise ValueError(

@@ -3,7 +3,8 @@
 # Data
 dataset: "CIFAR100"
 dataset_dir: "/home/geyingjie/hypersphere-data/CIFAR100"
-class_num: 100
+cifar100_label_mode: "coarse"
+class_num: 20
 validation_ratio: 0.1
 validation_seed: 42
 official_eval_split: "test"

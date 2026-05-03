@@ -466,6 +466,7 @@ def build_semantic_prototype_state(
     backbone_name: str,
     dataset_name: str,
     dataset_dir: str,
+    cifar100_label_mode: str,
     prompt_style: str,
     aggregation: str,
     imagenet_synonym_mode: str,
@@ -479,6 +480,7 @@ def build_semantic_prototype_state(
         backbone_name=backbone_name,
         dataset_name=dataset_name,
         dataset_dir=dataset_dir,
+        cifar100_label_mode=cifar100_label_mode,
         prompt_style=prompt_style,
         aggregation=aggregation,
         imagenet_synonym_mode=imagenet_synonym_mode,
@@ -578,7 +580,11 @@ def build_semantic_prototype_state(
     )
 
 
-def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
+def load_class_texts(
+    dataset_name: str,
+    dataset_dir: str,
+    cifar100_label_mode: str = "fine",
+) -> list[str]:
     label_entries = load_label_entries(dataset_name)
     if label_entries:
         return [entry.name for entry in label_entries]
@@ -588,7 +594,13 @@ def load_class_texts(dataset_name: str, dataset_dir: str) -> list[str]:
     if dataset_name == "CIFAR100":
         return [
             name.replace("_", " ")
-            for name in CIFAR100Dataset(root=dataset_dir, train=True, transform=None, download=False).classes
+            for name in CIFAR100Dataset(
+                root=dataset_dir,
+                train=True,
+                transform=None,
+                download=False,
+                label_mode=cifar100_label_mode,
+            ).classes
         ]
     if dataset_name == "STL10":
         return [
@@ -621,6 +633,7 @@ def build_semantic_text_features(
     backbone_name: str,
     dataset_name: str,
     dataset_dir: str,
+    cifar100_label_mode: str,
     prompt_style: str,
     aggregation: str,
     imagenet_synonym_mode: str,
@@ -662,7 +675,11 @@ def build_semantic_text_features(
 
     else:
         # Standard code path for other datasets using single class names
-        class_texts = load_class_texts(dataset_name, dataset_dir)
+        class_texts = load_class_texts(
+            dataset_name,
+            dataset_dir,
+            cifar100_label_mode=cifar100_label_mode,
+        )
         num_classes = len(class_texts)
 
         prompt_groups = [

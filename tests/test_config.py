@@ -243,6 +243,49 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.class_num, 102)
         self.assertEqual(config.official_eval_split, "valid")
 
+    def test_cifar100_coarse_mode_is_supported(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR100"
+            dataset_dir: "/tmp/cifar100"
+            cifar100_label_mode: "coarse"
+            class_num: 20
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.dataset, "CIFAR100")
+        self.assertEqual(config.cifar100_label_mode, "coarse")
+        self.assertEqual(config.class_num, 20)
+
+    def test_cifar100_coarse_mode_requires_20_classes(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR100"
+            dataset_dir: "/tmp/cifar100"
+            cifar100_label_mode: "coarse"
+            class_num: 100
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        with self.assertRaisesRegex(
+            ValueError, "class_num for CIFAR100 must match cifar100_label_mode"
+        ):
+            load_experiment_config(config_path)
+
     def test_min_learning_rate_cannot_exceed_learning_rate(self):
         config_text = textwrap.dedent(
             """

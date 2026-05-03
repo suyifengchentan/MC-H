@@ -360,10 +360,18 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
 
     if config.dataset == "CIFAR100":
         train_base = CIFAR100Dataset(
-            root=config.dataset_dir, train=True, transform=None, download=False
+            root=config.dataset_dir,
+            train=True,
+            transform=None,
+            download=False,
+            label_mode=config.cifar100_label_mode,
         )
         eval_base = CIFAR100Dataset(
-            root=config.dataset_dir, train=False, transform=None, download=False
+            root=config.dataset_dir,
+            train=False,
+            transform=None,
+            download=False,
+            label_mode=config.cifar100_label_mode,
         )
         return train_base, eval_base
 

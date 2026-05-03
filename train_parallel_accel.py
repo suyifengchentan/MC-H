@@ -239,6 +239,7 @@ def main():
                 backbone_name=config.backbone_name,
                 dataset_name=config.dataset,
                 dataset_dir=config.dataset_dir,
+                cifar100_label_mode=config.cifar100_label_mode,
                 prompt_style=config.semantic_prompt_style,
                 aggregation=config.semantic_prototype_aggregation,
                 imagenet_synonym_mode=config.semantic_imagenet_synonym_mode,
