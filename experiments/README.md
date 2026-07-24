@@ -104,3 +104,59 @@ python experiments/figures/generate_cifar100_tsne.py
 - `experiments/generated/figures/fig6_curriculum_scheduling.png`
 - `experiments/generated/figures/fig7_subspace_regularization.png`
 - `experiments/generated/figures/cifar100_tsne_before_after.png`
+
+## Rebuttal: k-means 和 CIFAR-100-Mixed
+
+新增脚本把审稿人要求的公平 k-means 基线和单数据集混合粒度评估分开执行。所有 k-means 中心仅在训练协议 split 上拟合，再在官方 test split 上预测；不会在 test 特征上 `fit_predict`。
+
+先训练 `K=60` 的视觉无标签 MC-H 变体：
+
+```bash
+PYTHON=/home/rainy/.conda/envs/py312/bin/python
+$PYTHON train.py \
+  --config config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml
+```
+
+配置关闭了类别名称、text prototype、semantic alignment 和 prototype anchor。它仍使用相同的 frozen CLIP image features、adapter、DPCA、SSD 与 H-DPP；训练标签仅用于训练后评估。
+
+运行 frozen CLIP k-means 与 spherical k-means：
+
+```bash
+$PYTHON experiments/run_kmeans_baselines.py \
+  --config config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml \
+  --features frozen --clusterers both --cluster-count 60 \
+  --output-dir save/experiments/cifar100_mixed/kmeans_frozen/seed_42
+```
+
+运行 adapted feature 的两种 k-means 基线：
+
+```bash
+$PYTHON experiments/run_kmeans_baselines.py \
+  --config config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml \
+  --checkpoint save/experiments/cifar100_mixed/adaptive/seed_42/last.pt \
+  --features adapted --clusterers both --cluster-count 60 \
+  --output-dir save/experiments/cifar100_mixed/kmeans_adapted/seed_42
+```
+
+`results.json` 包含 official test 的 rectangular Hungarian ACC、NMI 和 ARI；每个方法会保存其 `*_test_predictions.npy`。将任一预测输入 mixed evaluator：
+
+```bash
+$PYTHON experiments/evaluate_cifar100_mixed.py \
+  --predictions-npy save/experiments/cifar100_mixed/kmeans_adapted/seed_42/adapted_spherical_test_predictions.npy \
+  --cifar-root hypersphere-data/CIFAR100 \
+  --num-partition-pairs 10 --partition-seed 2026 \
+  --output-json save/experiments/cifar100_mixed/kmeans_adapted/seed_42/mixed_metrics.json
+```
+
+该评估构造 20 个平衡分区：每个分区将 10 个 superclass 合并为 10 个粗簇，另 10 个 superclass 的 50 个 subclass 保持细簇，故每次评估都是同一批图像上的 `K=60` 混合目标。输出包含全局 mixed ACC/NMI/ARI、coarse 子集的 fragmentation、fine 子集的 merge rate，以及逐分区原始结果。
+
+也可以让 evaluator 直接从 `K=60` checkpoint 推理：
+
+```bash
+$PYTHON experiments/evaluate_cifar100_mixed.py \
+  --config config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml \
+  --checkpoint save/experiments/cifar100_mixed/adaptive/seed_42/last.pt \
+  --cifar-root hypersphere-data/CIFAR100 \
+  --output-json save/experiments/cifar100_mixed/adaptive/seed_42/mixed_metrics.json \
+  --save-predictions
+```
