@@ -54,3 +54,5 @@ __pycache__/
 # Ignore resolved/derived YAML configs in training outputs
 save/**/*.yaml
 save/**/*.yml
+
+/hypersphere-data/
