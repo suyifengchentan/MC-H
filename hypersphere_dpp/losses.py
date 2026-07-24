@@ -93,6 +93,22 @@ def mean_pairwise_cosine(features: torch.Tensor) -> torch.Tensor:
     return off_diagonal_sum / (batch_size * (batch_size - 1))
 
 
+def uniformity_loss(
+    features: torch.Tensor,
+    temperature: float = 2.0,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Wang-Isola-style global uniformity penalty on normalized batch features."""
+    with torch.autocast(device_type=features.device.type, enabled=False):
+        normalized = F.normalize(features.float(), dim=-1)
+        if normalized.size(0) <= 1:
+            zero = normalized.new_zeros(())
+            return zero, zero.detach()
+        squared_distances = torch.pdist(normalized, p=2).square()
+        loss = torch.logsumexp(-temperature * squared_distances, dim=0)
+        loss = loss - math.log(squared_distances.numel())
+    return loss, mean_pairwise_cosine(normalized).detach()
+
+
 def dpp_diversity_loss(
     features: torch.Tensor,
     assignments: torch.Tensor,

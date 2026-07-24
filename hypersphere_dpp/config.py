@@ -53,6 +53,12 @@ SUPPORTED_SEMANTIC_MODES = {"legacy", "tac_imagenet1k"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
+SUPPORTED_REPULSION_MODES = {
+    "adaptive_hdpp",
+    "constant_hdpp",
+    "uniformity",
+    "none",
+}
 SUPPORTED_CIFAR100_LABEL_MODES = {"fine", "coarse"}
 
 
@@ -63,6 +69,7 @@ class ExperimentConfig:
     dataset_dir: str = ""
     class_num: int = 200
     cifar100_label_mode: str = "fine"
+    cifar100_allow_noncanonical_class_num: bool = False
     validation_ratio: float = 0.1
     validation_seed: int = 42
     official_eval_split: str | None = None
@@ -134,6 +141,8 @@ class ExperimentConfig:
     alpha_div_decay_start_epoch: float = -1.0
     alpha_div_decay_end_epoch: float = -1.0
     alpha_div_decay_target: float = 1.0
+    repulsion_mode: str = "adaptive_hdpp"
+    uniformity_temperature: float = 2.0
     dpp_warmup_epochs: int = 20
     dpp_curve_epochs: int = 3
     dpp_every_n_steps: int = 4
@@ -244,11 +253,16 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.dataset == "CIFAR100":
         expected_class_num = 20 if config.cifar100_label_mode == "coarse" else 100
-        if config.class_num != expected_class_num:
+        if (
+            config.class_num != expected_class_num
+            and not config.cifar100_allow_noncanonical_class_num
+        ):
             raise ValueError(
                 "class_num for CIFAR100 must match cifar100_label_mode: "
                 f"expected {expected_class_num} for mode {config.cifar100_label_mode!r}, "
-                f"got {config.class_num}."
+                f"got {config.class_num}; set "
+                "cifar100_allow_noncanonical_class_num=true for a controlled "
+                "non-standard-K experiment."
             )
 
     if config.imagenet1k_cached_teacher_views_enabled and config.dataset != "ImageNet1K":
@@ -314,6 +328,15 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             "alpha_div_mode must be one of "
             f"{sorted(SUPPORTED_ALPHA_DIV_MODES)}, got {config.alpha_div_mode!r}."
         )
+
+    if config.repulsion_mode not in SUPPORTED_REPULSION_MODES:
+        raise ValueError(
+            "repulsion_mode must be one of "
+            f"{sorted(SUPPORTED_REPULSION_MODES)}, got {config.repulsion_mode!r}."
+        )
+
+    if config.uniformity_temperature <= 0:
+        raise ValueError("uniformity_temperature must be positive.")
 
     if config.alpha_div_base < 0:
         raise ValueError("alpha_div_base must be non-negative.")

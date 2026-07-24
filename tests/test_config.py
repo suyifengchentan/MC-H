@@ -286,6 +286,28 @@ class ConfigLoaderTest(unittest.TestCase):
         ):
             load_experiment_config(config_path)
 
+    def test_cifar100_noncanonical_class_num_requires_explicit_opt_in(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR100"
+            dataset_dir: "/tmp/cifar100"
+            cifar100_label_mode: "fine"
+            cifar100_allow_noncanonical_class_num: true
+            class_num: 60
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.class_num, 60)
+        self.assertTrue(config.cifar100_allow_noncanonical_class_num)
+
     def test_min_learning_rate_cannot_exceed_learning_rate(self):
         config_text = textwrap.dedent(
             """

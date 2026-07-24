@@ -21,6 +21,7 @@ from hypersphere_dpp.losses import (
     dpp_diversity_loss,
     nt_xent_loss,
     swav_cluster_loss,
+    uniformity_loss,
 )
 from hypersphere_dpp.metrics import (
     clustering_selection_score,
@@ -238,14 +239,23 @@ def train_one_epoch(
             else:
                 subspace_loss = student_cat.new_zeros(())
 
-            if step % config.dpp_every_n_steps == 0:
-                dpp_loss, observed_rho, _ = dpp_diversity_loss(
-                    features=student_cat,
-                    assignments=assignment_cat,
-                    jitter=config.dpp_jitter,
-                    class_aware=config.class_aware_dpp,
-                    class_aware_min_mass=config.class_aware_dpp_min_mass,
-                )
+            if (
+                config.repulsion_mode != "none"
+                and step % config.dpp_every_n_steps == 0
+            ):
+                if config.repulsion_mode == "uniformity":
+                    dpp_loss, observed_rho = uniformity_loss(
+                        student_cat,
+                        temperature=config.uniformity_temperature,
+                    )
+                else:
+                    dpp_loss, observed_rho, _ = dpp_diversity_loss(
+                        features=student_cat,
+                        assignments=assignment_cat,
+                        jitter=config.dpp_jitter,
+                        class_aware=config.class_aware_dpp,
+                        class_aware_min_mass=config.class_aware_dpp_min_mass,
+                    )
                 epoch_progress = epoch + step / max(num_steps, 1)
                 previous_rho = rho_state.get("ema")
                 if previous_rho is None or config.rho_ema_momentum <= 0.0:
@@ -256,10 +266,15 @@ def train_one_epoch(
                         1.0 - config.rho_ema_momentum,
                     )
                 rho_state["ema"] = float(rho.item())
+                weight_rho = rho
+                weight_mode = config.alpha_div_mode
+                if config.repulsion_mode in {"constant_hdpp", "uniformity"}:
+                    weight_rho = rho.new_ones(())
+                    weight_mode = "clamp_positive"
                 alpha_div = adaptive_diversity_weight(
-                    rho=rho,
+                    rho=weight_rho,
                     alpha_div_base=config.alpha_div_base,
-                    alpha_div_mode=config.alpha_div_mode,
+                    alpha_div_mode=weight_mode,
                     alpha_div_floor=config.alpha_div_floor,
                     alpha_div_rho_center=config.alpha_div_rho_center,
                     alpha_div_rho_scale=config.alpha_div_rho_scale,
