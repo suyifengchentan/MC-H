@@ -10,6 +10,54 @@ from hypersphere_dpp.config import load_experiment_config
 
 
 class ConfigLoaderTest(unittest.TestCase):
+    def test_home_relative_paths_are_expanded(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR10"
+            dataset_dir: "~/hypersphere-data/CIFAR10"
+            pretrained_checkpoint: "~/clip-pretrained/open_clip_pytorch_model.bin"
+            class_num: 10
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(
+            config.dataset_dir,
+            str(Path.home() / "hypersphere-data" / "CIFAR10"),
+        )
+        self.assertEqual(
+            config.pretrained_checkpoint,
+            str(Path.home() / "clip-pretrained" / "open_clip_pytorch_model.bin"),
+        )
+
+    def test_dataset_dir_defaults_below_current_home(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR10"
+            class_num: 10
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(
+            config.dataset_dir,
+            str(Path.home() / "hypersphere-data" / "CIFAR10"),
+        )
+
     def test_unknown_fields_emit_warning(self):
         config_text = textwrap.dedent(
             """

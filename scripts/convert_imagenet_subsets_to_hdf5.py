@@ -35,7 +35,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--imagenet-root",
         type=Path,
-        default=Path("/home/geyingjie/hypersphere-data/imagenet-1k"),
+        default=Path.home() / "hypersphere-data" / "imagenet-1k",
         help="Path to the downloaded ImageNet-1k parquet dataset root.",
     )
     parser.add_argument(

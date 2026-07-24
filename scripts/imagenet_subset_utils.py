@@ -14,10 +14,10 @@ from hypersphere_dpp.labels import LabelEntry, default_label_config_path, load_l
 
 
 DEFAULT_OUTPUT_ROOTS = {
-    "ImageNet1K": Path("/home/geyingjie/hypersphere-data/ImageNet1K"),
-    "Image50": Path("/home/geyingjie/hypersphere-data/Image50"),
-    "Image100": Path("/home/geyingjie/hypersphere-data/Image100"),
-    "Image200": Path("/home/geyingjie/hypersphere-data/Image200"),
+    "ImageNet1K": Path.home() / "hypersphere-data" / "ImageNet1K",
+    "Image50": Path.home() / "hypersphere-data" / "Image50",
+    "Image100": Path.home() / "hypersphere-data" / "Image100",
+    "Image200": Path.home() / "hypersphere-data" / "Image200",
 }
 DEFAULT_DATASETS = ["ImageNet1K", "Image50", "Image100", "Image200"]
 

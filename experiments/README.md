@@ -1,6 +1,6 @@
 # Experiments: Validation and Ablation
 
-本目录把 [`methodology.md`](/home/geyingjie/hypersphere/methodology.md) 的核心主张映射为可执行实验。
+本目录把 [`methodology.md`](../methodology.md) 的核心主张映射为可执行实验。
 
 ## 实验映射
 
@@ -17,17 +17,17 @@
 
 ## 文件说明
 
-- [`suites/validation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/validation_methodology.yaml): 验证实验矩阵
-- [`suites/ablation_methodology.yaml`](/home/geyingjie/hypersphere/experiments/suites/ablation_methodology.yaml): 消融实验矩阵
-- [`run_suite.py`](/home/geyingjie/hypersphere/experiments/run_suite.py): 实验运行器（生成配置 + 可选执行 train/eval）
-- [`collect_results.py`](/home/geyingjie/hypersphere/experiments/collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
-- [`run_validation.sh`](/home/geyingjie/hypersphere/experiments/run_validation.sh): 运行验证实验套件
-- [`run_ablation.sh`](/home/geyingjie/hypersphere/experiments/run_ablation.sh): 运行消融实验套件
-- [`figures/generate_fig3.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
-- [`figures/generate_fig6.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig6.py): 图6（课程调度与训练动态）
-- [`figures/generate_fig7.py`](/home/geyingjie/hypersphere/experiments/figures/generate_fig7.py): 图7（子空间正则化可视化）
-- [`figures/generate_cifar100_tsne.py`](/home/geyingjie/hypersphere/experiments/figures/generate_cifar100_tsne.py): CIFAR-100 t-SNE（聚类前后特征分布对比）
-- [`figures/ieee_style.py`](/home/geyingjie/hypersphere/experiments/figures/ieee_style.py): 统一 IEEE 风格样式（Computer Modern Roman 字体、线宽、网格、图例）
+- [`suites/validation_methodology.yaml`](suites/validation_methodology.yaml): 验证实验矩阵
+- [`suites/ablation_methodology.yaml`](suites/ablation_methodology.yaml): 消融实验矩阵
+- [`run_suite.py`](run_suite.py): 实验运行器（生成配置 + 可选执行 train/eval）
+- [`collect_results.py`](collect_results.py): 聚合 `metrics.jsonl` 与 `eval_*.json` 输出 CSV
+- [`run_validation.sh`](run_validation.sh): 运行验证实验套件
+- [`run_ablation.sh`](run_ablation.sh): 运行消融实验套件
+- [`figures/generate_fig3.py`](figures/generate_fig3.py): 图3（DPP 密度自适应排斥机制）
+- [`figures/generate_fig6.py`](figures/generate_fig6.py): 图6（课程调度与训练动态）
+- [`figures/generate_fig7.py`](figures/generate_fig7.py): 图7（子空间正则化可视化）
+- [`figures/generate_cifar100_tsne.py`](figures/generate_cifar100_tsne.py): CIFAR-100 t-SNE（聚类前后特征分布对比）
+- [`figures/ieee_style.py`](figures/ieee_style.py): 统一 IEEE 风格样式（Computer Modern Roman 字体、线宽、网格、图例）
 
 ## 使用方式
 
@@ -112,7 +112,7 @@ python experiments/figures/generate_cifar100_tsne.py
 先训练 `K=60` 的视觉无标签 MC-H 变体：
 
 ```bash
-PYTHON=/home/rainy/.conda/envs/py312/bin/python
+PYTHON=python
 $PYTHON train.py \
   --config config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml
 ```

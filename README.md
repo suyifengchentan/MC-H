@@ -190,11 +190,11 @@ python3 eval.py --config ... --checkpoint ... --device cuda:0
 
 `Image10`、`ImageNet1K`、`Image50`、`Image100`、`Image200` 统一使用分片式 ImageNet 存储协议；当前主线直接读取 HDF5 shard，默认目录分别是：
 
-- `Image10`: `/home/geyingjie/hypersphere-data/imagenet-10`
-- `ImageNet1K`: `/home/geyingjie/hypersphere-data/ImageNet1K`
-- `Image50`: `/home/geyingjie/hypersphere-data/Image50`
-- `Image100`: `/home/geyingjie/hypersphere-data/Image100`
-- `Image200`: `/home/geyingjie/hypersphere-data/Image200`
+- `Image10`: `~/hypersphere-data/imagenet-10`
+- `ImageNet1K`: `~/hypersphere-data/ImageNet1K`
+- `Image50`: `~/hypersphere-data/Image50`
+- `Image100`: `~/hypersphere-data/Image100`
+- `Image200`: `~/hypersphere-data/Image200`
 
 目录结构统一为：
 
@@ -234,7 +234,7 @@ wnid: 类别 wnid
 若需要从原始 ImageNet parquet shard 直接导出成当前训练使用的 HDF5 shard，可运行：
 
 ```bash
-/home/geyingjie/hypersphere/.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py \
+.venv/bin/python scripts/convert_imagenet_subsets_to_hdf5.py \
   --imagenet-root /path/to/imagenet-1k \
   --datasets ImageNet1K
 ```

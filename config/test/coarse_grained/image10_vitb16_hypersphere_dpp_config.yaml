@@ -2,7 +2,7 @@
 
 # Data
 dataset: "Image10"
-dataset_dir: "/home/geyingjie/hypersphere-data/imagenet-10"
+dataset_dir: "~/hypersphere-data/imagenet-10"
 # ImageNet HDF5 shard layout:
 # data/train-*.h5, data/test-*.h5, label_info.json
 class_num: 10

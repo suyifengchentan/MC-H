@@ -197,6 +197,14 @@ def _field_names() -> set[str]:
     return {item.name for item in fields(ExperimentConfig)}
 
 
+def _default_dataset_dir(dataset: str) -> Path:
+    return Path.home() / "hypersphere-data" / dataset
+
+
+def _resolve_user_path(value: str | Path) -> str:
+    return str(Path(value).expanduser())
+
+
 def _warn_unknown_fields(
     values: Dict[str, Any], supported_fields: Iterable[str]
 ) -> None:
@@ -220,6 +228,18 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
     _warn_unknown_fields(raw, _field_names())
     usable = {key: value for key, value in raw.items() if key in _field_names()}
     config = ExperimentConfig(**usable)
+
+    # Configs stay portable by declaring paths below the invoking user's home.
+    # Resolve them once here so downstream datasets receive ordinary absolute paths.
+    config.dataset_dir = _resolve_user_path(
+        config.dataset_dir or _default_dataset_dir(config.dataset)
+    )
+    if config.pretrained_checkpoint:
+        config.pretrained_checkpoint = _resolve_user_path(config.pretrained_checkpoint)
+    if config.imagenet1k_cached_teacher_views_dir:
+        config.imagenet1k_cached_teacher_views_dir = _resolve_user_path(
+            config.imagenet1k_cached_teacher_views_dir
+        )
 
     if config.dataset not in SUPPORTED_DATASETS:
         raise ValueError(

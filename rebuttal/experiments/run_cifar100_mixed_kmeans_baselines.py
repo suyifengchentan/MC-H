@@ -89,7 +89,7 @@ def main() -> None:
                 "--predictions-npy",
                 str((feature_dir / f"{feature_name}_{clusterer}_test_predictions.npy").relative_to(REPO_ROOT)),
                 "--cifar-root",
-                "/home/geyingjie/hypersphere-data/CIFAR100",
+                str(Path.home() / "hypersphere-data" / "CIFAR100"),
                 "--num-partition-pairs",
                 "10",
                 "--partition-seed",
