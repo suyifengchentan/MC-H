@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import REPO_ROOT, append_command, default_python, run_or_print, write_manifest
+from common import REPO_ROOT, add_cuda_arguments, append_command, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
 EXPERIMENT_ID = "cifar100_mixed_kmeans_baselines"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
@@ -23,13 +23,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--checkpoint", type=Path, default=DEFAULT_CHECKPOINT)
     parser.add_argument("--seed", type=int, default=42)
     parser.add_argument("--python", default=default_python())
-    parser.add_argument("--device", default="cuda:0")
+    add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    devices = resolve_cuda_devices(args.devices)
     base = REPO_ROOT / BASE_CONFIG
     checkpoint = args.checkpoint if args.checkpoint.is_absolute() else REPO_ROOT / args.checkpoint
     output_root = REPO_ROOT / "save/experiments/rebuttal" / EXPERIMENT_ID / f"seed_{args.seed}"
@@ -67,11 +68,18 @@ def main() -> None:
         "--output-dir",
         str(adapted_dir.relative_to(REPO_ROOT)),
     ]
-    if args.device:
-        frozen_command.extend(["--device", args.device])
-        adapted_command.extend(["--device", args.device])
-    append_command(records, name="fit-and-predict:frozen", command=frozen_command)
-    append_command(records, name="fit-and-predict:adapted", command=adapted_command)
+    append_command(
+        records,
+        name="fit-and-predict:frozen",
+        command=frozen_command,
+        job_id="frozen",
+    )
+    append_command(
+        records,
+        name="fit-and-predict:adapted",
+        command=adapted_command,
+        job_id="adapted",
+    )
 
     for feature_dir, feature_name in ((frozen_dir, "frozen"), (adapted_dir, "adapted")):
         for clusterer in ("euclidean", "spherical"):
@@ -89,11 +97,16 @@ def main() -> None:
                 "--output-json",
                 str((feature_dir / f"{clusterer}_mixed_metrics.json").relative_to(REPO_ROOT)),
             ]
-            append_command(records, name=f"mixed-eval:{feature_name}:{clusterer}", command=evaluate_command)
+            append_command(
+                records,
+                name=f"mixed-eval:{feature_name}:{clusterer}",
+                command=evaluate_command,
+                job_id=feature_name,
+            )
 
     manifest = write_manifest(EXPERIMENT_ID, records)
     print(f"Wrote {len(records)} commands to {manifest.relative_to(REPO_ROOT)}")
-    run_or_print(records, args.execute)
+    run_or_print(records, args.execute, devices=devices, max_parallel=args.max_parallel)
 
 
 if __name__ == "__main__":

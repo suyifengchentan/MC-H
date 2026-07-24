@@ -12,7 +12,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import GENERATED_ROOT, REPO_ROOT, append_command, append_train_and_eval, default_python, run_or_print, write_manifest
+from common import GENERATED_ROOT, REPO_ROOT, add_cuda_arguments, append_command, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
 EXPERIMENT_ID = "cifar100_mixed_component_baselines"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
@@ -22,13 +22,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--python", default=default_python())
-    parser.add_argument("--device", default="cuda:0")
+    add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    devices = resolve_cuda_devices(args.devices)
     variants = {
         "instance_only": {
             "lambda_cluster": 0.0,
@@ -54,7 +55,7 @@ def main() -> None:
                 seed=seed,
                 overrides=overrides,
                 python_bin=args.python,
-                device=args.device,
+                device=None,
             )
             config_path = GENERATED_ROOT / EXPERIMENT_ID / variant_id / f"seed_{seed}_train.yaml"
             mixed_eval = [
@@ -69,9 +70,13 @@ def main() -> None:
                 "--output-json",
                 str((run_dir / "mixed_metrics.json").relative_to(REPO_ROOT)),
             ]
-            if args.device:
-                mixed_eval.extend(["--device", args.device])
-            append_command(records, name=f"mixed-eval:{variant_id}:seed_{seed}", command=mixed_eval)
+            job_id = f"{EXPERIMENT_ID}:{variant_id}:seed_{seed}"
+            append_command(
+                records,
+                name=f"mixed-eval:{variant_id}:seed_{seed}",
+                command=mixed_eval,
+                job_id=job_id,
+            )
 
             if variant_id == "instance_only":
                 kmeans_dir = run_dir / "adapted_spherical_kmeans"
@@ -91,9 +96,12 @@ def main() -> None:
                     "--output-dir",
                     str(kmeans_dir.relative_to(REPO_ROOT)),
                 ]
-                if args.device:
-                    kmeans.extend(["--device", args.device])
-                append_command(records, name=f"kmeans:instance-only:seed_{seed}", command=kmeans)
+                append_command(
+                    records,
+                    name=f"kmeans:instance-only:seed_{seed}",
+                    command=kmeans,
+                    job_id=job_id,
+                )
                 kmeans_eval = [
                     args.python,
                     "experiments/evaluate_cifar100_mixed.py",
@@ -104,10 +112,15 @@ def main() -> None:
                     "--output-json",
                     str((kmeans_dir / "mixed_metrics.json").relative_to(REPO_ROOT)),
                 ]
-                append_command(records, name=f"mixed-eval:instance-only-kmeans:seed_{seed}", command=kmeans_eval)
+                append_command(
+                    records,
+                    name=f"mixed-eval:instance-only-kmeans:seed_{seed}",
+                    command=kmeans_eval,
+                    job_id=job_id,
+                )
     manifest = write_manifest(EXPERIMENT_ID, records)
     print(f"Wrote {len(records)} commands to {manifest.relative_to(REPO_ROOT)}")
-    run_or_print(records, args.execute)
+    run_or_print(records, args.execute, devices=devices, max_parallel=args.max_parallel)
 
 
 if __name__ == "__main__":

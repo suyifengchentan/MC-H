@@ -5,8 +5,10 @@ import time
 from contextlib import nullcontext
 
 import torch
+import torch.distributed as dist
 from torch import amp
 from torch import optim
+from torch.nn.parallel import DistributedDataParallel
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
@@ -37,7 +39,14 @@ from hypersphere_dpp.semantic import (
 )
 from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
 from hypersphere_dpp.transforms import build_gpu_train_transform
-from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
+from hypersphere_dpp.utils import (
+    ensure_dir,
+    finalize_distributed,
+    initialize_distributed,
+    is_main_process,
+    resolve_device,
+    set_seed,
+)
 
 
 def parse_args():
@@ -72,6 +81,10 @@ def resolve_amp_settings(
 
 def use_cached_teacher_feature_candidates(batch: dict) -> bool:
     return TEACHER_FEATURE_CANDIDATES_KEY in batch
+
+
+def unwrap_model(model):
+    return model.module if isinstance(model, DistributedDataParallel) else model
 
 
 def maybe_profile_sync(device: torch.device, enabled: bool) -> None:
@@ -159,12 +172,12 @@ def train_one_epoch(
                 teacher1, teacher2 = sample_two_teacher_feature_views(
                     teacher_feature_candidates
                 )
-            else:
-                teacher1 = model.encode_teacher(view1)
-                teacher2 = model.encode_teacher(view2)
-            teacher_cat = torch.cat([teacher1, teacher2], dim=0)
-            student_cat = model.encode_student(teacher_features=teacher_cat)
-            logits_cat = model.prototype_logits(student_cat)
+            teacher_cat, student_cat, logits_cat = model(
+                view1=view1 if teacher_feature_candidates is None else None,
+                view2=view2 if teacher_feature_candidates is None else None,
+                teacher1=teacher1 if teacher_feature_candidates is not None else None,
+                teacher2=teacher2 if teacher_feature_candidates is not None else None,
+            )
 
             student1, student2 = student_cat.chunk(2)
             logits1, logits2 = logits_cat.chunk(2)
@@ -219,7 +232,7 @@ def train_one_epoch(
                         )
                 if config.lambda_prototype_anchor > 0:
                     prototype_anchor = prototype_anchor_loss(
-                        model=model,
+                        model=unwrap_model(model),
                         target_prototypes=semantic_state.prototype_features.detach(),
                     )
 
@@ -310,7 +323,7 @@ def train_one_epoch(
         scaler.scale(loss).backward()
         scaler.step(optimizer)
         scaler.update()
-        model.normalize_prototypes()
+        unwrap_model(model).normalize_prototypes()
         queue.enqueue(teacher_cat, assignment_cat)
 
         if step_profile_enabled:
@@ -483,10 +496,18 @@ def eval_snapshot_checkpoint_path(config, epoch: int) -> Path:
 def main():
     args = parse_args()
     config = load_experiment_config(args.config)
-    device = resolve_device(args.device or config.device)
-    set_seed(config.seed)
-    ensure_dir(config.output_dir)
-    logger = setup_training_logger(config.output_dir)
+    rank, world_size, local_rank = initialize_distributed()
+    device = torch.device(f"cuda:{local_rank}") if world_size > 1 else resolve_device(args.device or config.device)
+    set_seed(config.seed + rank)
+    if is_main_process(rank):
+        ensure_dir(config.output_dir)
+    if world_size > 1:
+        dist.barrier()
+    logger = setup_training_logger(config.output_dir) if is_main_process(rank) else None
+    if logger is None:
+        import logging
+        logger = logging.getLogger("hypersphere_dpp.distributed_worker")
+        logger.addHandler(logging.NullHandler())
     use_amp, amp_device_type, amp_dtype, use_grad_scaler = resolve_amp_settings(
         config.precision, device
     )
@@ -516,7 +537,7 @@ def main():
             device,
         )
 
-    datasets = build_experiment_dataloaders(config)
+    datasets = build_experiment_dataloaders(config, rank=rank, world_size=world_size)
     train_prefetch_factor = getattr(datasets.train_loader, "prefetch_factor", None)
     logger.info("validation split: stratified=%s", datasets.val_is_stratified)
     logger.info(
@@ -599,7 +620,10 @@ def main():
         config.dpp_curve_epochs,
         config.rho_ema_momentum,
     )
-    optimizer = build_optimizer(model, config)
+    if world_size > 1:
+        model = DistributedDataParallel(model, device_ids=[local_rank], output_device=local_rank)
+    raw_model = model.module if isinstance(model, DistributedDataParallel) else model
+    optimizer = build_optimizer(raw_model, config)
     scheduler = build_lr_scheduler(optimizer, config)
     scaler = amp.GradScaler(
         device="cuda" if device.type == "cuda" else "cpu",
@@ -613,7 +637,7 @@ def main():
     )
 
     start_epoch, global_step, best_metric, rho_state = maybe_resume_training(
-        model=model,
+        model=raw_model,
         optimizer=optimizer,
         scaler=scaler,
         scheduler=scheduler,
@@ -643,8 +667,10 @@ def main():
 
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
+        if datasets.train_sampler is not None:
+            datasets.train_sampler.set_epoch(epoch)
         set_prototype_trainability(
-            model=model,
+            model=raw_model,
             freeze_epochs=config.prototype_freeze_epochs,
             epoch=epoch,
             logger=logger,
@@ -665,17 +691,18 @@ def main():
             logger=logger,
         )
         global_step += len(datasets.train_loader)
-        logger.info("epoch=%03d split=train metrics=%s", epoch, train_metrics)
-        append_metrics_record(
-            config.output_dir,
-            {
-                "epoch": epoch,
-                "global_step": global_step,
-                "lr": epoch_lr,
-                "split": "train",
-                **train_metrics,
-            },
-        )
+        if is_main_process(rank):
+            logger.info("epoch=%03d split=train metrics=%s", epoch, train_metrics)
+            append_metrics_record(
+                config.output_dir,
+                {
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    "lr": epoch_lr,
+                    "split": "train",
+                    **train_metrics,
+                },
+            )
         if scheduler is not None:
             scheduler.step()
             logger.info(
@@ -689,7 +716,17 @@ def main():
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
-        eval_metrics = evaluate_splits(model, datasets.val_loader, device)
+        if world_size > 1:
+            dist.barrier()
+        if not is_main_process(rank):
+            should_stop = torch.zeros(1, device=device, dtype=torch.int32)
+            if world_size > 1:
+                dist.broadcast(should_stop, src=0)
+            if bool(should_stop.item()):
+                break
+            continue
+
+        eval_metrics = evaluate_splits(raw_model, datasets.val_loader, device)
         for split_name, metrics in eval_metrics.items():
             selection_score = clustering_selection_score(metrics)
             logger.info(
@@ -717,7 +754,7 @@ def main():
         eval_snapshot_path = eval_snapshot_checkpoint_path(config, epoch)
         save_checkpoint(
             checkpoint_path=eval_snapshot_path,
-            model=model,
+            model=raw_model,
             optimizer=optimizer,
             scaler=scaler,
             scheduler=scheduler,
@@ -743,7 +780,7 @@ def main():
             epochs_without_improvement = 0
             save_checkpoint(
                 checkpoint_path=config.output_dir / "best.pt",
-                model=model,
+                model=raw_model,
                 optimizer=optimizer,
                 scaler=scaler,
                 scheduler=scheduler,
@@ -766,7 +803,7 @@ def main():
 
         save_checkpoint(
             checkpoint_path=config.output_dir / "last.pt",
-            model=model,
+            model=raw_model,
             optimizer=optimizer,
             scaler=scaler,
             scheduler=scheduler,
@@ -783,12 +820,21 @@ def main():
             best_metric,
         )
 
-        if epochs_without_improvement >= config.best_checkpoint_patience:
+        should_stop = epochs_without_improvement >= config.best_checkpoint_patience
+        if world_size > 1:
+            stop_tensor = torch.tensor([int(should_stop)], device=device, dtype=torch.int32)
+            dist.broadcast(stop_tensor, src=0)
+
+        if should_stop:
             logger.info(
                 "stopping early after %d eval rounds without improvement",
                 config.best_checkpoint_patience,
             )
             break
+
+    if world_size > 1:
+        dist.barrier()
+    finalize_distributed()
 
 
 if __name__ == "__main__":

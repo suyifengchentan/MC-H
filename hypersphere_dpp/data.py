@@ -7,7 +7,7 @@ from dataclasses import dataclass
 import torch
 from datasets.cifar100_dataset import CIFAR100Dataset
 from datasets.stl10_dataset import STL10Dataset
-from torch.utils.data import DataLoader, Dataset, Subset
+from torch.utils.data import DataLoader, Dataset, DistributedSampler, Subset
 
 from datasets.aircraft_dataset import AircraftDataset
 from datasets.cifar10_dataset import CIFAR10Dataset
@@ -108,6 +108,7 @@ class DatasetBundle:
     val_loader: DataLoader
     test_loader: DataLoader
     val_is_stratified: bool = False
+    train_sampler: DistributedSampler | None = None
 
 
 def split_train_indices(
@@ -277,6 +278,7 @@ def _build_loader(
     pin_memory: bool = True,
     persistent_workers: bool | None = None,
     prefetch_factor: int | None = None,
+    sampler: DistributedSampler | None = None,
 ) -> DataLoader:
     if persistent_workers is None:
         persistent_workers = workers > 0
@@ -284,12 +286,13 @@ def _build_loader(
     loader_kwargs = {
         "dataset": dataset,
         "batch_size": batch_size,
-        "shuffle": shuffle,
+        "shuffle": shuffle if sampler is None else False,
         "drop_last": drop_last,
         "num_workers": workers,
         "pin_memory": pin_memory,
         "persistent_workers": persistent_workers if workers > 0 else False,
         "collate_fn": safe_default_collate,
+        "sampler": sampler,
     }
     if workers > 0 and prefetch_factor is not None:
         loader_kwargs["prefetch_factor"] = prefetch_factor
@@ -458,7 +461,12 @@ def _build_base_datasets(config: ExperimentConfig) -> tuple[Dataset, Dataset]:
     )
 
 
-def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
+def build_experiment_dataloaders(
+    config: ExperimentConfig,
+    *,
+    rank: int = 0,
+    world_size: int = 1,
+) -> DatasetBundle:
     train_base, test_base = _build_base_datasets(config)
     train_labels = _extract_dataset_labels(train_base)
     val_is_stratified = train_labels is not None
@@ -531,15 +539,33 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
             else (4 if eval_workers > 0 else None)
         )
 
+    if world_size <= 0 or rank < 0 or rank >= world_size:
+        raise ValueError("rank must be in [0, world_size).")
+    if config.distributed_batch_size_mode == "global" and config.batch_size % world_size != 0:
+        raise ValueError(
+            "batch_size must be divisible by world_size when "
+            "distributed_batch_size_mode='global'."
+        )
+    train_batch_size = (
+        config.batch_size // world_size
+        if config.distributed_batch_size_mode == "global"
+        else config.batch_size
+    )
+    train_sampler = (
+        DistributedSampler(train_dataset, num_replicas=world_size, rank=rank, shuffle=True)
+        if world_size > 1
+        else None
+    )
     train_loader = _build_loader(
         train_dataset,
-        batch_size=config.batch_size,
+        batch_size=train_batch_size,
         workers=train_workers,
         shuffle=True,
         drop_last=True,
         pin_memory=pin_memory,
         persistent_workers=persistent_workers,
         prefetch_factor=train_prefetch_factor,
+        sampler=train_sampler,
     )
     val_loader = _build_loader(
         val_dataset,
@@ -566,4 +592,5 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
         val_loader=val_loader,
         test_loader=test_loader,
         val_is_stratified=val_is_stratified,
+        train_sampler=train_sampler,
     )

@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import append_train_and_eval, default_python, run_or_print, write_manifest
+from common import add_cuda_arguments, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
 EXPERIMENT_ID = "table7_fixed_ssd"
 DATASETS = {
@@ -25,13 +25,14 @@ def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--python", default=default_python())
-    parser.add_argument("--device", default="cuda:0")
+    add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    devices = resolve_cuda_devices(args.devices)
     variants = {
         "dpca_ssd": {"repulsion_mode": "none", "alpha_div_base": 0.0},
         "uniformity_005": {"repulsion_mode": "uniformity", "alpha_div_base": 0.05},
@@ -60,11 +61,11 @@ def main() -> None:
                     seed=seed,
                     overrides=visual_only | variant,
                     python_bin=args.python,
-                    device=args.device,
+                    device=None,
                 )
     manifest = write_manifest(EXPERIMENT_ID, records)
     print(f"Wrote {len(records)} commands to {manifest}")
-    run_or_print(records, args.execute)
+    run_or_print(records, args.execute, devices=devices, max_parallel=args.max_parallel)
 
 
 if __name__ == "__main__":

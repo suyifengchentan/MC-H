@@ -163,10 +163,17 @@ class HypersphereDPPModel(nn.Module):
         return self.backbone(images)
 
     def forward(
-        self, view1: torch.Tensor, view2: torch.Tensor
+        self,
+        view1: torch.Tensor | None = None,
+        view2: torch.Tensor | None = None,
+        teacher1: torch.Tensor | None = None,
+        teacher2: torch.Tensor | None = None,
     ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor]:
-        teacher1 = self.encode_teacher(view1)
-        teacher2 = self.encode_teacher(view2)
+        if teacher1 is None or teacher2 is None:
+            if view1 is None or view2 is None:
+                raise ValueError("Provide either two image views or two teacher feature views.")
+            teacher1 = self.encode_teacher(view1)
+            teacher2 = self.encode_teacher(view2)
         teacher_cat = torch.cat([teacher1, teacher2], dim=0)
         student_cat = self.encode_student(teacher_features=teacher_cat)
         logits_cat = self.prototype_logits(student_cat)

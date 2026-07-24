@@ -11,7 +11,7 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import GENERATED_ROOT, REPO_ROOT, append_command, append_train_and_eval, default_python, run_or_print, write_manifest
+from common import GENERATED_ROOT, REPO_ROOT, add_cuda_arguments, append_command, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
 EXPERIMENT_ID = "cifar100_mixed_batch_size"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
@@ -22,13 +22,14 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--batch-sizes", type=int, nargs="+", default=[128, 256, 512])
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
     parser.add_argument("--python", default=default_python())
-    parser.add_argument("--device", default="cuda:0")
+    add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
     return parser.parse_args()
 
 
 def main() -> None:
     args = parse_args()
+    devices = resolve_cuda_devices(args.devices)
     records: list[dict[str, object]] = []
     for batch_size in args.batch_sizes:
         if batch_size <= 1:
@@ -43,7 +44,7 @@ def main() -> None:
                 seed=seed,
                 overrides={"batch_size": batch_size, "repulsion_mode": "adaptive_hdpp"},
                 python_bin=args.python,
-                device=args.device,
+                device=None,
             )
             config_path = GENERATED_ROOT / EXPERIMENT_ID / variant_id / f"seed_{seed}_train.yaml"
             mixed_eval = [
@@ -58,12 +59,15 @@ def main() -> None:
                 "--output-json",
                 str((run_dir / "mixed_metrics.json").relative_to(REPO_ROOT)),
             ]
-            if args.device:
-                mixed_eval.extend(["--device", args.device])
-            append_command(records, name=f"mixed-eval:{variant_id}:seed_{seed}", command=mixed_eval)
+            append_command(
+                records,
+                name=f"mixed-eval:{variant_id}:seed_{seed}",
+                command=mixed_eval,
+                job_id=f"{EXPERIMENT_ID}:{variant_id}:seed_{seed}",
+            )
     manifest = write_manifest(EXPERIMENT_ID, records)
     print(f"Wrote {len(records)} commands to {manifest}")
-    run_or_print(records, args.execute)
+    run_or_print(records, args.execute, devices=devices, max_parallel=args.max_parallel)
 
 
 if __name__ == "__main__":
