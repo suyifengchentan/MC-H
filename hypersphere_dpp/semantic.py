@@ -29,6 +29,57 @@ class SemanticPrototypeState:
 
 _DEFAULT_SEMANTIC_TEXT_BATCH_SIZE = 256
 
+
+def _spherical_text_prototypes(
+    text_features: torch.Tensor,
+    num_prototypes: int,
+    max_iter: int = 25,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    """Deterministically compress class text features to an arbitrary K."""
+    if text_features.ndim != 2:
+        raise ValueError("text_features must be a 2D tensor.")
+    num_texts = text_features.size(0)
+    if not 1 < num_prototypes <= num_texts:
+        raise ValueError(
+            f"num_prototypes must be in [2, {num_texts}], got {num_prototypes}."
+        )
+
+    features = F.normalize(text_features.float(), dim=-1)
+    if num_prototypes == num_texts:
+        assignments = torch.arange(num_texts, device=features.device)
+        return features, assignments
+
+    # Farthest-first initialization followed by spherical Lloyd updates avoids
+    # adding a random seed to semantic prototype construction.
+    selected = [0]
+    nearest_distance = 1.0 - features @ features[0]
+    for _ in range(1, num_prototypes):
+        next_index = int(nearest_distance.argmax().item())
+        selected.append(next_index)
+        distance = 1.0 - features @ features[next_index]
+        nearest_distance = torch.minimum(nearest_distance, distance)
+
+    centers = features[selected]
+    assignments = torch.full(
+        (num_texts,), -1, device=features.device, dtype=torch.long
+    )
+    for _ in range(max_iter):
+        next_assignments = (features @ centers.t()).argmax(dim=1)
+        if torch.equal(next_assignments, assignments):
+            break
+        assignments = next_assignments
+        updated = []
+        for cluster_index in range(num_prototypes):
+            members = features[assignments == cluster_index]
+            center = (
+                centers[cluster_index]
+                if members.numel() == 0
+                else members.mean(dim=0)
+            )
+            updated.append(F.normalize(center, dim=0))
+        centers = torch.stack(updated, dim=0)
+    return centers, assignments
+
 _CIFAR10_CLASS_NAMES = [
     "airplane",
     "automobile",
@@ -474,6 +525,7 @@ def build_semantic_prototype_state(
     semantic_template_topk: int,
     semantic_mode: str,
     device: torch.device,
+    num_prototypes: int | None = None,
 ) -> SemanticPrototypeState:
     class_text_features, info = build_semantic_text_features(
         backbone_model=backbone_model,
@@ -489,16 +541,32 @@ def build_semantic_prototype_state(
         device=device,
     )
 
+    source_text_features = class_text_features
+    source_class_count = class_text_features.size(0)
+    target_prototype_count = num_prototypes or source_class_count
+
     if not (dataset_name == "ImageNet1K" and semantic_mode == "tac_imagenet1k"):
-        retrieval_class_indices = torch.arange(
-            class_text_features.size(0), device=device, dtype=torch.long
+        class_text_features, retrieval_class_indices = _spherical_text_prototypes(
+            source_text_features,
+            target_prototype_count,
         )
         return SemanticPrototypeState(
             prototype_features=class_text_features,
             class_text_features=class_text_features,
-            retrieval_text_features=class_text_features,
+            retrieval_text_features=source_text_features,
             retrieval_class_indices=retrieval_class_indices,
-            info={**info, "semantic_mode": semantic_mode, "retrieval_bank_size": class_text_features.size(0)},
+            info={
+                **info,
+                "num_source_classes": source_class_count,
+                "num_classes": target_prototype_count,
+                "semantic_mode": semantic_mode,
+                "retrieval_bank_size": source_class_count,
+            },
+        )
+
+    if target_prototype_count != source_class_count:
+        raise ValueError(
+            "tac_imagenet1k requires num_prototypes to match the number of classes."
         )
 
     prompt_templates, resolved_prompt_style = _resolve_prompt_style(dataset_name, prompt_style)

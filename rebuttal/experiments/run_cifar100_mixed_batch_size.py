@@ -13,7 +13,7 @@ from pathlib import Path
 
 from common import GENERATED_ROOT, REPO_ROOT, add_cuda_arguments, append_command, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
-EXPERIMENT_ID = "cifar100_mixed_batch_size"
+EXPERIMENT_ID = "cifar100_mixed_batch_size_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 
 

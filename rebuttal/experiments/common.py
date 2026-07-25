@@ -29,6 +29,7 @@ SPEED_OVERRIDES: dict[str, Any] = {
     "dpp_every_n_steps": 4,
     "dpp_warmup_epochs": 3,
     "eval_interval": 30,
+    "semantic_prototype_enabled": True,
 }
 
 

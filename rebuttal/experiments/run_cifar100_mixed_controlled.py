@@ -23,7 +23,7 @@ from common import (
     write_manifest,
 )
 
-EXPERIMENT_ID = "cifar100_mixed_controlled"
+EXPERIMENT_ID = "cifar100_mixed_controlled_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 
 

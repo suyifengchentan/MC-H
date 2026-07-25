@@ -7,10 +7,34 @@ from pathlib import Path
 
 import torch
 
-from hypersphere_dpp.semantic import _encode_text_prompts_batched, load_class_texts
+from hypersphere_dpp.semantic import (
+    _encode_text_prompts_batched,
+    _spherical_text_prototypes,
+    load_class_texts,
+)
 
 
 class SemanticClassTextTest(unittest.TestCase):
+    def test_spherical_text_prototypes_support_noncanonical_k(self):
+        features = torch.tensor(
+            [[1.0, 0.0], [0.9, 0.1], [-1.0, 0.0], [-0.9, -0.1]]
+        )
+        centers, assignments = _spherical_text_prototypes(features, 2)
+
+        self.assertEqual(tuple(centers.shape), (2, 2))
+        self.assertEqual(tuple(assignments.shape), (4,))
+        self.assertTrue(torch.allclose(centers.norm(dim=1), torch.ones(2)))
+        self.assertEqual(assignments[0], assignments[1])
+        self.assertEqual(assignments[2], assignments[3])
+        self.assertNotEqual(assignments[0], assignments[2])
+
+    def test_spherical_text_prototypes_preserve_matching_k(self):
+        features = torch.eye(3)
+        centers, assignments = _spherical_text_prototypes(features, 3)
+
+        self.assertTrue(torch.allclose(centers, features))
+        self.assertTrue(torch.equal(assignments, torch.arange(3)))
+
     def test_image10_uses_label_config_class_texts(self):
         self.assertEqual(
             load_class_texts("Image10", "/unused"),

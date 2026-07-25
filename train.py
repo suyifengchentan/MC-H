@@ -591,6 +591,7 @@ def main():
             semantic_template_topk=config.semantic_template_topk,
             semantic_mode=config.semantic_mode,
             device=device,
+            num_prototypes=config.class_num,
         )
         semantic_info = semantic_state.info
         # Initialize random prototypes with the semantic text features!
