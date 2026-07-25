@@ -44,6 +44,10 @@ def main() -> None:
     variants = {
         "uniformity_010": {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
         "constant_hdpp": {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
+        "constant_hdpp_matched": {
+            "repulsion_mode": "constant_hdpp",
+            "alpha_div_base": 0.0012,
+        },
         "adaptive_hdpp": {"repulsion_mode": "adaptive_hdpp", "alpha_div_base": 0.30},
     }
     records: list[dict[str, object]] = []
