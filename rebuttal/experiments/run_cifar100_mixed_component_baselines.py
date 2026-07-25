@@ -20,7 +20,7 @@ BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
+    parser.add_argument("--seeds", type=int, nargs="+", default=[42])
     parser.add_argument("--python", default=default_python())
     add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")

@@ -20,6 +20,17 @@ import yaml
 REPO_ROOT = Path(__file__).resolve().parents[2]
 GENERATED_ROOT = REPO_ROOT / "rebuttal" / "generated"
 
+# Global speed-up overrides applied to every experiment.
+# Per-variant overrides always take precedence.
+SPEED_OVERRIDES: dict[str, Any] = {
+    "epochs": 30,
+    "sinkhorn_iters": 1,
+    "subspace_every_n_steps": 10,
+    "dpp_every_n_steps": 4,
+    "dpp_warmup_epochs": 3,
+    "eval_interval": 30,
+}
+
 
 def load_yaml(path: Path) -> dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
@@ -47,7 +58,12 @@ def build_train_plan(
 ) -> tuple[dict[str, Any], Path, Path, list[str]]:
     config = deepcopy(load_yaml(REPO_ROOT / base_config))
     run_dir = REPO_ROOT / "save" / "experiments" / "rebuttal" / experiment_id / variant_id / f"seed_{seed}"
+    config.update(SPEED_OVERRIDES)
     config.update(overrides)
+    # Expand ~ in paths loaded from raw YAML.
+    for key in ("dataset_dir", "pretrained_checkpoint"):
+        if key in config and isinstance(config[key], str):
+            config[key] = os.path.expanduser(config[key])
     config["seed"] = seed
     config["validation_seed"] = seed
     config["model_path"] = str(run_dir.relative_to(REPO_ROOT))

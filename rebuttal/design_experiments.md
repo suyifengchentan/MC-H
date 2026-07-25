@@ -85,7 +85,7 @@ SSD 可以保留，但其语义先验只能来自每张图像的 frozen CLIP ima
 
 ### 2.4 核心对照矩阵
 
-以下矩阵既回答单数据集混合粒度问题，也修复表 7 的 SSD 混淆：
+以下矩阵既回答单数据集混合粒度问题，也修复表 7 的 SSD 混淆。为保证 rebuttal 可快速完成，主运行只执行 B--D；A 已由原稿的组件消融覆盖，不是回答密度自适应质疑所必需的额外训练。
 
 | ID | DPCA | SSD | Repulsion | 目的 |
 |---|---:|---:|---|---|
@@ -93,6 +93,8 @@ SSD 可以保留，但其语义先验只能来自每张图像的 frozen CLIP ima
 | B | yes | yes | global uniformity | 固定 SSD 后复现表 7 对照 |
 | C | yes | yes | constant H-DPP | 只去掉 density schedule |
 | D | yes | yes | adaptive H-DPP | 完整核心方法 |
+
+**最小执行计划。** 使用 seeds `42, 43`，固定 final epoch，并仅运行 B--D，共 `3 x 2 = 6` 次 30-epoch 训练。每个 checkpoint 只在 20 个互补的混合标签划分上离线评估；不再报告与该 `K=60` 目标不一致的 100 类标准评估，因此这些划分不增加训练次数。
 
 其中 C 与 D 必须使用完全相同的 log-determinant kernel、quality weights、warmup 和计算频率；唯一差异是：
 

@@ -18,7 +18,7 @@ Use the unified entry instead of invoking a runner directly:
 Use `--devices 0,2` to select a subset. DDP honors `distributed_batch_size_mode`:
 `per_rank` keeps `batch_size` per GPU, while `global` divides it across ranks.
 
-- `run_cifar100_mixed_controlled.py`: R1-Q1 and the central R2 concern.
+- `run_cifar100_mixed_controlled.py`: the minimal 6-run R1-Q1/R2 core experiment (uniformity, constant H-DPP, and adaptive H-DPP; DPCA and SSD fixed).
 - `run_cifar100_endpoints.py`: auxiliary R1-Q1 endpoint evidence.
 - `run_table7_fixed_ssd.py`: R1-Q2 and the Table 7 concern in R2.
 - `run_cifar100_mixed_kmeans_baselines.py`: frozen and full-adapted R2-Q2 baselines.

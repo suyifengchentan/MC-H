@@ -1,5 +1,5 @@
 dataset: CIFAR100
-dataset_dir: ~/hypersphere-data/CIFAR100
+dataset_dir: ~/Rebuttal/hypersphere-data/CIFAR100
 class_num: 60
 cifar100_label_mode: fine
 cifar100_allow_noncanonical_class_num: true
@@ -49,3 +49,6 @@ workers: 8
 reload: false
 seed: 42
 best_checkpoint_patience: 0
+cached_teacher_views_enabled: true
+cached_teacher_num_views: 8
+cached_teacher_dtype: float16

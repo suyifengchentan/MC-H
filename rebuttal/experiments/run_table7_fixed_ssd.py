@@ -16,14 +16,12 @@ from common import add_cuda_arguments, append_train_and_eval, default_python, re
 EXPERIMENT_ID = "table7_fixed_ssd"
 DATASETS = {
     "cifar10": Path("config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"),
-    "imagenet50": Path("config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"),
-    "oxford_flowers": Path("config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"),
 }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43, 44])
+    parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43])
     parser.add_argument("--python", default=default_python())
     add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
@@ -35,9 +33,7 @@ def main() -> None:
     devices = resolve_cuda_devices(args.devices)
     variants = {
         "dpca_ssd": {"repulsion_mode": "none", "alpha_div_base": 0.0},
-        "uniformity_005": {"repulsion_mode": "uniformity", "alpha_div_base": 0.05},
         "uniformity_010": {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
-        "uniformity_020": {"repulsion_mode": "uniformity", "alpha_div_base": 0.20},
         "constant_hdpp": {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
         "adaptive_hdpp": {"repulsion_mode": "adaptive_hdpp"},
     }
