@@ -59,6 +59,12 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--n-init", type=int, default=20)
     parser.add_argument("--max-iter", type=int, default=300)
     parser.add_argument(
+        "--seed",
+        type=int,
+        default=None,
+        help="Clustering seed. Defaults to seed from the experiment config.",
+    )
+    parser.add_argument(
         "--fit-on-all-train",
         action="store_true",
         help="Fit centers on all official training samples instead of the training protocol split.",
@@ -166,10 +172,11 @@ def main() -> None:
         raise ValueError("--checkpoint is required for adapted or both feature baselines.")
 
     config = load_experiment_config(args.config)
+    args.seed = config.seed if args.seed is None else args.seed
     if args.workers is not None:
         config.workers = args.workers
     device = resolve_device(args.device or config.device)
-    set_seed(config.seed)
+    set_seed(args.seed)
     k = args.cluster_count or config.class_num
     if k <= 1:
         raise ValueError("cluster-count must be greater than one.")
@@ -224,7 +231,7 @@ def main() -> None:
         "fit_on_all_train": args.fit_on_all_train,
         "fit_samples": int(next(iter(train_features.values())).shape[0]),
         "test_samples": int(test_labels.size),
-        "seed": config.seed,
+        "seed": args.seed,
         "n_init": args.n_init,
         "max_iter": args.max_iter,
         "results": results,

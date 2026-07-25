@@ -42,7 +42,6 @@ def main() -> None:
         "lambda_semantic": 0.0,
         "lambda_semantic_retrieval": 0.0,
         "lambda_prototype_anchor": 0.0,
-        "eval_interval": 999999,
         "best_checkpoint_patience": 0,
     }
     records: list[dict[str, object]] = []
