@@ -222,6 +222,33 @@ cache_root/
   metadata.json
 ```
 
+### CIFAR / Flowers / Image50 teacher cache
+
+`CIFAR10`、`CIFAR100`、`Oxford_Flowers` 与 `Image50` 的训练配置默认启用
+CLIP `ViT-B-16` teacher cache。先为每个数据集生成一次缓存：
+
+```bash
+.venv/bin/python scripts/precompute_teacher_feature_cache.py --config config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml --device cuda:0
+.venv/bin/python scripts/precompute_teacher_feature_cache.py --config config/train/coarse_grained/cifar100_vitb16_hypersphere_dpp_config.yaml --device cuda:0
+.venv/bin/python scripts/precompute_teacher_feature_cache.py --config config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml --device cuda:0
+.venv/bin/python scripts/precompute_teacher_feature_cache.py --config config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml --device cuda:0
+```
+
+默认输出位于每个 `dataset_dir` 的
+`teacher_cache_vitb16_views8_memmap/` 下，格式为：
+
+```text
+teacher_cache_vitb16_views8_memmap/
+  data/train.mmap
+  data/train.mmap.progress.json
+  metadata.json
+```
+
+`train.py` 与 `train_parallel.py` 会从每个样本的 8 个候选特征
+`[8, 512]` 中随机无放回选取两个 view。脚本可在中断后续写；需要从头重算时传入
+`--overwrite`。缓存配置的 `cached_teacher_num_views`、`cached_teacher_dtype`
+必须与脚本参数一致。
+
 每个 ImageNet HDF5 shard 至少包含以下内容：
 
 ```text

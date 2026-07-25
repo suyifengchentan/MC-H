@@ -9,6 +9,9 @@ class_num: 50
 validation_ratio: 0.1
 validation_seed: 42
 official_eval_split: "val"
+cached_teacher_views_enabled: true
+cached_teacher_num_views: 8
+cached_teacher_dtype: "float16"
 
 # Model
 image_size: 224

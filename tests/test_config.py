@@ -181,6 +181,34 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.imagenet1k_cached_teacher_num_views, 6)
         self.assertEqual(config.imagenet1k_cached_teacher_dtype, "float16")
 
+    def test_small_dataset_cached_teacher_views_resolve_below_dataset_dir(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR10"
+            dataset_dir: "/tmp/cifar10"
+            class_num: 10
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            cached_teacher_views_enabled: true
+            cached_teacher_num_views: 8
+            cached_teacher_dtype: "float16"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertTrue(config.uses_cached_teacher_views)
+        self.assertEqual(config.teacher_cache_num_views, 8)
+        self.assertEqual(config.teacher_cache_dtype, "float16")
+        self.assertEqual(
+            config.resolved_teacher_cache_dir,
+            Path("/tmp/cifar10/teacher_cache_vitb16_views8_memmap"),
+        )
+
     def test_step_profile_fields_are_supported(self):
         config_text = textwrap.dedent(
             """

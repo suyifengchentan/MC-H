@@ -52,6 +52,7 @@ SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES = {"mean_all", "primary_weighted"}
 SUPPORTED_SEMANTIC_MODES = {"legacy", "tac_imagenet1k"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
+SUPPORTED_CACHED_TEACHER_DATASETS = {"CIFAR10", "CIFAR100", "Oxford_Flowers", "Image50"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
 SUPPORTED_REPULSION_MODES = {
     "adaptive_hdpp",
@@ -77,6 +78,12 @@ class ExperimentConfig:
     imagenet1k_cached_teacher_views_dir: str | None = None
     imagenet1k_cached_teacher_num_views: int = 6
     imagenet1k_cached_teacher_dtype: str = "float16"
+    # Optional CLIP-B/16 feature cache for the small datasets.  The ImageNet1K
+    # fields above remain supported for backwards compatibility.
+    cached_teacher_views_enabled: bool = False
+    cached_teacher_views_dir: str | None = None
+    cached_teacher_num_views: int = 8
+    cached_teacher_dtype: str = "float16"
 
     # Model
     image_size: int = 224
@@ -179,6 +186,36 @@ class ExperimentConfig:
         return self.dataset == "ImageNet1K" and self.imagenet1k_cached_teacher_views_enabled
 
     @property
+    def uses_cached_teacher_views(self) -> bool:
+        return self.uses_imagenet1k_cached_teacher_views or (
+            self.dataset in SUPPORTED_CACHED_TEACHER_DATASETS
+            and self.cached_teacher_views_enabled
+        )
+
+    @property
+    def teacher_cache_num_views(self) -> int:
+        if self.uses_imagenet1k_cached_teacher_views:
+            return self.imagenet1k_cached_teacher_num_views
+        return self.cached_teacher_num_views
+
+    @property
+    def teacher_cache_dtype(self) -> str:
+        if self.uses_imagenet1k_cached_teacher_views:
+            return self.imagenet1k_cached_teacher_dtype
+        return self.cached_teacher_dtype
+
+    @property
+    def resolved_teacher_cache_dir(self) -> Path | None:
+        if self.uses_imagenet1k_cached_teacher_views:
+            return self.resolved_imagenet1k_cached_teacher_views_dir
+        if not self.uses_cached_teacher_views:
+            return None
+        if self.cached_teacher_views_dir:
+            return Path(self.cached_teacher_views_dir)
+        backbone_tag = self.backbone_name.lower().replace("-", "").replace("/", "")
+        return Path(self.dataset_dir) / f"teacher_cache_{backbone_tag}_views{self.cached_teacher_num_views}_memmap"
+
+    @property
     def resolved_imagenet1k_cached_teacher_views_dir(self) -> Path | None:
         if not self.uses_imagenet1k_cached_teacher_views:
             return None
@@ -240,6 +277,8 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         config.imagenet1k_cached_teacher_views_dir = _resolve_user_path(
             config.imagenet1k_cached_teacher_views_dir
         )
+    if config.cached_teacher_views_dir:
+        config.cached_teacher_views_dir = _resolve_user_path(config.cached_teacher_views_dir)
 
     if config.dataset not in SUPPORTED_DATASETS:
         raise ValueError(
@@ -290,8 +329,17 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             "imagenet1k_cached_teacher_views_enabled is only supported when dataset='ImageNet1K'."
         )
 
+    if config.cached_teacher_views_enabled and config.dataset not in SUPPORTED_CACHED_TEACHER_DATASETS:
+        raise ValueError(
+            "cached_teacher_views_enabled is only supported for "
+            f"{sorted(SUPPORTED_CACHED_TEACHER_DATASETS)}."
+        )
+
     if config.imagenet1k_cached_teacher_num_views < 2:
         raise ValueError("imagenet1k_cached_teacher_num_views must be at least 2.")
+
+    if config.cached_teacher_num_views < 2:
+        raise ValueError("cached_teacher_num_views must be at least 2.")
 
     if (
         config.imagenet1k_cached_teacher_dtype
@@ -301,6 +349,13 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
             "imagenet1k_cached_teacher_dtype must be one of "
             f"{sorted(SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES)}, "
             f"got {config.imagenet1k_cached_teacher_dtype!r}."
+        )
+
+    if config.cached_teacher_dtype not in SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES:
+        raise ValueError(
+            "cached_teacher_dtype must be one of "
+            f"{sorted(SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES)}, "
+            f"got {config.cached_teacher_dtype!r}."
         )
 
     if config.eval_interval <= 0:

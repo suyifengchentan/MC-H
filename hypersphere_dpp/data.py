@@ -21,7 +21,7 @@ from datasets.tiny_imagenet_dataset import TinyImageNetDataset
 
 from .config import ExperimentConfig
 from .labels import load_label_wnids
-from .teacher_cache import ImageNetTeacherFeatureCache
+from .teacher_cache import TeacherFeatureCache
 from .transforms import build_eval_transform, build_train_decode_transform
 
 TEACHER_FEATURE_CANDIDATES_KEY = "teacher_feature_candidates"
@@ -61,8 +61,8 @@ class SingleViewDataset(Dataset):
         }
 
 
-class ImageNetTeacherFeatureTrainDataset(Dataset):
-    def __init__(self, dataset: Subset, teacher_cache: ImageNetTeacherFeatureCache):
+class TeacherFeatureTrainDataset(Dataset):
+    def __init__(self, dataset: Subset, teacher_cache: TeacherFeatureCache):
         if not isinstance(dataset, Subset):
             raise TypeError("ImageNetTeacherFeatureTrainDataset expects a torch.utils.data.Subset.")
         if not hasattr(dataset.dataset, "targets"):
@@ -100,6 +100,10 @@ class ImageNetTeacherFeatureTrainDataset(Dataset):
             }
             for offset in range(len(base_indices))
         ]
+
+
+# Keep the old public name for callers that explicitly import it.
+ImageNetTeacherFeatureTrainDataset = TeacherFeatureTrainDataset
 
 
 @dataclass
@@ -481,16 +485,21 @@ def build_experiment_dataloaders(
     train_subset = Subset(train_base, train_indices)
     val_subset = Subset(train_base, val_indices)
 
-    if config.uses_imagenet1k_cached_teacher_views:
-        teacher_cache_dir = config.resolved_imagenet1k_cached_teacher_views_dir
+    if config.uses_cached_teacher_views:
+        teacher_cache_dir = config.resolved_teacher_cache_dir
         if teacher_cache_dir is None:
-            raise ValueError("ImageNet1K cached teacher views are enabled but no cache dir was resolved.")
-        teacher_cache = ImageNetTeacherFeatureCache(
+            raise ValueError("Cached teacher views are enabled but no cache dir was resolved.")
+        teacher_cache = TeacherFeatureCache(
             teacher_cache_dir,
-            expected_num_views=config.imagenet1k_cached_teacher_num_views,
+            expected_num_views=config.teacher_cache_num_views,
             expected_feature_dim=config.feature_dim,
         )
-        train_dataset = ImageNetTeacherFeatureTrainDataset(
+        if len(teacher_cache) != len(train_base):
+            raise ValueError(
+                "Teacher feature cache must cover the complete training split: "
+                f"cache has {len(teacher_cache)} rows, dataset has {len(train_base)}."
+            )
+        train_dataset = TeacherFeatureTrainDataset(
             train_subset,
             teacher_cache,
         )

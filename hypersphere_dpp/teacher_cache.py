@@ -17,9 +17,9 @@ class _CacheShard:
     num_rows: int
 
 
-class ImageNetTeacherFeatureCache:
+class TeacherFeatureCache:
     """
-    In-memory reader for precomputed ImageNet teacher feature candidates.
+    Reader for precomputed teacher feature candidates stored as mmap shards.
 
     Expected layout:
     - cache_root/metadata.json
@@ -243,3 +243,7 @@ class ImageNetTeacherFeatureCache:
 
         index_tensor = torch.tensor(normalized_indices, dtype=torch.long)
         return self.features.index_select(0, index_tensor)
+
+
+# Backwards-compatible name used by the original ImageNet1K cache path.
+ImageNetTeacherFeatureCache = TeacherFeatureCache
