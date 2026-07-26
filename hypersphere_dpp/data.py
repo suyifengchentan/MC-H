@@ -20,7 +20,11 @@ from datasets.stanford_dogs_dataset import StanfordDogsDataset
 
 from .config import ExperimentConfig
 from .labels import load_label_wnids
+from .teacher_cache import TeacherFeatureCache
 from .transforms import build_eval_transform, build_train_decode_transform
+
+
+TEACHER_FEATURE_CANDIDATES_KEY = "teacher_feature_candidates"
 
 
 class TrainTensorDataset(Dataset):
@@ -38,6 +42,42 @@ class TrainTensorDataset(Dataset):
             "label": label,
             "index": sample_index,
         }
+
+
+class TeacherFeatureTrainDataset(Dataset):
+    def __init__(self, dataset: Subset, teacher_cache: TeacherFeatureCache):
+        if not isinstance(dataset, Subset):
+            raise TypeError("TeacherFeatureTrainDataset expects a Subset.")
+        if len(teacher_cache) != len(dataset.dataset):
+            raise ValueError("Teacher feature cache must cover the full training dataset.")
+        self.dataset = dataset
+        self.base_dataset = dataset.dataset
+        self.teacher_cache = teacher_cache
+        if not hasattr(self.base_dataset, "targets"):
+            raise ValueError("Cached teacher datasets must expose targets.")
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __getitem__(self, index: int):
+        base_index = int(self.dataset.indices[index])
+        return {
+            TEACHER_FEATURE_CANDIDATES_KEY: self.teacher_cache[base_index],
+            "label": int(self.base_dataset.targets[base_index]),
+            "index": base_index,
+        }
+
+    def __getitems__(self, indices: Sequence[int]):
+        base_indices = [int(self.dataset.indices[int(index)]) for index in indices]
+        candidates = self.teacher_cache.get_many(base_indices)
+        return [
+            {
+                TEACHER_FEATURE_CANDIDATES_KEY: candidates[offset],
+                "label": int(self.base_dataset.targets[base_index]),
+                "index": base_index,
+            }
+            for offset, base_index in enumerate(base_indices)
+        ]
 
 
 class SingleViewDataset(Dataset):
@@ -64,6 +104,22 @@ class DatasetBundle:
     val_loader: DataLoader
     test_loader: DataLoader
     val_is_stratified: bool = False
+
+
+def sample_two_teacher_feature_views(
+    teacher_feature_candidates: torch.Tensor,
+) -> tuple[torch.Tensor, torch.Tensor]:
+    if teacher_feature_candidates.ndim != 3:
+        raise ValueError("Expected teacher features shaped [batch, views, feature_dim].")
+    if teacher_feature_candidates.size(1) < 2:
+        raise ValueError("Teacher cache must provide at least two feature views.")
+    scores = torch.rand(
+        teacher_feature_candidates.shape[:2], device=teacher_feature_candidates.device
+    )
+    indices = scores.topk(k=2, dim=1).indices
+    gather_indices = indices.unsqueeze(-1).expand(-1, -1, teacher_feature_candidates.size(-1))
+    views = torch.gather(teacher_feature_candidates, 1, gather_indices)
+    return views[:, 0], views[:, 1]
 
 
 def split_train_indices(
@@ -366,10 +422,23 @@ def build_experiment_dataloaders(config: ExperimentConfig) -> DatasetBundle:
     train_subset = Subset(train_base, train_indices)
     val_subset = Subset(train_base, val_indices)
 
-    train_dataset = TrainTensorDataset(
-        train_subset,
-        build_train_decode_transform(config.image_size, config.transform_profile),
-    )
+    if config.uses_cached_teacher_views:
+        cache_dir = config.resolved_teacher_cache_dir
+        if cache_dir is None:
+            raise ValueError("Teacher cache was enabled but no cache directory was resolved.")
+        train_dataset = TeacherFeatureTrainDataset(
+            train_subset,
+            TeacherFeatureCache(
+                cache_dir,
+                expected_num_views=config.cached_teacher_num_views,
+                expected_feature_dim=config.feature_dim,
+            ),
+        )
+    else:
+        train_dataset = TrainTensorDataset(
+            train_subset,
+            build_train_decode_transform(config.image_size, config.transform_profile),
+        )
     train_eval_dataset = SingleViewDataset(
         train_subset, build_eval_transform(config.image_size, config.transform_profile)
     )

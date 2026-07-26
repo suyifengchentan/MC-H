@@ -1,15 +1,25 @@
 from __future__ import annotations
 
 import argparse
+import logging
+import os
 from contextlib import nullcontext
 
 import torch
+import torch.distributed as dist
 from torch import amp
 from torch import optim
+from torch.nn.parallel import DistributedDataParallel
+from torch.utils.data import DataLoader
+from torch.utils.data.distributed import DistributedSampler
 
 from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
 from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders
+from hypersphere_dpp.data import (
+    TEACHER_FEATURE_CANDIDATES_KEY,
+    build_experiment_dataloaders,
+    sample_two_teacher_feature_views,
+)
 from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
 from hypersphere_dpp.losses import (
     adaptive_diversity_weight,
@@ -70,6 +80,94 @@ def resolve_amp_settings(
     raise ValueError(f"Unsupported precision mode: {precision}")
 
 
+def distributed_env() -> tuple[int, int, int]:
+    return (
+        int(os.environ.get("RANK", "0")),
+        int(os.environ.get("WORLD_SIZE", "1")),
+        int(os.environ.get("LOCAL_RANK", "0")),
+    )
+
+
+def resolve_parallel_device(
+    requested_device: str | None, world_size: int, local_rank: int
+) -> torch.device:
+    if world_size == 1:
+        return resolve_device(requested_device)
+    if not torch.cuda.is_available():
+        raise RuntimeError("Distributed training requires CUDA.")
+    torch.cuda.set_device(local_rank)
+    return torch.device("cuda", local_rank)
+
+
+def is_main_process(rank: int) -> bool:
+    return rank == 0
+
+
+def build_distributed_train_loader(
+    train_loader: DataLoader, rank: int, world_size: int, batch_size_mode: str
+) -> tuple[DataLoader, DistributedSampler]:
+    requested_batch_size = int(train_loader.batch_size)
+    if batch_size_mode == "global":
+        if requested_batch_size % world_size:
+            raise ValueError("Global batch_size must be divisible by world_size.")
+        per_rank_batch_size = requested_batch_size // world_size
+    else:
+        per_rank_batch_size = requested_batch_size
+    sampler = DistributedSampler(
+        train_loader.dataset,
+        num_replicas=world_size,
+        rank=rank,
+        shuffle=True,
+        drop_last=train_loader.drop_last,
+    )
+    kwargs = {
+        "dataset": train_loader.dataset,
+        "batch_size": per_rank_batch_size,
+        "sampler": sampler,
+        "shuffle": False,
+        "drop_last": train_loader.drop_last,
+        "num_workers": train_loader.num_workers,
+        "pin_memory": train_loader.pin_memory,
+        "persistent_workers": train_loader.persistent_workers,
+        "collate_fn": train_loader.collate_fn,
+    }
+    if train_loader.num_workers > 0 and train_loader.prefetch_factor is not None:
+        kwargs["prefetch_factor"] = train_loader.prefetch_factor
+    return DataLoader(**kwargs), sampler
+
+
+def gather_with_local_gradient(
+    features: torch.Tensor, rank: int, world_size: int
+) -> torch.Tensor:
+    if world_size == 1:
+        return features
+    gathered = [torch.empty_like(features) for _ in range(world_size)]
+    dist.all_gather(gathered, features.detach())
+    gathered[rank] = features
+    return torch.cat(gathered, dim=0)
+
+
+@torch.no_grad()
+def gather_no_gradient(features: torch.Tensor, world_size: int) -> torch.Tensor:
+    if world_size == 1:
+        return features
+    gathered = [torch.empty_like(features) for _ in range(world_size)]
+    dist.all_gather(gathered, features)
+    return torch.cat(gathered, dim=0)
+
+
+def reduce_metrics(
+    metrics: dict[str, float], device: torch.device, world_size: int
+) -> dict[str, float]:
+    if world_size == 1:
+        return metrics
+    keys = sorted(metrics)
+    values = torch.tensor([metrics[key] for key in keys], device=device, dtype=torch.float64)
+    dist.all_reduce(values, op=dist.ReduceOp.SUM)
+    values /= world_size
+    return {key: float(values[index]) for index, key in enumerate(keys)}
+
+
 def resolve_spectral_cluster_cap(config, epoch: int) -> int:
     target_cap = config.max_spectral_clusters if config.max_spectral_clusters > 0 else config.class_num
     target_cap = max(config.min_spectral_clusters, int(target_cap))
@@ -98,8 +196,14 @@ def train_one_epoch(
     device: torch.device,
     epoch: int,
     logger,
+    rank: int = 0,
+    world_size: int = 1,
+    sampler: DistributedSampler | None = None,
 ) -> dict[str, float]:
+    if sampler is not None:
+        sampler.set_epoch(epoch)
     model.train()
+    module = model.module if isinstance(model, DistributedDataParallel) else model
     use_amp, amp_device_type, amp_dtype, _ = resolve_amp_settings(
         config.precision, device
     )
@@ -128,8 +232,16 @@ def train_one_epoch(
         spectral_cluster_cap = resolve_spectral_cluster_cap(config, epoch)
 
     for step, batch in enumerate(dataloader):
-        images = batch["image"].to(device, non_blocking=True)
-        view1, view2 = gpu_train_transform(images)
+        cached_candidates = None
+        if TEACHER_FEATURE_CANDIDATES_KEY in batch:
+            cached_candidates = batch[TEACHER_FEATURE_CANDIDATES_KEY].to(
+                device, non_blocking=True
+            )
+        else:
+            if gpu_train_transform is None:
+                raise ValueError("Image batches require a GPU training transform.")
+            images = batch["image"].to(device, non_blocking=True)
+            view1, view2 = gpu_train_transform(images)
 
         optimizer.zero_grad(set_to_none=True)
         autocast_kwargs = {"device_type": amp_device_type, "enabled": use_amp}
@@ -137,14 +249,23 @@ def train_one_epoch(
             autocast_kwargs["dtype"] = amp_dtype
         amp_context = amp.autocast(**autocast_kwargs) if use_amp else nullcontext()
         with amp_context:
-            teacher1 = model.encode_teacher(view1)
-            teacher2 = model.encode_teacher(view2)
+            if cached_candidates is not None:
+                teacher1, teacher2 = sample_two_teacher_feature_views(cached_candidates)
+            else:
+                teacher1 = module.encode_teacher(view1)
+                teacher2 = module.encode_teacher(view2)
+            local_teacher_cat = torch.cat([teacher1, teacher2], dim=0)
+            local_student_cat = model(local_teacher_cat)
+            local_student1, local_student2 = local_student_cat.chunk(2)
+            teacher1 = gather_no_gradient(teacher1, world_size)
+            teacher2 = gather_no_gradient(teacher2, world_size)
+            student1 = gather_with_local_gradient(local_student1, rank, world_size)
+            student2 = gather_with_local_gradient(local_student2, rank, world_size)
             teacher_cat = torch.cat([teacher1, teacher2], dim=0)
-            student_cat = model.encode_student(teacher_features=teacher_cat)
-            student1, student2 = student_cat.chunk(2)
+            student_cat = torch.cat([student1, student2], dim=0)
 
             if config.clustering_mode == "spectral_free_k":
-                spectral_output = model.spectral_cluster(
+                spectral_output = module.spectral_cluster(
                     student_features=student_cat,
                     temperature=config.spectral_assignment_temperature,
                     min_clusters=config.min_spectral_clusters,
@@ -161,7 +282,7 @@ def train_one_epoch(
                 logits1, logits2 = logits_cat.chunk(2)
                 assign1, assign2 = assignment_cat.chunk(2)
             else:
-                logits_cat = model.prototype_logits(student_cat)
+                logits_cat = module.prototype_logits(student_cat)
                 logits1, logits2 = logits_cat.chunk(2)
                 estimated_k = float(config.class_num)
                 raw_estimated_k = estimated_k
@@ -193,7 +314,7 @@ def train_one_epoch(
                         assignments=assignment_cat,
                         teacher_features=teacher_cat,
                         text_features=semantic_text_features,
-                        teacher_logit_scale=model.teacher_logit_scale(),
+                        teacher_logit_scale=module.teacher_logit_scale(),
                         temperature=config.semantic_temperature,
                     )
                 else:
@@ -201,7 +322,7 @@ def train_one_epoch(
                         logits=logits_cat,
                         teacher_features=teacher_cat,
                         text_features=semantic_text_features,
-                        teacher_logit_scale=model.teacher_logit_scale(),
+                        teacher_logit_scale=module.teacher_logit_scale(),
                         temperature=config.semantic_temperature,
                     )
             else:
@@ -212,7 +333,7 @@ def train_one_epoch(
                     student_features=student_cat,
                     teacher_features=teacher_cat,
                     text_features=semantic_text_features,
-                    teacher_logit_scale=model.teacher_logit_scale(),
+                    teacher_logit_scale=module.teacher_logit_scale(),
                     topk=config.semantic_retrieval_topk,
                 )
             else:
@@ -290,10 +411,12 @@ def train_one_epoch(
                 + alpha_div * dpp_loss
             )
 
-        scaler.scale(loss).backward()
+        # Every rank evaluates the same global-batch objective, but only its
+        # local student chunk retains gradients. DDP averages those gradients.
+        scaler.scale(loss * world_size).backward()
         scaler.step(optimizer)
         scaler.update()
-        model.normalize_prototypes()
+        module.normalize_prototypes()
         if queue is not None:
             queue.enqueue(teacher_cat, assignment_cat)
 
@@ -309,7 +432,9 @@ def train_one_epoch(
         totals["raw_estimated_k"] += raw_estimated_k
         totals["estimated_k"] += estimated_k
 
-        if (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps:
+        if is_main_process(rank) and (
+            (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps
+        ):
             running_denom = step + 1
             logger.info(
                 (
@@ -333,7 +458,7 @@ def train_one_epoch(
             )
 
     denom = max(len(dataloader), 1)
-    return {key: value / denom for key, value in totals.items()}
+    return reduce_metrics({key: value / denom for key, value in totals.items()}, device, world_size)
 
 
 def build_lr_scheduler(optimizer, config):
@@ -417,15 +542,27 @@ def maybe_resume_training(model, optimizer, scaler, scheduler, queue, config, de
 
 def main():
     args = parse_args()
+    rank, world_size, local_rank = distributed_env()
+    device = resolve_parallel_device(args.device, world_size, local_rank)
+    if world_size > 1:
+        dist.init_process_group(backend="nccl")
     config = load_experiment_config(args.config)
-    device = resolve_device(args.device or config.device)
-    set_seed(config.seed)
-    ensure_dir(config.output_dir)
-    logger = setup_training_logger(config.output_dir)
+    set_seed(config.seed + rank)
+    if is_main_process(rank):
+        ensure_dir(config.output_dir)
+    if world_size > 1:
+        dist.barrier()
+    if is_main_process(rank):
+        logger = setup_training_logger(config.output_dir)
+    else:
+        logger = logging.getLogger(f"hypersphere_dpp.rank{rank}")
+        logger.handlers = [logging.NullHandler()]
+        logger.propagate = False
     use_amp, amp_device_type, amp_dtype, use_grad_scaler = resolve_amp_settings(
         config.precision, device
     )
     logger.info("starting training")
+    logger.info("rank=%d world_size=%d device=%s", rank, world_size, device)
     logger.info("device=%s output_dir=%s", device, config.output_dir)
     logger.info("config=%s", config.as_dict())
     logger.info(
@@ -452,6 +589,14 @@ def main():
         )
 
     datasets = build_experiment_dataloaders(config)
+    train_sampler = None
+    if world_size > 1:
+        datasets.train_loader, train_sampler = build_distributed_train_loader(
+            datasets.train_loader,
+            rank,
+            world_size,
+            config.distributed_batch_size_mode,
+        )
     train_prefetch_factor = getattr(datasets.train_loader, "prefetch_factor", None)
     logger.info("validation split: stratified=%s", datasets.val_is_stratified)
     logger.info(
@@ -461,9 +606,11 @@ def main():
         datasets.train_loader.persistent_workers,
         train_prefetch_factor,
     )
-    gpu_train_transform = build_gpu_train_transform(
-        config.image_size, config.transform_profile
-    ).to(device)
+    gpu_train_transform = None
+    if not config.uses_cached_teacher_views:
+        gpu_train_transform = build_gpu_train_transform(
+            config.image_size, config.transform_profile
+        ).to(device)
     model = build_model_from_config(config, device=device).to(device)
     semantic_text_features = None
     if config.clustering_mode == "fixed_k" and config.semantic_prototype_enabled:
@@ -579,6 +726,9 @@ def main():
         config.min_learning_rate,
     )
 
+    if world_size > 1:
+        model = DistributedDataParallel(model, device_ids=[local_rank])
+
     epochs_without_improvement = 0
     for epoch in range(start_epoch, config.epochs):
         epoch_lr = current_learning_rate(optimizer)
@@ -600,40 +750,51 @@ def main():
             device=device,
             epoch=epoch,
             logger=logger,
+            rank=rank,
+            world_size=world_size,
+            sampler=train_sampler,
         )
         global_step += len(datasets.train_loader)
-        logger.info("epoch=%03d split=train metrics=%s", epoch, train_metrics)
-        append_metrics_record(
-            config.output_dir,
-            {
-                "epoch": epoch,
-                "global_step": global_step,
-                "lr": epoch_lr,
-                "split": "train",
-                **train_metrics,
-            },
-        )
+        if is_main_process(rank):
+            logger.info("epoch=%03d split=train metrics=%s", epoch, train_metrics)
+            append_metrics_record(
+                config.output_dir,
+                {
+                    "epoch": epoch,
+                    "global_step": global_step,
+                    "lr": epoch_lr,
+                    "split": "train",
+                    **train_metrics,
+                },
+            )
         if scheduler is not None:
             scheduler.step()
-            logger.info(
-                "epoch=%03d lr=%.8f next_lr=%.8f scheduler=%s",
-                epoch,
-                epoch_lr,
-                current_learning_rate(optimizer),
-                config.lr_scheduler,
-            )
+            if is_main_process(rank):
+                logger.info(
+                    "epoch=%03d lr=%.8f next_lr=%.8f scheduler=%s",
+                    epoch,
+                    epoch_lr,
+                    current_learning_rate(optimizer),
+                    config.lr_scheduler,
+                )
 
         if (epoch + 1) % config.eval_interval != 0:
             continue
 
+        if world_size > 1 and not is_main_process(rank):
+            dist.barrier()
+            continue
+
+        eval_model = model.module if isinstance(model, DistributedDataParallel) else model
+
         maybe_refresh_free_k_prototypes(
-            model=model,
+            model=eval_model,
             reference_loader=datasets.train_eval_loader,
             config=config,
             device=device,
             logger=logger,
         )
-        eval_metrics = evaluate_splits(model, datasets.val_loader, device)
+        eval_metrics = evaluate_splits(eval_model, datasets.val_loader, device)
         for split_name, metrics in eval_metrics.items():
             selection_score = clustering_selection_score(metrics)
             logger.info(
@@ -663,7 +824,7 @@ def main():
             epochs_without_improvement = 0
             save_checkpoint(
                 checkpoint_path=config.output_dir / "best.pt",
-                model=model,
+                model=eval_model,
                 optimizer=optimizer,
                 scaler=scaler,
                 scheduler=scheduler,
@@ -685,7 +846,7 @@ def main():
 
         save_checkpoint(
             checkpoint_path=config.output_dir / "last.pt",
-            model=model,
+            model=eval_model,
             optimizer=optimizer,
             scaler=scaler,
             scheduler=scheduler,
@@ -706,7 +867,15 @@ def main():
                 "stopping early after %d eval rounds without improvement",
                 config.best_checkpoint_patience,
             )
+            if world_size > 1:
+                dist.barrier()
             break
+
+        if world_size > 1:
+            dist.barrier()
+
+    if dist.is_available() and dist.is_initialized():
+        dist.destroy_process_group()
 
 
 if __name__ == "__main__":

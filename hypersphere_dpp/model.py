@@ -136,6 +136,9 @@ class HypersphereDPPModel(nn.Module):
             teacher_features = self.encode_teacher(images)
         return self.adapter(teacher_features)
 
+    def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        return self.encode_student(teacher_features=teacher_features)
+
     def prototype_logits(self, student_features: torch.Tensor) -> torch.Tensor:
         return self.prototypes(student_features)
 
@@ -213,6 +216,9 @@ class HypersphereFreeKModel(nn.Module):
                 raise ValueError("Either images or teacher_features must be provided.")
             teacher_features = self.encode_teacher(images)
         return self.adapter(teacher_features)
+
+    def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        return self.encode_student(teacher_features=teacher_features)
 
     @torch.no_grad()
     def teacher_logit_scale(self) -> torch.Tensor:

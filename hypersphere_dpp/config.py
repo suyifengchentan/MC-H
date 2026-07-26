@@ -49,6 +49,9 @@ SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_CLUSTERING_MODES = {"fixed_k", "spectral_free_k"}
 SUPPORTED_DIVERSITY_WEIGHT_MODES = {"adaptive", "constant"}
 SUPPORTED_SUBSPACE_ANCHOR_MODES = {"auto", "teacher_pca", "spectral_prototype"}
+SUPPORTED_CACHED_TEACHER_DATASETS = {"CIFAR10", "CIFAR100", "Oxford_Flowers", "Image50"}
+SUPPORTED_CACHED_TEACHER_DTYPES = {"float16", "float32"}
+SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 
 
 @dataclass
@@ -60,6 +63,10 @@ class ExperimentConfig:
     validation_ratio: float = 0.1
     validation_seed: int = 42
     official_eval_split: str | None = None
+    cached_teacher_views_enabled: bool = False
+    cached_teacher_views_dir: str | None = None
+    cached_teacher_num_views: int = 8
+    cached_teacher_dtype: str = "float16"
 
     # Model
     image_size: int = 224
@@ -131,6 +138,7 @@ class ExperimentConfig:
     # Runtime / output
     eval_interval: int = 1
     workers: int = 8
+    distributed_batch_size_mode: str = "per_rank"
     reload: bool = False
     seed: int = 42
     best_checkpoint_patience: int = 50
@@ -143,6 +151,21 @@ class ExperimentConfig:
 
     def as_dict(self) -> Dict[str, Any]:
         return asdict(self)
+
+    @property
+    def uses_cached_teacher_views(self) -> bool:
+        return self.cached_teacher_views_enabled
+
+    @property
+    def resolved_teacher_cache_dir(self) -> Path | None:
+        if not self.uses_cached_teacher_views:
+            return None
+        if self.cached_teacher_views_dir:
+            return Path(self.cached_teacher_views_dir).expanduser()
+        backbone_tag = self.backbone_name.lower().replace("-", "").replace("/", "")
+        return Path(self.dataset_dir) / (
+            f"teacher_cache_{backbone_tag}_views{self.cached_teacher_num_views}_memmap"
+        )
 
 
 def _field_names() -> set[str]:
@@ -218,6 +241,27 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.class_num <= 1:
         raise ValueError("class_num must be greater than 1.")
+
+    if (
+        config.cached_teacher_views_enabled
+        and config.dataset not in SUPPORTED_CACHED_TEACHER_DATASETS
+    ):
+        raise ValueError(
+            "cached_teacher_views_enabled is only supported for "
+            f"{sorted(SUPPORTED_CACHED_TEACHER_DATASETS)}."
+        )
+    if config.cached_teacher_num_views < 2:
+        raise ValueError("cached_teacher_num_views must be at least 2.")
+    if config.cached_teacher_dtype not in SUPPORTED_CACHED_TEACHER_DTYPES:
+        raise ValueError(
+            "cached_teacher_dtype must be one of "
+            f"{sorted(SUPPORTED_CACHED_TEACHER_DTYPES)}."
+        )
+    if config.distributed_batch_size_mode not in SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES:
+        raise ValueError(
+            "distributed_batch_size_mode must be one of "
+            f"{sorted(SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES)}."
+        )
 
     if config.min_spectral_clusters <= 0:
         raise ValueError("min_spectral_clusters must be a positive integer.")
