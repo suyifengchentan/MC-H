@@ -20,6 +20,7 @@ RUNNERS = {
     "kmeans": "run_cifar100_mixed_kmeans_baselines.py",
     "components": "run_cifar100_mixed_component_baselines.py",
     "batch-size": "run_cifar100_mixed_batch_size.py",
+    "sensitivity": "run_cifar100_mixed_sensitivity.py",
 }
 
 
