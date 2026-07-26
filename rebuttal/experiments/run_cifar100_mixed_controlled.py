@@ -14,6 +14,7 @@ from pathlib import Path
 from common import (
     GENERATED_ROOT,
     REPO_ROOT,
+    SEMANTIC_GUIDANCE_DISABLED,
     add_cuda_arguments,
     append_command,
     build_train_plan,
@@ -23,7 +24,7 @@ from common import (
     write_manifest,
 )
 
-EXPERIMENT_ID = "cifar100_mixed_controlled_semantic"
+EXPERIMENT_ID = "cifar100_mixed_controlled_adaptive_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 
 
@@ -42,9 +43,12 @@ def main() -> None:
     # --execute launches the training and evaluation subprocesses.
     devices = resolve_cuda_devices(args.devices) if args.execute else []
     variants = {
-        "uniformity_010": {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
-        "constant_hdpp": {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
-        "constant_hdpp_matched": {
+        "uniformity_010": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
+        "constant_hdpp": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
+        "constant_hdpp_matched": SEMANTIC_GUIDANCE_DISABLED
+        | {
             "repulsion_mode": "constant_hdpp",
             "alpha_div_base": 0.0012,
         },

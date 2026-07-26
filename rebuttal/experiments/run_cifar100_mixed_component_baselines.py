@@ -2,9 +2,9 @@
 """Run the instance-only, DPCA-only, and DPCA+SSD component baselines.
 
 Addresses R2-Q2 and R1's observation that DPCA/SSD may explain most gains.
-The script fixes the K=60 data protocol and semantic prior while removing
-components one at a time; the instance-only adapter is then evaluated with
-spherical k-means rather than the prototype head.
+The script fixes the K=60 data protocol with semantic guidance disabled while
+removing components one at a time; the instance-only adapter is then evaluated
+with spherical k-means rather than the prototype head.
 """
 
 from __future__ import annotations
@@ -12,9 +12,20 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import GENERATED_ROOT, REPO_ROOT, add_cuda_arguments, append_command, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
+from common import (
+    GENERATED_ROOT,
+    REPO_ROOT,
+    SEMANTIC_GUIDANCE_DISABLED,
+    add_cuda_arguments,
+    append_command,
+    append_train_and_eval,
+    default_python,
+    resolve_cuda_devices,
+    run_or_print,
+    write_manifest,
+)
 
-EXPERIMENT_ID = "cifar100_mixed_component_baselines_semantic"
+EXPERIMENT_ID = "cifar100_mixed_component_baselines_adaptive_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 
 
@@ -31,18 +42,21 @@ def main() -> None:
     args = parse_args()
     devices = resolve_cuda_devices(args.devices)
     variants = {
-        "instance_only": {
+        "instance_only": SEMANTIC_GUIDANCE_DISABLED
+        | {
             "lambda_cluster": 0.0,
             "lambda_subspace": 0.0,
             "repulsion_mode": "none",
             "alpha_div_base": 0.0,
         },
-        "dpca_only": {
+        "dpca_only": SEMANTIC_GUIDANCE_DISABLED
+        | {
             "lambda_subspace": 0.0,
             "repulsion_mode": "none",
             "alpha_div_base": 0.0,
         },
-        "dpca_ssd": {"repulsion_mode": "none", "alpha_div_base": 0.0},
+        "dpca_ssd": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "none", "alpha_div_base": 0.0},
     }
     records: list[dict[str, object]] = []
     for variant_id, overrides in variants.items():

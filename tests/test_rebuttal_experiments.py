@@ -15,9 +15,40 @@ from experiments.evaluate_cifar100_mixed import (
     fine_merge_rate,
     fragmentation_at_coverage,
 )
+from rebuttal.experiments.common import (
+    SPEED_OVERRIDES,
+    apply_adaptive_semantic_guidance_policy,
+)
 
 
 class RebuttalExperimentTests(unittest.TestCase):
+    def test_semantic_guidance_is_enabled_only_for_adaptive_hdpp(self):
+        self.assertNotIn("semantic_prototype_enabled", SPEED_OVERRIDES)
+
+        adaptive = {
+            "repulsion_mode": "adaptive_hdpp",
+            "semantic_prototype_enabled": False,
+            "lambda_semantic": 0.05,
+        }
+        apply_adaptive_semantic_guidance_policy(adaptive)
+        self.assertTrue(adaptive["semantic_prototype_enabled"])
+        self.assertEqual(adaptive["lambda_semantic"], 0.05)
+
+        constant = {
+            "repulsion_mode": "constant_hdpp",
+            "semantic_prototype_enabled": True,
+            "lambda_semantic": 0.05,
+            "lambda_semantic_retrieval": 0.2,
+            "lambda_prototype_anchor": 0.3,
+            "prototype_freeze_epochs": 1,
+        }
+        apply_adaptive_semantic_guidance_policy(constant)
+        self.assertFalse(constant["semantic_prototype_enabled"])
+        self.assertEqual(constant["lambda_semantic"], 0.0)
+        self.assertEqual(constant["lambda_semantic_retrieval"], 0.0)
+        self.assertEqual(constant["lambda_prototype_anchor"], 0.0)
+        self.assertEqual(constant["prototype_freeze_epochs"], 0)
+
     def test_rectangular_accuracy_penalizes_extra_clusters(self):
         truth = np.array([0, 0, 1, 1])
         predictions = np.array([0, 1, 2, 2])

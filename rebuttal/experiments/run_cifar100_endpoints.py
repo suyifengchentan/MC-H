@@ -11,9 +11,17 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import add_cuda_arguments, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
+from common import (
+    SEMANTIC_GUIDANCE_DISABLED,
+    add_cuda_arguments,
+    append_train_and_eval,
+    default_python,
+    resolve_cuda_devices,
+    run_or_print,
+    write_manifest,
+)
 
-EXPERIMENT_ID = "cifar100_endpoints_semantic"
+EXPERIMENT_ID = "cifar100_endpoints_adaptive_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 
 
@@ -42,7 +50,8 @@ def main() -> None:
         },
     }
     repulsion_overrides = {
-        "constant_hdpp": {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
+        "constant_hdpp": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
         "adaptive_hdpp": {"repulsion_mode": "adaptive_hdpp", "alpha_div_base": 0.30},
     }
     records: list[dict[str, object]] = []

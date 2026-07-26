@@ -13,7 +13,7 @@ from pathlib import Path
 
 from common import REPO_ROOT, add_cuda_arguments, append_command, default_python, resolve_cuda_devices, run_or_print, write_manifest
 
-EXPERIMENT_ID = "cifar100_mixed_kmeans_baselines_semantic"
+EXPERIMENT_ID = "cifar100_mixed_kmeans_baselines_adaptive_semantic"
 BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_config.yaml")
 DEFAULT_CHECKPOINT = Path("save/experiments/cifar100_mixed/adaptive/seed_42/last.pt")
 

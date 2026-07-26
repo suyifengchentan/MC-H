@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """Re-run the Table 7 geometry ablation with DPCA and SSD held fixed.
 
-Addresses R1-Q2 and R2's Table 7 objection. Every row keeps the same semantic
-prototype, DPCA, and SSD setup, isolating no repulsion, uniformity, constant
-H-DPP, and adaptive H-DPP under the true known K.
+Addresses R1-Q2 and R2's Table 7 objection. Every row keeps DPCA and SSD fixed,
+while semantic guidance is enabled only for adaptive H-DPP. The comparison
+isolates no repulsion, uniformity, constant H-DPP, and adaptive H-DPP under K.
 """
 
 from __future__ import annotations
@@ -11,9 +11,17 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from common import add_cuda_arguments, append_train_and_eval, default_python, resolve_cuda_devices, run_or_print, write_manifest
+from common import (
+    SEMANTIC_GUIDANCE_DISABLED,
+    add_cuda_arguments,
+    append_train_and_eval,
+    default_python,
+    resolve_cuda_devices,
+    run_or_print,
+    write_manifest,
+)
 
-EXPERIMENT_ID = "table7_fixed_ssd_semantic"
+EXPERIMENT_ID = "table7_fixed_ssd_adaptive_semantic"
 DATASETS = {
     "cifar10": Path("config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"),
 }
@@ -32,9 +40,12 @@ def main() -> None:
     args = parse_args()
     devices = resolve_cuda_devices(args.devices)
     variants = {
-        "dpca_ssd": {"repulsion_mode": "none", "alpha_div_base": 0.0},
-        "uniformity_010": {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
-        "constant_hdpp": {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
+        "dpca_ssd": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "none", "alpha_div_base": 0.0},
+        "uniformity_010": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
+        "constant_hdpp": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
         "adaptive_hdpp": {"repulsion_mode": "adaptive_hdpp"},
     }
     shared_overrides = {

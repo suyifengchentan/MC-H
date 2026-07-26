@@ -29,8 +29,25 @@ SPEED_OVERRIDES: dict[str, Any] = {
     "dpp_every_n_steps": 4,
     "dpp_warmup_epochs": 3,
     "eval_interval": 30,
-    "semantic_prototype_enabled": True,
 }
+
+# Rebuttal controls must not inherit semantic guidance from a semantic-enabled
+# base config. Adaptive H-DPP variants deliberately omit these overrides.
+SEMANTIC_GUIDANCE_DISABLED: dict[str, Any] = {
+    "semantic_prototype_enabled": False,
+    "lambda_semantic": 0.0,
+    "lambda_semantic_retrieval": 0.0,
+    "lambda_prototype_anchor": 0.0,
+    "prototype_freeze_epochs": 0,
+}
+
+
+def apply_adaptive_semantic_guidance_policy(config: dict[str, Any]) -> None:
+    """Enable semantic guidance exclusively for adaptive H-DPP variants."""
+    if config.get("repulsion_mode") == "adaptive_hdpp":
+        config["semantic_prototype_enabled"] = True
+    else:
+        config.update(SEMANTIC_GUIDANCE_DISABLED)
 
 
 def load_yaml(path: Path) -> dict[str, Any]:
@@ -61,6 +78,7 @@ def build_train_plan(
     run_dir = REPO_ROOT / "save" / "experiments" / "rebuttal" / experiment_id / variant_id / f"seed_{seed}"
     config.update(SPEED_OVERRIDES)
     config.update(overrides)
+    apply_adaptive_semantic_guidance_policy(config)
     # Expand ~ in paths loaded from raw YAML.
     for key in ("dataset_dir", "pretrained_checkpoint"):
         if key in config and isinstance(config[key], str):
