@@ -292,7 +292,10 @@ def train_one_epoch(
             inst_loss = nt_xent_loss(
                 student1.float(), student2.float(), config.instance_temperature
             )
-            if config.clustering_mode == "spectral_free_k":
+            if (
+                config.clustering_mode == "spectral_free_k"
+                and config.spectral_assignment_mode == "sharpen"
+            ):
                 cluster_loss, assign1, assign2 = spectral_cluster_loss(
                     logits_a=logits1.float(),
                     logits_b=logits2.float(),
@@ -647,8 +650,9 @@ def main():
         config.class_aware_dpp_min_mass,
     )
     logger.info(
-        "clustering_mode=%s min_spectral_clusters=%d max_spectral_clusters=%d cardinality_ema_momentum=%.3f cardinality_hysteresis=%d",
+        "clustering_mode=%s spectral_assignment_mode=%s min_spectral_clusters=%d max_spectral_clusters=%d cardinality_ema_momentum=%.3f cardinality_hysteresis=%d",
         config.clustering_mode,
+        config.spectral_assignment_mode,
         config.min_spectral_clusters,
         config.max_spectral_clusters,
         config.spectral_cardinality_ema_momentum,

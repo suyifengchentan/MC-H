@@ -49,6 +49,7 @@ class ConfigLoaderTest(unittest.TestCase):
             initial_spectral_clusters: 300
             spectral_assignment_temperature: 0.2
             spectral_sharpen_temperature: 0.1
+            spectral_assignment_mode: "swav_sinkhorn"
             spectral_proto_momentum: 0.9
             spectral_cardinality_ema_momentum: 0.8
             spectral_cardinality_hysteresis: 3
@@ -76,6 +77,7 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.initial_spectral_clusters, 300)
         self.assertEqual(config.spectral_assignment_temperature, 0.2)
         self.assertEqual(config.spectral_sharpen_temperature, 0.1)
+        self.assertEqual(config.spectral_assignment_mode, "swav_sinkhorn")
         self.assertEqual(config.spectral_proto_momentum, 0.9)
         self.assertEqual(config.spectral_cardinality_ema_momentum, 0.8)
         self.assertEqual(config.spectral_cardinality_hysteresis, 3)

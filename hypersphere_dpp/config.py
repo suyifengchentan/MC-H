@@ -47,6 +47,7 @@ SUPPORTED_BACKBONE_FEATURE_DIMS = {
 SUPPORTED_SEMANTIC_AGGREGATIONS = {"mean", "max", "first"}
 SUPPORTED_SEMANTIC_PROMPT_STYLES = {"auto", "single", "clip_ensemble"}
 SUPPORTED_CLUSTERING_MODES = {"fixed_k", "spectral_free_k"}
+SUPPORTED_SPECTRAL_ASSIGNMENT_MODES = {"sharpen", "swav_sinkhorn"}
 SUPPORTED_DIVERSITY_WEIGHT_MODES = {"adaptive", "constant"}
 SUPPORTED_SUBSPACE_ANCHOR_MODES = {"auto", "teacher_pca", "spectral_prototype"}
 SUPPORTED_CACHED_TEACHER_DATASETS = {"CIFAR10", "CIFAR100", "Oxford_Flowers", "Image50"}
@@ -83,6 +84,7 @@ class ExperimentConfig:
     initial_spectral_clusters: int = 0
     spectral_assignment_temperature: float = 0.2
     spectral_sharpen_temperature: float = 0.1
+    spectral_assignment_mode: str = "sharpen"
     spectral_proto_momentum: float = 0.9
     spectral_cardinality_ema_momentum: float = 0.9
     spectral_cardinality_hysteresis: int = 2
@@ -312,6 +314,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if config.spectral_eval_refresh_min_mass <= 0:
         raise ValueError("spectral_eval_refresh_min_mass must be positive.")
+    if config.spectral_assignment_mode not in SUPPORTED_SPECTRAL_ASSIGNMENT_MODES:
+        raise ValueError(
+            "spectral_assignment_mode must be one of "
+            f"{sorted(SUPPORTED_SPECTRAL_ASSIGNMENT_MODES)}, got "
+            f"{config.spectral_assignment_mode!r}."
+        )
 
     if config.eval_interval <= 0:
         raise ValueError("eval_interval must be a positive integer.")
