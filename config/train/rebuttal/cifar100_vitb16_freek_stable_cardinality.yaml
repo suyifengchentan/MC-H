@@ -1,7 +1,7 @@
 # CIFAR-100 free-K validation with label-free cardinality smoothing.
 dataset: "CIFAR100"
 dataset_dir: "/home/geyingjie/hypersphere-data/CIFAR100"
-class_num: 100
+class_num: 60
 validation_ratio: 0.1
 validation_seed: 42
 official_eval_split: "test"
@@ -16,8 +16,8 @@ adapter_dropout: 0.1
 transform_profile: "small_image_two_view"
 clustering_mode: "spectral_free_k"
 min_spectral_clusters: 2
-max_spectral_clusters: 100
-initial_spectral_clusters: 100
+max_spectral_clusters: 60
+initial_spectral_clusters: 60
 spectral_assignment_temperature: 0.2
 spectral_sharpen_temperature: 0.1
 spectral_proto_momentum: 0.9
@@ -63,7 +63,7 @@ dpp_every_n_steps: 4
 dpp_jitter: 0.00001
 
 eval_interval: 30
-model_path: "save/experiments/rebuttal/cifar100_freek_stable_cardinality_ddp_cache/seed_42"
+model_path: "save/experiments/rebuttal/cifar100_mixed_freek_stable_cardinality_ddp_cache/seed_42"
 workers: 4
 distributed_batch_size_mode: "global"
 reload: false

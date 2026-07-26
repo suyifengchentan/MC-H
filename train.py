@@ -141,6 +141,7 @@ def gather_with_local_gradient(
 ) -> torch.Tensor:
     if world_size == 1:
         return features
+    features = features.contiguous()
     gathered = [torch.empty_like(features) for _ in range(world_size)]
     dist.all_gather(gathered, features.detach())
     gathered[rank] = features
@@ -151,6 +152,7 @@ def gather_with_local_gradient(
 def gather_no_gradient(features: torch.Tensor, world_size: int) -> torch.Tensor:
     if world_size == 1:
         return features
+    features = features.contiguous()
     gathered = [torch.empty_like(features) for _ in range(world_size)]
     dist.all_gather(gathered, features)
     return torch.cat(gathered, dim=0)
