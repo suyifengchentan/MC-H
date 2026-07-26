@@ -45,9 +45,21 @@ class FrozenCLIPBackbone(nn.Module):
 
 
 class FeatureAdapter(nn.Module):
-    def __init__(self, feature_dim: int, hidden_dim: int, dropout: float):
+    def __init__(
+        self,
+        feature_dim: int,
+        hidden_dim: int,
+        dropout: float,
+        input_dim: int | None = None,
+    ):
         super().__init__()
+        input_dim = feature_dim if input_dim is None else input_dim
         self.block_hidden_dim = max(1, hidden_dim // 2)
+        self.input_projection: nn.Module
+        if input_dim == feature_dim:
+            self.input_projection = nn.Identity()
+        else:
+            self.input_projection = nn.Linear(input_dim, feature_dim, bias=False)
         self.main_scale = nn.Parameter(torch.tensor(1.0))
         self.norm = nn.LayerNorm(feature_dim)
         self.fc1 = nn.Linear(feature_dim, self.block_hidden_dim)
@@ -75,7 +87,11 @@ class FeatureAdapter(nn.Module):
         x = fc2(x)
         return residual + scale * x
 
+    def project_teacher_features(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        return F.normalize(self.input_projection(teacher_features), dim=-1)
+
     def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        teacher_features = self.project_teacher_features(teacher_features)
         x = self._apply_residual_block(
             teacher_features,
             self.norm,
@@ -138,6 +154,7 @@ class HypersphereDPPModel(nn.Module):
         adapter_dropout: float,
         num_prototypes: int,
         device: Optional[torch.device] = None,
+        representation_dim: int | None = None,
     ):
         super().__init__()
         self.backbone = FrozenCLIPBackbone(
@@ -146,12 +163,16 @@ class HypersphereDPPModel(nn.Module):
             pretrained_checkpoint=pretrained_checkpoint,
             device=device,
         )
+        representation_dim = feature_dim if representation_dim is None else representation_dim
         self.adapter = FeatureAdapter(
-            feature_dim=feature_dim,
+            feature_dim=representation_dim,
             hidden_dim=adapter_hidden_dim,
             dropout=adapter_dropout,
+            input_dim=feature_dim,
         )
-        self.prototypes = PrototypeHead(num_prototypes=num_prototypes, feature_dim=feature_dim)
+        self.prototypes = PrototypeHead(
+            num_prototypes=num_prototypes, feature_dim=representation_dim
+        )
 
     def train(self, mode: bool = True):
         super().train(mode)
@@ -189,6 +210,9 @@ class HypersphereDPPModel(nn.Module):
                 raise ValueError("Either images or teacher_features must be provided.")
             teacher_features = self.encode_teacher(images)
         return self.adapter(teacher_features)
+
+    def project_teacher_features(self, teacher_features: torch.Tensor) -> torch.Tensor:
+        return self.adapter.project_teacher_features(teacher_features)
 
     def prototype_logits(self, student_features: torch.Tensor) -> torch.Tensor:
         return self.prototypes(student_features)

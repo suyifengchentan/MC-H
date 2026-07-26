@@ -15,6 +15,19 @@ class ModelComponentsTest(unittest.TestCase):
         norms = student_features.norm(dim=-1)
         self.assertTrue(torch.allclose(norms, torch.ones_like(norms), atol=1e-5))
 
+    def test_feature_adapter_projects_to_requested_representation_dimension(self):
+        adapter = FeatureAdapter(
+            feature_dim=256, hidden_dim=512, dropout=0.0, input_dim=512
+        )
+        teacher_features = torch.nn.functional.normalize(torch.randn(4, 512), dim=-1)
+        student_features = adapter(teacher_features)
+        self.assertEqual(student_features.shape, (4, 256))
+        self.assertTrue(
+            torch.allclose(
+                student_features.norm(dim=-1), torch.ones(4), atol=1e-5
+            )
+        )
+
     def test_feature_adapter_uses_two_smaller_residual_blocks(self):
         adapter = FeatureAdapter(feature_dim=768, hidden_dim=1024, dropout=0.1)
         self.assertEqual(adapter.block_hidden_dim, 512)

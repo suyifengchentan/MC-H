@@ -88,6 +88,7 @@ class ExperimentConfig:
     # Model
     image_size: int = 224
     feature_dim: int = 768
+    representation_dim: int | None = None
     backbone_name: str = "ViT-L-14"
     pretrained: str = "laion2b_s32b_b82k"
     pretrained_checkpoint: str | None = None
@@ -295,6 +296,11 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
         raise ValueError(
             f"feature_dim must be {expected_feature_dim} for {config.backbone_name} CLIP, got {config.feature_dim}."
         )
+
+    if config.representation_dim is None:
+        config.representation_dim = config.feature_dim
+    if config.representation_dim <= 1:
+        raise ValueError("representation_dim must be greater than one.")
 
     if not 0.0 < config.validation_ratio < 1.0:
         raise ValueError(

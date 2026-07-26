@@ -241,7 +241,9 @@ def train_one_epoch(
             if step % config.subspace_every_n_steps == 0:
                 subspace_loss, _ = subspace_regularization_loss(
                     student_features=student_cat,
-                    teacher_features=teacher_cat,
+                    teacher_features=unwrap_model(model)
+                    .project_teacher_features(teacher_cat)
+                    .detach(),
                     assignments=assignment_cat,
                     queue=queue,
                     rank=config.subspace_rank,
@@ -575,6 +577,7 @@ def main():
         adapter_dropout=config.adapter_dropout,
         num_prototypes=config.class_num,
         device=device,
+        representation_dim=config.representation_dim,
     ).to(device)
     semantic_state = None
     if config.semantic_prototype_enabled:
@@ -596,7 +599,9 @@ def main():
         semantic_info = semantic_state.info
         # Initialize random prototypes with the semantic text features!
         with torch.no_grad():
-            model.prototypes.prototypes.data.copy_(semantic_state.prototype_features)
+            model.prototypes.prototypes.data.copy_(
+                model.project_teacher_features(semantic_state.prototype_features)
+            )
             model.normalize_prototypes()
 
         logger.info(
@@ -633,7 +638,7 @@ def main():
     )
     queue = ClusterFeatureQueue(
         num_clusters=config.class_num,
-        feature_dim=config.feature_dim,
+        feature_dim=config.representation_dim,
         queue_size=config.subspace_queue_size,
         device=device,
     )

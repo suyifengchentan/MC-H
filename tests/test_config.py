@@ -116,6 +116,27 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertTrue(config.class_aware_dpp)
         self.assertEqual(config.class_aware_dpp_min_mass, 2.0)
 
+    def test_representation_dimension_defaults_to_backbone_feature_dimension(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "CIFAR10"
+            dataset_dir: "/tmp/cifar10"
+            class_num: 10
+            feature_dim: 512
+            representation_dim: 256
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertEqual(config.feature_dim, 512)
+        self.assertEqual(config.representation_dim, 256)
+
     def test_image100_is_supported(self):
         config_text = textwrap.dedent(
             """

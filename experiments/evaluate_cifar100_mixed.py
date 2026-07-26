@@ -156,6 +156,7 @@ def predict_checkpoint(config, checkpoint: str, device: torch.device) -> tuple[n
         adapter_dropout=config.adapter_dropout,
         num_prototypes=config.class_num,
         device=device,
+        representation_dim=config.representation_dim,
     ).to(device)
     load_checkpoint(checkpoint, model=model, map_location=device)
     model.eval()

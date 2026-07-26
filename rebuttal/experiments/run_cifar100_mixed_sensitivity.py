@@ -49,10 +49,10 @@ def main() -> None:
     for value in args.values:
         if args.control == "batch":
             variant_id = f"adaptive_hdpp_batch_{value}_dim_{BASE_FEATURE_DIM}"
-            overrides = {"batch_size": value, "feature_dim": BASE_FEATURE_DIM}
+            overrides = {"batch_size": value, "representation_dim": BASE_FEATURE_DIM}
         else:
             variant_id = f"adaptive_hdpp_batch_{BASE_BATCH_SIZE}_dim_{value}"
-            overrides = {"batch_size": BASE_BATCH_SIZE, "feature_dim": value}
+            overrides = {"batch_size": BASE_BATCH_SIZE, "representation_dim": value}
         for seed in args.seeds:
             config, run_dir = append_train_and_eval(
                 records,

@@ -35,6 +35,7 @@ def main():
         adapter_dropout=config.adapter_dropout,
         num_prototypes=config.class_num,
         device=device,
+        representation_dim=config.representation_dim,
     ).to(device)
     load_checkpoint(args.checkpoint, model=model, map_location=device)
     model.eval()
