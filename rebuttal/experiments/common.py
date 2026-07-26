@@ -44,7 +44,9 @@ SEMANTIC_GUIDANCE_DISABLED: dict[str, Any] = {
 
 def apply_adaptive_semantic_guidance_policy(config: dict[str, Any]) -> None:
     """Enable semantic guidance exclusively for adaptive H-DPP variants."""
-    if config.get("repulsion_mode") == "adaptive_hdpp":
+    # ``adaptive_hdpp`` is the ExperimentConfig default and is intentionally
+    # omitted by compact base YAML files.
+    if config.get("repulsion_mode", "adaptive_hdpp") == "adaptive_hdpp":
         config["semantic_prototype_enabled"] = True
     else:
         config.update(SEMANTIC_GUIDANCE_DISABLED)

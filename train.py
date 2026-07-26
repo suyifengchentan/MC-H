@@ -326,7 +326,10 @@ def train_one_epoch(
         scaler.step(optimizer)
         scaler.update()
         unwrap_model(model).normalize_prototypes()
-        queue.enqueue(teacher_cat, assignment_cat)
+        queue.enqueue(
+            unwrap_model(model).project_teacher_features(teacher_cat).detach(),
+            assignment_cat,
+        )
 
         if step_profile_enabled:
             maybe_profile_sync(device, step_profile_cuda_sync)

@@ -34,6 +34,14 @@ class RebuttalExperimentTests(unittest.TestCase):
         self.assertTrue(adaptive["semantic_prototype_enabled"])
         self.assertEqual(adaptive["lambda_semantic"], 0.05)
 
+        implicit_adaptive = {
+            "semantic_prototype_enabled": False,
+            "lambda_semantic": 0.05,
+        }
+        apply_adaptive_semantic_guidance_policy(implicit_adaptive)
+        self.assertTrue(implicit_adaptive["semantic_prototype_enabled"])
+        self.assertEqual(implicit_adaptive["lambda_semantic"], 0.05)
+
         constant = {
             "repulsion_mode": "constant_hdpp",
             "semantic_prototype_enabled": True,
