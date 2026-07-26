@@ -88,7 +88,9 @@ class FeatureAdapter(nn.Module):
         return residual + scale * x
 
     def project_teacher_features(self, teacher_features: torch.Tensor) -> torch.Tensor:
-        return F.normalize(self.input_projection(teacher_features), dim=-1)
+        # Cached frozen CLIP features are stored in FP16, while this projection
+        # is initialized in FP32 and can also be called outside autocast.
+        return F.normalize(self.input_projection(teacher_features.float()), dim=-1)
 
     def forward(self, teacher_features: torch.Tensor) -> torch.Tensor:
         teacher_features = self.project_teacher_features(teacher_features)

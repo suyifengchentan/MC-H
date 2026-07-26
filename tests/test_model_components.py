@@ -27,6 +27,10 @@ class ModelComponentsTest(unittest.TestCase):
                 student_features.norm(dim=-1), torch.ones(4), atol=1e-5
             )
         )
+        cached_teacher_features = teacher_features.half()
+        projected_features = adapter.project_teacher_features(cached_teacher_features)
+        self.assertEqual(projected_features.dtype, torch.float32)
+        self.assertEqual(projected_features.shape, (4, 256))
 
     def test_feature_adapter_uses_two_smaller_residual_blocks(self):
         adapter = FeatureAdapter(feature_dim=768, hidden_dim=1024, dropout=0.1)
