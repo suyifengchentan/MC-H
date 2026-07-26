@@ -50,6 +50,8 @@ class ConfigLoaderTest(unittest.TestCase):
             spectral_assignment_temperature: 0.2
             spectral_sharpen_temperature: 0.1
             spectral_proto_momentum: 0.9
+            spectral_cardinality_ema_momentum: 0.8
+            spectral_cardinality_hysteresis: 3
             diversity_weight_mode: "constant"
             subspace_anchor_mode: "teacher_pca"
             semantic_prototype_enabled: true
@@ -75,6 +77,8 @@ class ConfigLoaderTest(unittest.TestCase):
         self.assertEqual(config.spectral_assignment_temperature, 0.2)
         self.assertEqual(config.spectral_sharpen_temperature, 0.1)
         self.assertEqual(config.spectral_proto_momentum, 0.9)
+        self.assertEqual(config.spectral_cardinality_ema_momentum, 0.8)
+        self.assertEqual(config.spectral_cardinality_hysteresis, 3)
         self.assertEqual(config.diversity_weight_mode, "constant")
         self.assertEqual(config.subspace_anchor_mode, "teacher_pca")
         self.assertTrue(config.semantic_prototype_enabled)

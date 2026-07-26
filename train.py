@@ -113,6 +113,7 @@ def train_one_epoch(
         "semantic_retrieval_loss": 0.0,
         "alpha_div": 0.0,
         "rho": 0.0,
+        "raw_estimated_k": 0.0,
         "estimated_k": 0.0,
     }
     num_steps = len(dataloader)
@@ -149,17 +150,21 @@ def train_one_epoch(
                     min_clusters=config.min_spectral_clusters,
                     max_clusters=spectral_cluster_cap,
                     momentum=config.spectral_proto_momentum,
+                    cardinality_ema_momentum=config.spectral_cardinality_ema_momentum,
+                    cardinality_hysteresis=config.spectral_cardinality_hysteresis,
                     update_state=True,
                 )
                 logits_cat = spectral_output["logits"]
                 assignment_cat = spectral_output["assignments"]
                 estimated_k = float(spectral_output["estimated_k"])
+                raw_estimated_k = float(spectral_output["raw_estimated_k"])
                 logits1, logits2 = logits_cat.chunk(2)
                 assign1, assign2 = assignment_cat.chunk(2)
             else:
                 logits_cat = model.prototype_logits(student_cat)
                 logits1, logits2 = logits_cat.chunk(2)
                 estimated_k = float(config.class_num)
+                raw_estimated_k = estimated_k
 
             inst_loss = nt_xent_loss(
                 student1.float(), student2.float(), config.instance_temperature
@@ -301,6 +306,7 @@ def train_one_epoch(
         totals["dpp_loss"] += float(dpp_loss.item())
         totals["alpha_div"] += float(alpha_div.item())
         totals["rho"] += float(rho.item())
+        totals["raw_estimated_k"] += raw_estimated_k
         totals["estimated_k"] += estimated_k
 
         if (step + 1) % log_interval == 0 or step == 0 or (step + 1) == num_steps:
@@ -308,7 +314,7 @@ def train_one_epoch(
             logger.info(
                 (
                     "epoch=%03d step=%04d/%04d "
-                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f k=%.2f"
+                    "loss=%.4f inst=%.4f cluster=%.4f semantic=%.4f sem_ret=%.4f sub=%.4f dpp=%.4f alpha_div=%.4f rho=%.4f raw_k=%.2f stable_k=%.2f"
                 ),
                 epoch,
                 step + 1,
@@ -322,6 +328,7 @@ def train_one_epoch(
                 totals["dpp_loss"] / running_denom,
                 totals["alpha_div"] / running_denom,
                 totals["rho"] / running_denom,
+                totals["raw_estimated_k"] / running_denom,
                 totals["estimated_k"] / running_denom,
             )
 
@@ -491,10 +498,12 @@ def main():
         config.class_aware_dpp_min_mass,
     )
     logger.info(
-        "clustering_mode=%s min_spectral_clusters=%d max_spectral_clusters=%d",
+        "clustering_mode=%s min_spectral_clusters=%d max_spectral_clusters=%d cardinality_ema_momentum=%.3f cardinality_hysteresis=%d",
         config.clustering_mode,
         config.min_spectral_clusters,
         config.max_spectral_clusters,
+        config.spectral_cardinality_ema_momentum,
+        config.spectral_cardinality_hysteresis,
     )
     if config.clustering_mode == "spectral_free_k":
         target_spectral_cap = config.max_spectral_clusters if config.max_spectral_clusters > 0 else config.class_num

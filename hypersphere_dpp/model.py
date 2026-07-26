@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import math
 from typing import Optional
 
 import torch
@@ -191,6 +192,7 @@ class HypersphereFreeKModel(nn.Module):
         self.register_buffer(
             "estimated_num_clusters", torch.tensor(0, dtype=torch.long)
         )
+        self.register_buffer("spectral_cardinality_ema", torch.tensor(float("nan")))
 
     def train(self, mode: bool = True):
         super().train(mode)
@@ -247,6 +249,38 @@ class HypersphereFreeKModel(nn.Module):
         prototypes = prototypes / top_values.sqrt().unsqueeze(0)
         return F.normalize(prototypes.t(), dim=-1)
 
+    @staticmethod
+    def _stabilize_cardinality(
+        raw_estimated_k: int,
+        previous_ema: float,
+        previous_k: int,
+        ema_momentum: float,
+        hysteresis: int,
+        min_clusters: int,
+        max_clusters: int,
+        num_samples: int,
+        positive_eigenvalues: int,
+    ) -> tuple[float, int]:
+        """Smooth a label-free spectral count before resizing the prototype bank."""
+        lower = min(max(1, min_clusters), max(1, num_samples))
+        upper = max(1, num_samples)
+        if max_clusters > 0:
+            upper = min(upper, max_clusters)
+        if positive_eigenvalues > 0:
+            upper = min(upper, positive_eigenvalues)
+        raw_estimated_k = max(lower, min(int(raw_estimated_k), upper))
+
+        ema = float(raw_estimated_k)
+        if math.isfinite(previous_ema):
+            ema = ema_momentum * float(previous_ema) + (1.0 - ema_momentum) * ema
+        ema_target = max(lower, min(int(round(ema)), upper))
+
+        if previous_k > 0:
+            previous_k = max(lower, min(int(previous_k), upper))
+            if abs(ema_target - previous_k) <= hysteresis:
+                return ema, previous_k
+        return ema, ema_target
+
     def _stabilize_prototypes(
         self,
         prototypes: torch.Tensor,
@@ -292,6 +326,8 @@ class HypersphereFreeKModel(nn.Module):
         min_clusters: int,
         max_clusters: int,
         momentum: float,
+        cardinality_ema_momentum: float,
+        cardinality_hysteresis: int,
         update_state: bool,
     ) -> dict[str, torch.Tensor | int]:
         with torch.autocast(device_type=student_features.device.type, enabled=False):
@@ -305,11 +341,24 @@ class HypersphereFreeKModel(nn.Module):
             order = torch.argsort(eigenvalues, descending=True)
             eigenvalues = eigenvalues[order].clamp_min(0.0)
             eigenvectors = eigenvectors[:, order]
-            estimated_k = self._estimate_cluster_count(
+            raw_estimated_k = self._estimate_cluster_count(
                 eigenvalues=eigenvalues,
                 min_clusters=min_clusters,
                 max_clusters=max_clusters,
                 num_samples=student_features.size(0),
+            )
+            previous_ema = float(self.spectral_cardinality_ema.detach().item())
+            previous_k = int(self.spectral_prototypes.size(0))
+            estimated_ema, estimated_k = self._stabilize_cardinality(
+                raw_estimated_k=raw_estimated_k,
+                previous_ema=previous_ema,
+                previous_k=previous_k,
+                ema_momentum=cardinality_ema_momentum,
+                hysteresis=cardinality_hysteresis,
+                min_clusters=min_clusters,
+                max_clusters=max_clusters,
+                num_samples=student_features.size(0),
+                positive_eigenvalues=int((eigenvalues > 1e-6).sum().item()),
             )
             prototypes = self._prototypes_from_spectrum(
                 phi=phi,
@@ -326,6 +375,11 @@ class HypersphereFreeKModel(nn.Module):
                 device=self.estimated_num_clusters.device,
                 dtype=torch.long,
             )
+            self.spectral_cardinality_ema = torch.tensor(
+                estimated_ema,
+                device=self.spectral_cardinality_ema.device,
+                dtype=torch.float32,
+            )
         logits = normalized @ prototypes.t()
         logits = logits / temperature
         assignments = F.softmax(logits, dim=-1)
@@ -336,6 +390,8 @@ class HypersphereFreeKModel(nn.Module):
             "relative_quality": relative_quality,
             "eigenvalues": eigenvalues[:estimated_k],
             "estimated_k": int(prototypes.size(0)),
+            "raw_estimated_k": int(raw_estimated_k),
+            "cardinality_ema": float(estimated_ema),
             "phi": phi,
         }
 
@@ -440,6 +496,7 @@ class HypersphereFreeKModel(nn.Module):
             "spectral_prototypes": self.spectral_prototypes.detach().cpu(),
             "spectral_eigenvalues": self.spectral_eigenvalues.detach().cpu(),
             "estimated_num_clusters": self.estimated_num_clusters.detach().cpu(),
+            "spectral_cardinality_ema": self.spectral_cardinality_ema.detach().cpu(),
         }
 
     def load_trainable_state_dict(self, state_dict: dict[str, dict[str, torch.Tensor] | torch.Tensor]) -> None:
@@ -448,12 +505,17 @@ class HypersphereFreeKModel(nn.Module):
         spectral_prototypes = state_dict.get("spectral_prototypes")
         spectral_eigenvalues = state_dict.get("spectral_eigenvalues")
         estimated_num_clusters = state_dict.get("estimated_num_clusters")
+        spectral_cardinality_ema = state_dict.get("spectral_cardinality_ema")
         if spectral_prototypes is not None:
             self.spectral_prototypes = spectral_prototypes.to(self.spectral_prototypes.device)
         if spectral_eigenvalues is not None:
             self.spectral_eigenvalues = spectral_eigenvalues.to(self.spectral_eigenvalues.device)
         if estimated_num_clusters is not None:
             self.estimated_num_clusters = estimated_num_clusters.to(self.estimated_num_clusters.device)
+        if spectral_cardinality_ema is not None:
+            self.spectral_cardinality_ema = spectral_cardinality_ema.to(
+                self.spectral_cardinality_ema.device
+            )
 
 
 def build_model_from_config(config, device: Optional[torch.device] = None):

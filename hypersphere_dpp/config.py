@@ -77,6 +77,8 @@ class ExperimentConfig:
     spectral_assignment_temperature: float = 0.2
     spectral_sharpen_temperature: float = 0.1
     spectral_proto_momentum: float = 0.9
+    spectral_cardinality_ema_momentum: float = 0.9
+    spectral_cardinality_hysteresis: int = 2
     spectral_eval_refresh_enabled: bool = True
     spectral_eval_refresh_passes: int = 1
     spectral_eval_refresh_temperature: float = 0.2
@@ -251,6 +253,12 @@ def load_experiment_config(path: str | Path) -> ExperimentConfig:
 
     if not 0.0 <= config.spectral_proto_momentum < 1.0:
         raise ValueError("spectral_proto_momentum must be in [0, 1).")
+
+    if not 0.0 <= config.spectral_cardinality_ema_momentum < 1.0:
+        raise ValueError("spectral_cardinality_ema_momentum must be in [0, 1).")
+
+    if config.spectral_cardinality_hysteresis < 0:
+        raise ValueError("spectral_cardinality_hysteresis must be non-negative.")
 
     if config.spectral_eval_refresh_passes <= 0:
         raise ValueError("spectral_eval_refresh_passes must be a positive integer.")
