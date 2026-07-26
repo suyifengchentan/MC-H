@@ -28,6 +28,13 @@ BASE_CONFIG = Path("config/train/rebuttal/cifar100_mixed_vitb16_hypersphere_dpp_
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43])
+    parser.add_argument(
+        "--repulsions",
+        nargs="+",
+        choices=["uniformity_010", "constant_hdpp", "adaptive_hdpp"],
+        default=["uniformity_010", "constant_hdpp", "adaptive_hdpp"],
+        help="Repulsion variants to run; use this to fill missing rows without rerunning completed ones.",
+    )
     parser.add_argument("--python", default=default_python())
     add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
@@ -50,13 +57,16 @@ def main() -> None:
         },
     }
     repulsion_overrides = {
+        "uniformity_010": SEMANTIC_GUIDANCE_DISABLED
+        | {"repulsion_mode": "uniformity", "alpha_div_base": 0.10},
         "constant_hdpp": SEMANTIC_GUIDANCE_DISABLED
         | {"repulsion_mode": "constant_hdpp", "alpha_div_base": 0.10},
         "adaptive_hdpp": {"repulsion_mode": "adaptive_hdpp", "alpha_div_base": 0.30},
     }
     records: list[dict[str, object]] = []
     for endpoint_id, endpoint in endpoint_overrides.items():
-        for repulsion_id, repulsion in repulsion_overrides.items():
+        for repulsion_id in args.repulsions:
+            repulsion = repulsion_overrides[repulsion_id]
             for seed in args.seeds:
                 append_train_and_eval(
                     records,

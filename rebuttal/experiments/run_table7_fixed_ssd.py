@@ -24,12 +24,28 @@ from common import (
 EXPERIMENT_ID = "table7_fixed_ssd_adaptive_semantic"
 DATASETS = {
     "cifar10": Path("config/train/coarse_grained/cifar10_vitb16_hypersphere_dpp_config.yaml"),
+    "image50": Path("config/train/medium_grained/image50_vitb16_hypersphere_dpp_config.yaml"),
+    "oxford_flowers": Path("config/train/fine_grained/oxford_flowers_vitb16_hypersphere_dpp_config.yaml"),
 }
 
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--seeds", type=int, nargs="+", default=[42, 43])
+    parser.add_argument(
+        "--datasets",
+        nargs="+",
+        choices=sorted(DATASETS),
+        default=sorted(DATASETS),
+        help="Dataset rows to run; use this to fill missing Table 7 entries.",
+    )
+    parser.add_argument(
+        "--variants",
+        nargs="+",
+        choices=["dpca_ssd", "uniformity_010", "constant_hdpp", "adaptive_hdpp"],
+        default=["dpca_ssd", "uniformity_010", "constant_hdpp", "adaptive_hdpp"],
+        help="Ablation rows to run; use this to fill missing entries without rerunning completed ones.",
+    )
     parser.add_argument("--python", default=default_python())
     add_cuda_arguments(parser)
     parser.add_argument("--execute", action="store_true")
@@ -52,8 +68,10 @@ def main() -> None:
         "best_checkpoint_patience": 0,
     }
     records: list[dict[str, object]] = []
-    for dataset_id, base_config in DATASETS.items():
-        for variant_id, variant in variants.items():
+    for dataset_id in args.datasets:
+        base_config = DATASETS[dataset_id]
+        for variant_id in args.variants:
+            variant = variants[variant_id]
             for seed in args.seeds:
                 append_train_and_eval(
                     records,
