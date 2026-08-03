@@ -1,4 +1,4 @@
-"""Precompute CLIP-B/16 augmented teacher features for small training sets.
+"""Precompute CLIP-B/16 augmented teacher features for training sets.
 
 The generated cache follows ``TEACHER_FEATURE_CANDIDATES_KEY``'s contract:
 each row has shape ``[num_views, feature_dim]`` and is indexed by the original
@@ -24,12 +24,8 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from datasets.cifar100_dataset import CIFAR100Dataset
-from datasets.cifar10_dataset import CIFAR10Dataset
-from datasets.imagenet_h5_dataset import ImageNetH5Dataset
-from datasets.oxford_flowers_dataset import OxfordFlowersDataset
 from hypersphere_dpp.config import SUPPORTED_CACHED_TEACHER_DATASETS, load_experiment_config
-from hypersphere_dpp.data import safe_default_collate
+from hypersphere_dpp.data import _build_base_datasets, safe_default_collate
 from hypersphere_dpp.model import FrozenCLIPBackbone
 from hypersphere_dpp.transforms import build_gpu_train_transform, build_train_decode_transform
 from hypersphere_dpp.utils import resolve_device, set_seed
@@ -39,8 +35,8 @@ from train import resolve_amp_settings
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
         description=(
-            "Precompute eight augmented CLIP-B/16 teacher feature candidates "
-            "for CIFAR10, CIFAR100, Oxford_Flowers, or Image50."
+            "Precompute augmented CLIP-B/16 teacher feature candidates for any "
+            "non-ImageNet-1K training dataset."
         )
     )
     parser.add_argument("--config", required=True, help="Training YAML for one supported dataset.")
@@ -87,34 +83,13 @@ def cache_root_from_config(config, num_views: int, output_dir: str | None) -> Pa
 
 def build_train_dataset(config):
     decode_transform = build_train_decode_transform(config.image_size, config.transform_profile)
-    if config.dataset == "CIFAR10":
-        return CIFAR10Dataset(
-            root=config.dataset_dir,
-            train=True,
-            transform=decode_transform,
-            download=False,
+    train_dataset, _ = _build_base_datasets(config)
+    if not hasattr(train_dataset, "transform"):
+        raise TypeError(
+            f"Training dataset for {config.dataset!r} does not expose a transform attribute."
         )
-    if config.dataset == "CIFAR100":
-        return CIFAR100Dataset(
-            root=config.dataset_dir,
-            train=True,
-            transform=decode_transform,
-            download=False,
-            label_mode=config.cifar100_label_mode,
-        )
-    if config.dataset == "Oxford_Flowers":
-        return OxfordFlowersDataset(
-            root=config.dataset_dir,
-            split="train",
-            transform=decode_transform,
-        )
-    if config.dataset == "Image50":
-        return ImageNetH5Dataset(
-            root=config.dataset_dir,
-            split="train",
-            transform=decode_transform,
-        )
-    raise ValueError(f"Unsupported cache dataset: {config.dataset!r}.")
+    train_dataset.transform = decode_transform
+    return train_dataset
 
 
 def progress_path(cache_path: Path) -> Path:

@@ -52,7 +52,9 @@ SUPPORTED_SEMANTIC_IMAGENET_SYNONYM_MODES = {"mean_all", "primary_weighted"}
 SUPPORTED_SEMANTIC_MODES = {"legacy", "tac_imagenet1k"}
 SUPPORTED_DISTRIBUTED_BATCH_SIZE_MODES = {"global", "per_rank"}
 SUPPORTED_IMAGENET1K_CACHED_TEACHER_DTYPES = {"float16", "float32"}
-SUPPORTED_CACHED_TEACHER_DATASETS = {"CIFAR10", "CIFAR100", "Oxford_Flowers", "Image50"}
+# ImageNet-1K uses its dedicated sharded cache format. Every other training
+# dataset uses the common single-memmap cache format.
+SUPPORTED_CACHED_TEACHER_DATASETS = SUPPORTED_DATASETS - {"ImageNet1K"}
 SUPPORTED_ALPHA_DIV_MODES = {"clamp_positive", "sigmoid_floor"}
 SUPPORTED_REPULSION_MODES = {
     "adaptive_hdpp",
@@ -78,8 +80,8 @@ class ExperimentConfig:
     imagenet1k_cached_teacher_views_dir: str | None = None
     imagenet1k_cached_teacher_num_views: int = 6
     imagenet1k_cached_teacher_dtype: str = "float16"
-    # Optional CLIP-B/16 feature cache for the small datasets.  The ImageNet1K
-    # fields above remain supported for backwards compatibility.
+    # Optional CLIP-B/16 feature cache for every non-ImageNet-1K dataset. The
+    # ImageNet1K fields above remain supported for its sharded cache format.
     cached_teacher_views_enabled: bool = False
     cached_teacher_views_dir: str | None = None
     cached_teacher_num_views: int = 8

@@ -230,6 +230,32 @@ class ConfigLoaderTest(unittest.TestCase):
             Path("/tmp/cifar10/teacher_cache_vitb16_views8_memmap"),
         )
 
+    def test_non_imagenet_dataset_can_enable_cached_teacher_views(self):
+        config_text = textwrap.dedent(
+            """
+            dataset: "Image10"
+            dataset_dir: "/tmp/image10"
+            class_num: 10
+            feature_dim: 512
+            backbone_name: "ViT-B-16"
+            official_eval_split: "test"
+            cached_teacher_views_enabled: true
+            cached_teacher_num_views: 8
+            cached_teacher_dtype: "float16"
+            """
+        )
+        with tempfile.NamedTemporaryFile("w", suffix=".yaml", delete=False) as handle:
+            handle.write(config_text)
+            config_path = handle.name
+
+        config = load_experiment_config(config_path)
+
+        self.assertTrue(config.uses_cached_teacher_views)
+        self.assertEqual(
+            config.resolved_teacher_cache_dir,
+            Path("/tmp/image10/teacher_cache_vitb16_views8_memmap"),
+        )
+
     def test_step_profile_fields_are_supported(self):
         config_text = textwrap.dedent(
             """
