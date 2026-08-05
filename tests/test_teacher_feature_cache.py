@@ -28,6 +28,18 @@ class _IndexedDataset(Dataset):
         return None, self.targets[index], index
 
 
+class _DataBackedDataset(Dataset):
+    def __init__(self):
+        self.data = [("a.jpg", 4), ("b.jpg", 8), ("c.jpg", 15)]
+
+    def __len__(self) -> int:
+        return len(self.data)
+
+    def __getitem__(self, index: int):
+        _path, label = self.data[index]
+        return None, label, index
+
+
 class TeacherFeatureCacheTest(unittest.TestCase):
     def _create_cache(self, root: Path) -> None:
         data_root = root / "data"
@@ -63,6 +75,20 @@ class TeacherFeatureCacheTest(unittest.TestCase):
             self.assertEqual(second_sample["label"], 4)
             self.assertEqual(second_sample[TEACHER_FEATURE_CANDIDATES_KEY].shape, (8, 512))
             self.assertEqual(second_sample[TEACHER_FEATURE_CANDIDATES_KEY][0, 0].item(), 0.0)
+
+    def test_subset_supports_data_backed_labels(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            cache_root = Path(tmp_dir)
+            self._create_cache(cache_root)
+            cache = TeacherFeatureCache(cache_root, expected_num_views=8, expected_feature_dim=512)
+            dataset = TeacherFeatureTrainDataset(Subset(_DataBackedDataset(), [2, 0]), cache)
+
+            self.assertEqual(dataset[0]["label"], 15)
+            self.assertEqual(dataset[1]["label"], 4)
+            self.assertEqual(
+                [sample["label"] for sample in dataset.__getitems__([0, 1])],
+                [15, 4],
+            )
 
     def test_random_two_view_sampling_uses_distinct_candidates(self):
         candidates = torch.arange(2 * 8 * 512, dtype=torch.float32).reshape(2, 8, 512)

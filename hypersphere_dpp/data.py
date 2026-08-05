@@ -65,8 +65,6 @@ class TeacherFeatureTrainDataset(Dataset):
     def __init__(self, dataset: Subset, teacher_cache: TeacherFeatureCache):
         if not isinstance(dataset, Subset):
             raise TypeError("ImageNetTeacherFeatureTrainDataset expects a torch.utils.data.Subset.")
-        if not hasattr(dataset.dataset, "targets"):
-            raise ValueError("The wrapped base dataset must expose targets for labels.")
         if len(teacher_cache) != len(dataset.dataset):
             raise ValueError(
                 "Teacher feature cache size must match the full ImageNet training dataset size."
@@ -74,6 +72,9 @@ class TeacherFeatureTrainDataset(Dataset):
 
         self.dataset = dataset
         self.base_dataset = dataset.dataset
+        self.labels = _extract_dataset_labels(self.base_dataset)
+        if self.labels is None:
+            raise ValueError("The wrapped base dataset must expose labels for cached teacher training.")
         self.teacher_cache = teacher_cache
 
     def __len__(self) -> int:
@@ -81,7 +82,7 @@ class TeacherFeatureTrainDataset(Dataset):
 
     def __getitem__(self, index: int):
         base_index = int(self.dataset.indices[index])
-        label = int(self.base_dataset.targets[base_index])
+        label = int(self.labels[base_index])
         return {
             TEACHER_FEATURE_CANDIDATES_KEY: self.teacher_cache[base_index],
             "label": label,
@@ -90,7 +91,7 @@ class TeacherFeatureTrainDataset(Dataset):
 
     def __getitems__(self, indices: Sequence[int]):
         base_indices = [int(self.dataset.indices[int(index)]) for index in indices]
-        labels = [int(self.base_dataset.targets[base_index]) for base_index in base_indices]
+        labels = [int(self.labels[base_index]) for base_index in base_indices]
         teacher_batches = self.teacher_cache.get_many(base_indices)
         return [
             {
