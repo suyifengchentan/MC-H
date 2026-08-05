@@ -36,6 +36,18 @@ class Image10DatasetTest(unittest.TestCase):
             self.assertEqual(label, 1)
             self.assertEqual(sample_index, 1)
 
+    def test_image10_dataset_ignores_teacher_cache_directories(self):
+        with tempfile.TemporaryDirectory() as tmp_dir:
+            root = Path(tmp_dir) / "imagenet-10"
+            _write_image(root / "n02056570" / "sample_1.JPEG", (255, 0, 0))
+            _write_image(root / "n02085936" / "sample_2.JPEG", (0, 255, 0))
+            (root / "teacher_cache_vitb16_views8_memmap").mkdir()
+
+            dataset = Image10Dataset(str(root), split="train")
+
+            self.assertEqual(dataset.classes, ["n02056570", "n02085936"])
+            self.assertEqual(len(dataset), 2)
+
     def test_image10_dataloaders_use_imagefolder_instead_of_h5_layout(self):
         with tempfile.TemporaryDirectory() as tmp_dir:
             root = Path(tmp_dir) / "imagenet-10"

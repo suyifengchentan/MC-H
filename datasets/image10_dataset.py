@@ -60,7 +60,11 @@ class Image10Dataset(datasets.ImageFolder):
         classes = [
             entry.name
             for entry in os.scandir(directory)
-            if entry.is_dir() and not entry.name.startswith(".")
+            if (
+                entry.is_dir()
+                and not entry.name.startswith(".")
+                and not entry.name.startswith("teacher_cache_")
+            )
         ]
         classes.sort()
         class_to_idx = {cls_name: index for index, cls_name in enumerate(classes)}
