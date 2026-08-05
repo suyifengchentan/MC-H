@@ -5,6 +5,31 @@ from torch.utils.data import Dataset
 from PIL import Image
 
 
+def _resolve_images_root(root: str) -> str:
+    candidates = (
+        os.path.join(root, "images", "images"),
+        os.path.join(root, "images"),
+    )
+    for candidate in candidates:
+        if os.path.isdir(candidate):
+            return candidate
+    raise FileNotFoundError(f"Oxford_Pet images directory not found below: {root}")
+
+
+def _resolve_annotation_path(root: str, split: str) -> str:
+    annotation_file = f"{split}.txt"
+    candidates = (
+        os.path.join(root, "annotations", annotation_file),
+        os.path.join(root, "annotations", "annotations", annotation_file),
+    )
+    for candidate in candidates:
+        if os.path.isfile(candidate):
+            return candidate
+    raise FileNotFoundError(
+        f"Oxford_Pet annotation file for split {split!r} not found below: {root}"
+    )
+
+
 class OxfordPetDataset(Dataset):
     """
     自定义的 Oxford-IIIT Pet 数据集类。
@@ -23,11 +48,9 @@ class OxfordPetDataset(Dataset):
         """
         self.root = root
         self.transform = transform
-        self.images_base_path = os.path.join(self.root, 'images')
+        self.images_base_path = _resolve_images_root(self.root)
 
-        # 1. 定义要加载的注释文件
-        annotation_file = f"{split}.txt"
-        annotation_path = os.path.join(self.root, 'annotations', annotation_file)
+        annotation_path = _resolve_annotation_path(self.root, split)
 
         print(f"[{self.__class__.__name__}] 正在从以下路径加载 {split} 数据: {annotation_path}")
 
