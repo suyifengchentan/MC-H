@@ -2,16 +2,16 @@ from __future__ import annotations
 
 import argparse
 
-from hypersphere_dpp.checkpoint import load_checkpoint
-from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders
-from hypersphere_dpp.metrics import evaluate_clustering
-from hypersphere_dpp.model import HypersphereDPPModel
-from hypersphere_dpp.utils import resolve_device, set_seed
+from src.checkpoint import load_checkpoint
+from src.config import load_experiment_config
+from src.data import build_experiment_dataloaders
+from src.metrics import evaluate_clustering
+from src.model import HypersphereDPPModel
+from src.utils import resolve_device, set_seed
 
 
 def parse_args():
-    parser = argparse.ArgumentParser(description="Evaluate the CUB ViT-L/14 hypersphere-DPP prototype.")
+    parser = argparse.ArgumentParser(description="Evaluate a hypersphere-DPP checkpoint.")
     parser.add_argument("--config", required=True, help="Path to the evaluation config YAML.")
     parser.add_argument("--checkpoint", required=True, help="Checkpoint path, e.g. best.pt.")
     parser.add_argument("--split", choices=["val", "test", "both"], default="both")

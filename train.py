@@ -10,36 +10,36 @@ from torch import amp
 from torch import optim
 from torch.nn.parallel import DistributedDataParallel
 
-from hypersphere_dpp.checkpoint import load_checkpoint, save_checkpoint
-from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import (
+from src.checkpoint import load_checkpoint, save_checkpoint
+from src.config import load_experiment_config
+from src.data import (
     TEACHER_FEATURE_CANDIDATES_KEY,
     build_experiment_dataloaders,
     sample_two_teacher_feature_views,
 )
-from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
-from hypersphere_dpp.losses import (
+from src.logging_utils import append_metrics_record, setup_training_logger
+from src.losses import (
     adaptive_diversity_weight,
     dpp_diversity_loss,
     nt_xent_loss,
     swav_cluster_loss,
     uniformity_loss,
 )
-from hypersphere_dpp.metrics import (
+from src.metrics import (
     clustering_selection_score,
     evaluate_clustering,
     format_clustering_metrics,
 )
-from hypersphere_dpp.model import HypersphereDPPModel
-from hypersphere_dpp.semantic import (
+from src.model import HypersphereDPPModel
+from src.semantic import (
     build_semantic_prototype_state,
     semantic_cluster_alignment_loss,
     semantic_retrieval_alignment_loss,
     semantic_tac_alignment_losses,
 )
-from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
-from hypersphere_dpp.transforms import build_gpu_train_transform
-from hypersphere_dpp.utils import (
+from src.subspace import ClusterFeatureQueue, subspace_regularization_loss
+from src.transforms import build_gpu_train_transform
+from src.utils import (
     ensure_dir,
     finalize_distributed,
     initialize_distributed,
@@ -51,7 +51,7 @@ from hypersphere_dpp.utils import (
 
 def parse_args():
     parser = argparse.ArgumentParser(
-        description="Train the CUB ViT-L/14 hypersphere-DPP prototype."
+        description="Train a hypersphere-DPP model."
     )
     parser.add_argument(
         "--config", required=True, help="Path to the training config YAML."

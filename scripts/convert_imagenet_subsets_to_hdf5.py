@@ -21,7 +21,7 @@ from scripts.imagenet_subset_utils import (
     discover_source_splits,
     load_imagenet_1k_classes,
 )
-from hypersphere_dpp.labels import default_label_config_path
+from src.labels import default_label_config_path
 
 
 def parse_args() -> argparse.Namespace:

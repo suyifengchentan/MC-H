@@ -88,7 +88,7 @@ class_aware_dpp_min_mass: 2.0
 
 # Runtime / output
 eval_interval: 1
-model_path: "save/hypersphere_dpp/ImageNet1K_CLIP_ViTB16_HypersphereDPP_freeze_proto"
+model_path: "results/hypersphere_dpp/ImageNet1K_CLIP_ViTB16_HypersphereDPP_freeze_proto"
 workers: 12
 train_prefetch_factor: 3
 eval_prefetch_factor: 2

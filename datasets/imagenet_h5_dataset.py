@@ -11,7 +11,7 @@ from typing import Sequence
 from PIL import Image
 from torch.utils.data import Dataset
 
-from hypersphere_dpp.hdf5_utils import open_readonly_h5
+from src.hdf5_utils import open_readonly_h5
 
 
 @dataclass(frozen=True)

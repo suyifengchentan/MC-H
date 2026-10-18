@@ -24,11 +24,11 @@ PROJECT_ROOT = Path(__file__).resolve().parents[1]
 if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
-from hypersphere_dpp.config import SUPPORTED_CACHED_TEACHER_DATASETS, load_experiment_config
-from hypersphere_dpp.data import _build_base_datasets, safe_default_collate
-from hypersphere_dpp.model import FrozenCLIPBackbone
-from hypersphere_dpp.transforms import build_gpu_train_transform, build_train_decode_transform
-from hypersphere_dpp.utils import resolve_device, set_seed
+from src.config import SUPPORTED_CACHED_TEACHER_DATASETS, load_experiment_config
+from src.data import _build_base_datasets, safe_default_collate
+from src.model import FrozenCLIPBackbone
+from src.transforms import build_gpu_train_transform, build_train_decode_transform
+from src.utils import resolve_device, set_seed
 from train import resolve_amp_settings
 
 

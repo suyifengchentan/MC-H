@@ -174,7 +174,7 @@ class ExperimentConfig:
     reload: bool = False
     seed: int = 42
     best_checkpoint_patience: int = 15
-    model_path: str = "save/hypersphere_dpp/cub_vitl14"
+    model_path: str = "results/cub_vitl14"
     device: str | None = None
 
     @property

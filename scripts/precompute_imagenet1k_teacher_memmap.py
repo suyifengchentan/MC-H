@@ -19,12 +19,12 @@ if str(PROJECT_ROOT) not in sys.path:
     sys.path.insert(0, str(PROJECT_ROOT))
 
 from datasets.imagenet_h5_dataset import ImageNetH5Dataset
-from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import safe_default_collate
-from hypersphere_dpp.labels import load_label_wnids
-from hypersphere_dpp.model import FrozenCLIPBackbone
-from hypersphere_dpp.transforms import build_gpu_train_transform, build_train_decode_transform
-from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
+from src.config import load_experiment_config
+from src.data import safe_default_collate
+from src.labels import load_label_wnids
+from src.model import FrozenCLIPBackbone
+from src.transforms import build_gpu_train_transform, build_train_decode_transform
+from src.utils import ensure_dir, resolve_device, set_seed
 from train import resolve_amp_settings
 
 

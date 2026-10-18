@@ -1,2 +1,2 @@
-"""Dataset package for hypersphere experiments."""
+"""Dataset readers used by the hypersphere-DPP training framework."""
 

@@ -14,34 +14,34 @@ from torch.nn.parallel import DistributedDataParallel
 from torch.utils.data import DataLoader
 from torch.utils.data.distributed import DistributedSampler
 
-from hypersphere_dpp.checkpoint import save_checkpoint
-from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import (
+from src.checkpoint import save_checkpoint
+from src.config import load_experiment_config
+from src.data import (
     TEACHER_FEATURE_CANDIDATES_KEY,
     build_experiment_dataloaders,
     sample_two_teacher_feature_views,
 )
-from hypersphere_dpp.logging_utils import append_metrics_record, setup_training_logger
-from hypersphere_dpp.losses import (
+from src.logging_utils import append_metrics_record, setup_training_logger
+from src.losses import (
     adaptive_diversity_weight,
     dpp_diversity_loss,
     nt_xent_loss,
     swav_cluster_loss,
 )
-from hypersphere_dpp.metrics import (
+from src.metrics import (
     clustering_selection_score,
     format_clustering_metrics,
 )
-from hypersphere_dpp.model import HypersphereDPPModel
-from hypersphere_dpp.semantic import (
+from src.model import HypersphereDPPModel
+from src.semantic import (
     build_semantic_prototype_state,
     semantic_cluster_alignment_loss,
     semantic_retrieval_alignment_loss,
     semantic_tac_alignment_losses,
 )
-from hypersphere_dpp.subspace import ClusterFeatureQueue, subspace_regularization_loss
-from hypersphere_dpp.transforms import build_gpu_train_transform
-from hypersphere_dpp.utils import ensure_dir, resolve_device, set_seed
+from src.subspace import ClusterFeatureQueue, subspace_regularization_loss
+from src.transforms import build_gpu_train_transform
+from src.utils import ensure_dir, resolve_device, set_seed
 from train import (
     build_optimizer,
     build_lr_scheduler,

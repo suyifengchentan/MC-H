@@ -27,7 +27,7 @@ __pycache__/
 /*/__pycache__
 *.py[cod]
 
-# Training outputs and binary artifacts
+# Training outputs and binary artifacts (results/ is kept via .gitkeep only)
 *.log
 *.jsonl
 *.pt
@@ -52,7 +52,7 @@ __pycache__/
 *.pdf
 
 # Ignore resolved/derived YAML configs in training outputs
-save/**/*.yaml
-save/**/*.yml
+results/**/*.yaml
+results/**/*.yml
 
 /hypersphere-data/
