@@ -48,6 +48,29 @@ A self-contained image representation learning and clustering framework built ar
 
 `results/` only keeps directory placeholders in git. Runtime artifacts such as `train.log`, `metrics.jsonl`, and `*.pt` are not committed.
 
+## Branches
+
+| Branch | Description |
+| --- | --- |
+| `main` | Cleaned, maintained implementation using the `src/` + `datasets/` + `results/` layout. The number of prototypes is fixed to `K = class_num`. |
+| `freek` | Experimental free-K variant. Estimates the number of clusters from the feature spectrum instead of fixing `K`, and uses spectral prototypes, variable-K Sinkhorn assignments, and label-blind cardinality estimation. |
+
+The `freek` branch keeps the earlier repository layout (`hypersphere_dpp/`, `save/`) and its own experimental configs, including the CIFAR-100 capacity sweeps under `config/train/rebuttal/`. Its core switch is the config field:
+
+```yaml
+clustering_mode: spectral_free_k
+```
+
+Related options include `min_spectral_clusters`, `max_spectral_clusters`, `initial_spectral_clusters`, `spectral_assignment_temperature`, `spectral_proto_momentum`, `spectral_cardinality_ema_momentum`, `spectral_eval_refresh_*`, `diversity_weight_mode`, and `subspace_anchor_mode`. The branch also contains experiments for label-blind K estimation, semantic audits, persistent prototype capacity sweeps, and cached distributed free-K training.
+
+To inspect or run the experimental variant:
+
+```bash
+git checkout freek
+```
+
+Use the instructions in the `README.md` on that branch, since its directory layout and output paths differ from `main`.
+
 ## Setup
 
 ```bash
