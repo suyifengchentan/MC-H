@@ -5,12 +5,12 @@ import argparse
 import numpy as np
 import torch
 
-from hypersphere_dpp.checkpoint import load_checkpoint
-from hypersphere_dpp.config import load_experiment_config
-from hypersphere_dpp.data import build_experiment_dataloaders
-from hypersphere_dpp.metrics import evaluate_clustering
-from hypersphere_dpp.model import build_model_from_config
-from hypersphere_dpp.utils import resolve_device, set_seed
+from src.checkpoint import load_checkpoint
+from src.config import load_experiment_config
+from src.data import build_experiment_dataloaders
+from src.metrics import evaluate_clustering
+from src.model import build_model_from_config
+from src.utils import resolve_device, set_seed
 
 
 def parse_args():

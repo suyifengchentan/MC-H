@@ -66,7 +66,7 @@ dpp_jitter: 0.00001
 
 # Runtime / output
 eval_interval: 3
-model_path: "save/hypersphere_dpp/Image100_CLIP_ViTB16_HypersphereDPP_20260328_200155"
+model_path: "results/hypersphere_dpp/Image100_CLIP_ViTB16_HypersphereDPP_20260328_200155"
 workers: 2
 reload: true
 seed: 42

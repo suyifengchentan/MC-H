@@ -66,7 +66,7 @@ dpp_jitter: 0.00001
 
 # Runtime / output
 eval_interval: 3
-model_path: "save/hypersphere_dpp/CIFAR10_CLIP_ViTB16_HypersphereDPP_20260328_234952"
+model_path: "results/hypersphere_dpp/CIFAR10_CLIP_ViTB16_HypersphereDPP_20260328_234952"
 workers: 8
 reload: true
 seed: 42
